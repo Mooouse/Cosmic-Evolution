@@ -1,3 +1,4 @@
+import {ART_SURFACES} from './vehicle-surfaces.js?v=0.2.0';
 /**
  * Vehicle content and replaceable side-profile illustrations.
  * referenceModel is developer-only research metadata, never a display name.
@@ -132,6 +133,9 @@ export const CARS = MODELS.flatMap((models,tier)=>models.map((row,i)=>{
  const [referenceModel,name,body,length,height,wheelbase]=row.split('|');
  return {id:`car-${String(tier*14+i+1).padStart(3,'0')}`, name, referenceModel, kind:'car',tier,body,length:+length,height:+height,wheelbase:+wheelbase,color:PALETTE[(tier*3+i)%PALETTE.length],variant:i,artStatus:'approximate-vector'};
 }));
+// First five illustrations approved by the user on 2026-10-18.
+const APPROVED_CARS = {'Pebble 67':'pebble-67','Kestrel 510':'kestrel-510','Firecrest 77':'firecrest-77','Tempest S':'tempest-s','Orfeo F':'orfeo-f'};
+for(const v of CARS)if(APPROVED_CARS[v.name]){v.image=`assets/approved/${APPROVED_CARS[v.name]}.webp`;v.artStatus='approved-image';v.surfacePoints=ART_SURFACES[APPROVED_CARS[v.name]];}
 const SHIP_NAMES=['Aster','Peregrine','Helix','Odyssey','Lumen','Cassini','Horizon','Vela','Meridian','Pioneer','Solstice','Aurora','Nomad','Equinox','Tethys','Halcyon','Umbra','Kepler','Zenith','Nacre'];
 const SHIP_ROLES=['Scout','Courier','Surveyor','Transport','Explorer'];
 export const SHIPS = Array.from({length:100},(_,i)=>({id:`ship-${String(i+1).padStart(3,'0')}`,name:`${SHIP_NAMES[i%20]} ${SHIP_ROLES[Math.floor(i/20)]}`,kind:'ship',tier:Math.min(8,Math.floor(i*9/100)),color:PALETTE[(i*3+4)%PALETTE.length],variant:i,body:['shuttle','courier','lander','interceptor','freighter'][Math.floor(i/20)],length:600+(i%7)*23,artStatus:'original-vector'}));

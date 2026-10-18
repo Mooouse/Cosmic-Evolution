@@ -1,4 +1,6 @@
-import { CARS, SHIPS } from './vehicles.js';
+import { CARS, SHIPS } from './vehicles.js?v=0.2.0';
+import {inside,surfacePoints,strokeRadius} from './surface.js?v=0.2.0';
+const coverageCache=new WeakMap();
 
 export const SAVE_KEY = 'garage-evolution.save.v1';
 export const OFFLINE_CAP = 8 * 3600;
@@ -62,10 +64,17 @@ export function toolCost(s,task,index=s.active) {return Math.round(GARAGES[index
 export function upgradeTool(s,task,index=s.active) {const g=s.garages[index];if(!g?.owned||!Number.isInteger(task)||task<0||task>4||g.tools[task]>=10)return false;if(!pay(s,toolCost(s,task,index)))return false;g.tools[task]++;return true;}
 export function robotCost(s,index=s.active) {return Math.round(GARAGES[index].reward*5*Math.pow(2.25,s.garages[index].robots));}
 export function buyRobot(s,index=s.active) {const g=s.garages[index];if(!g?.owned||g.robots>=6||!pay(s,robotCost(s,index)))return false;g.robots++;s.stats.robotsBought++;return true;}
+export function crew(g){return g.crew||Array(5).fill(g.robots);}
+export function crewCount(g){return crew(g).reduce((a,b)=>a+b,0);}
+export function specialistCost(s,task,index=s.active){return Math.round(GARAGES[index].reward*1.2*Math.pow(2.25,crew(s.garages[index])[task]));}
+export function buySpecialist(s,task,index=s.active){
+ const g=s.garages[index];if(!g?.owned||!Number.isInteger(task)||task<0||task>4||crew(g)[task]>=6||!pay(s,specialistCost(s,task,index)))return false;
+ g.crew=[...crew(g)];g.crew[task]++;g.robots=Math.max(...g.crew);s.stats.robotsBought++;return true;
+}
 export function robotUpgradeCost(s,index=s.active) {return Math.round(GARAGES[index].reward*8*Math.pow(2,s.garages[index].robotLevel-1));}
 export function upgradeRobots(s,index=s.active) {const g=s.garages[index];if(!g?.owned||!g.robots||g.robotLevel>=10)return false;const price=Math.round(GARAGES[index].reward*8*2**(g.robotLevel-1));if(!pay(s,price))return false;g.robotLevel++;return true;}
 export function robotCycle(s,index) {const g=s.garages[index];const avg=g.tools.reduce((a,b)=>a+b,0)/5;return 240/(1+(g.robotLevel-1)*.2+(avg-1)*.05);}
-export function garageRate(s,index) {const g=s.garages[index];return g.owned?reward(s,index)*g.robots/robotCycle(s,index):0;}
+export function garageRate(s,index) {const g=s.garages[index];return g.owned?reward(s,index)*Math.min(...crew(g))/robotCycle(s,index):0;}
 export function totalRate(s) {return GARAGES.reduce((n,g)=>n+garageRate(s,g.index),0);}
 export function brush(s,type,cell,index=s.active) {
  const g=s.garages[index],j=g?.job,ti=TASKS.indexOf(type);if(!j||ti<0||taskIndex(j)!==ti||!j.cells[type]||!Number.isInteger(cell)||cell<0||cell>=60)return false;
@@ -75,17 +84,76 @@ export function brush(s,type,cell,index=s.active) {
  return true;
 }
 export function bolt(s,id,index=s.active) {const j=s.garages[index]?.job;if(!j||taskIndex(j)!==2||id!==j.bolts.length||id<0||id>=5)return false;j.bolts.push(id);j.progress[2]=j.bolts.length*20;return true;}
-export function engineHit(s,quality,index=s.active) {const g=s.garages[index],j=g?.job;if(!j||taskIndex(j)!==3||!Number.isFinite(quality)||quality<0||quality>1)return false;const tolerance=.1+(g.tools[3]-1)*.012;if(Math.abs(quality-.5)>tolerance)return false;j.engineHits++;j.progress[3]=Math.min(100,j.engineHits*100/3);s.stats.perfectHits++;return true;}
-export function completeJob(s,index=s.active) {
+export function stroke(s,type,x,y,index=s.active){
+ const g=s.garages[index],j=g?.job,ti=TASKS.indexOf(type),space=GARAGES[index]?.world==='space';
+ if(!j||![0,1,4].includes(ti)||taskIndex(j)!==ti||![x,y].every(Number.isFinite)||!inside(x,y,space))return false;
+ j.surface ||= {};const marks=j.surface[type] ||= j.cells[type].map(c=>[Math.round(100+c%12*63.33),166+Math.floor(c/12)*23,32]);
+ const r=strokeRadius(g.tools[ti]);if(marks.some(([a,b,rad])=>(a-x)**2+(b-y)**2<16&&rad>=r)||marks.length>=5000)return false;
+ const points=surfacePoints(space,vehicleById(j.vehicleId).surfacePoints);let covered=coverageCache.get(marks);
+ if(!covered){covered=new Set();points.forEach(([px,py],i)=>{if(marks.some(([a,b,rad])=>(a-px)**2+(b-py)**2<=rad*rad))covered.add(i);});coverageCache.set(marks,covered);}
+ marks.push([Math.round(x),Math.round(y),r]);points.forEach(([px,py],i)=>{if((x-px)**2+(y-py)**2<=r*r)covered.add(i);});const coverage=covered.size/points.length;
+ const before=j.progress[ti];j.progress[ti]=Math.max(before,coverage>=.97?100:coverage*100);
+ if(type==='rust')s.stats.rust+=j.progress[ti]-before;return true;
+}
+export function wheelState(j){return j.wheelRepair||{phase:'loosen',bolts:[],tightened:[]};}
+export function turnBolt(s,id,index=s.active){
+ const j=s.garages[index]?.job;if(!j||taskIndex(j)!==2||!Number.isInteger(id)||id<0||id>4)return false;
+ const w=j.wheelRepair ||= wheelState(j);if(!['loosen','tighten'].includes(w.phase))return false;
+ const bolts=w.phase==='loosen'?w.bolts:w.tightened;if(bolts.includes(id))return false;bolts.push(id);
+ j.progress[2]=Math.max(j.progress[2],w.phase==='loosen'?bolts.length*5:60+bolts.length*8);
+ if(bolts.length===5)w.phase=w.phase==='loosen'?'remove':'done';return true;
+}
+export function movePart(s,move,index=s.active){
+ const j=s.garages[index]?.job;if(!j||taskIndex(j)!==2)return false;const w=j.wheelRepair ||= wheelState(j);
+ if(move==='remove'&&w.phase==='remove'){w.phase='mount';j.progress[2]=Math.max(j.progress[2],40);return true;}
+ if(move==='mount'&&w.phase==='mount'){w.phase='tighten';j.progress[2]=Math.max(j.progress[2],60);return true;}return false;
+}
+export function connectWire(s,from,to,index=s.active){
+ const j=s.garages[index]?.job;if(!j||taskIndex(j)!==3||!Number.isInteger(from)||from<0||from>2||from!==to)return false;
+ const wires=j.wires ||= [];if(wires.includes(from))return false;wires.push(from);return true;
+}
+export function testEngine(s,quality,index=s.active){const j=s.garages[index]?.job;if(!j||j.wires?.length!==3)return false;return engineHit(s,quality,index);}
+export function robotAction(s,index=s.active){
+ const g=s.garages[index],j=g?.job;if(!j)return null;const ti=taskIndex(j);if(ti<0)return {type:'deliver',task:ti,seconds:2};
+ const count=crew(g)[ti];if(!count)return null;let act;
+ if([0,1,4].includes(ti)){
+  const type=TASKS[ti],marks=j.surface?.[type]||j.cells[type].map(c=>[100+c%12*63.33,166+Math.floor(c/12)*23,32]);
+  const points=surfacePoints(GARAGES[index].world==='space',vehicleById(j.vehicleId).surfacePoints);const point=points.find(([x,y])=>!marks.some(([a,b,r])=>(x-a)**2+(y-b)**2<=r*r));
+  if(!point)return null;act={type:'stroke',point,seconds:.72};
+ }else if(ti===2){const w=wheelState(j);if(['loosen','tighten'].includes(w.phase)){const used=w.phase==='loosen'?w.bolts:w.tightened;act={type:'bolt',id:[0,1,2,3,4].find(i=>!used.includes(i)),phase:w.phase,seconds:3.4};}else act={type:'part',move:w.phase,seconds:7};
+ }else{const wires=j.wires||[];act=wires.length<3?{type:'wire',id:[0,1,2].find(i=>!wires.includes(i)),seconds:8}:{type:'engine',hit:j.engineHits,seconds:8};}
+ return {...act,task:ti,seconds:act.seconds/(count*(1+(g.robotLevel-1)*.2))};
+}
+export function performRobotAction(s,act,index=s.active){
+ const j=s.garages[index]?.job;if(!j||taskIndex(j)!==act.task||!crew(s.garages[index])[act.task])return false;
+ if(act.type==='stroke')return stroke(s,TASKS[act.task],...act.point,index);
+ if(act.type==='bolt'&&wheelState(j).phase===act.phase)return turnBolt(s,act.id,index);
+ if(act.type==='part')return movePart(s,act.move,index);
+ if(act.type==='wire')return connectWire(s,act.id,act.id,index);
+ if(act.type==='engine'&&j.engineHits===act.hit)return testEngine(s,.5,index);return false;
+}
+export function engineHit(s,quality,index=s.active) {const g=s.garages[index],j=g?.job;if(!j||taskIndex(j)!==3||!Number.isFinite(quality)||quality<0||quality>1)return false;const tolerance=.1+(g.tools[3]-1)*.012;if(Math.abs(quality-.5)>tolerance)return false;j.engineHits++;j.progress[3]=Math.max(j.progress[3],Math.min(100,j.engineHits*100/3));s.stats.perfectHits++;return true;}
+export function completeJob(s,index=s.active,{automatic=false,source=automatic?'auto':'manual'}={}) {
  const g=s.garages[index],j=g?.job;if(!j||taskIndex(j)!==-1)return null;
- const amount=reward(s,index);addMoney(s,amount);g.earnings+=amount;g.completed++;s.stats.manual++;s.stats.restored++;
+ const amount=reward(s,index);addMoney(s,amount,source);g.earnings+=amount;g.completed++;if(!automatic)s.stats.manual++;s.stats.restored++;
  if(j.required[0])s.stats.washed++;if(j.required[2])s.stats.wheels++;if(j.required[3])s.stats.engines++;if(j.required[4])s.stats.painted++;if(GARAGES[index].world==='space')s.stats.ships++;
  s.collection[j.vehicleId].repaired++;s.receipt={id:j.id,vehicleId:j.vehicleId,amount,garage:index,doubled:false};g.job=null;return s.receipt;
 }
-export function tick(s,seconds,{offline=false}={}) {
+function backgroundWork(s,index,seconds,offline){
+ const g=s.garages[index];let income=0;const receipt=s.receipt;
+ while(seconds>1e-6){const j=createJob(s,index),ti=taskIndex(j);if(ti<0){const r=completeJob(s,index,{automatic:!j.helped,source:offline?'offline':'auto'});income+=r.amount;g.autoSerial++;continue;}
+  const n=crew(g)[ti];if(!n)break;const stageSeconds=robotCycle(s,index)/5/n,remaining=(100-j.progress[ti])/100*stageSeconds,used=Math.min(seconds,remaining),before=j.progress[ti];
+  const target=remaining-used<1e-6?100:Math.min(100,before+used/stageSeconds*100);
+  if([0,1,4].includes(ti)&&target<100){let attempts=0;while(j.progress[ti]<target&&attempts++<160){const act=robotAction(s,index);if(!act||!performRobotAction(s,act,index))break;}}
+  else{j.progress[ti]=target;if(ti===1)s.stats.rust+=j.progress[ti]-before;}
+  seconds-=used;if(taskIndex(j)===-1){const r=completeJob(s,index,{automatic:!j.helped,source:offline?'offline':'auto'});income+=r.amount;g.autoSerial++;}
+ }
+ createJob(s,index);s.receipt=receipt;return income;
+}
+export function tick(s,seconds,{offline=false,workingGarage=null}={}) {
  if(!Number.isFinite(seconds)||seconds<=0)return 0;seconds=Math.min(seconds,offline?OFFLINE_CAP:60);let income=0;
  if(!offline)s.stats.playSeconds+=seconds;
- s.garages.forEach((g,index)=>{if(!g.owned||g.robots===0)return;g.autoProgress+=seconds*g.robots/robotCycle(s,index);const count=Math.floor(g.autoProgress);if(count<1)return;g.autoProgress-=count;g.completed+=count;const earned=count*reward(s,index);g.earnings+=earned;income+=earned;addMoney(s,earned,offline?'offline':'auto');s.stats.restored+=count;s.stats.washed+=count;s.stats.rust+=count*100;s.stats.wheels+=count;s.stats.engines+=count;s.stats.painted+=count;if(GARAGES[index].world==='space')s.stats.ships+=count;
+ s.garages.forEach((g,index)=>{if(!g.owned||g.robots===0||!offline&&index===workingGarage)return;if(g.crew){income+=backgroundWork(s,index,seconds,offline);return;}g.autoProgress+=seconds*g.robots/robotCycle(s,index);const count=Math.floor(g.autoProgress);if(count<1)return;g.autoProgress-=count;g.completed+=count;const earned=count*reward(s,index);g.earnings+=earned;income+=earned;addMoney(s,earned,offline?'offline':'auto');s.stats.restored+=count;s.stats.washed+=count;s.stats.rust+=count*100;s.stats.wheels+=count;s.stats.engines+=count;s.stats.painted+=count;if(GARAGES[index].world==='space')s.stats.ships+=count;
  const vehicles=pool(index);const whole=Math.floor(count/vehicles.length),extra=count%vehicles.length;
  vehicles.forEach((v,i)=>{const distance=(i-g.autoSerial%vehicles.length+vehicles.length)%vehicles.length;const n=whole+(distance<extra?1:0);if(n){const c=s.collection[v.id]||(s.collection[v.id]={seen:0,repaired:0});c.seen+=n;c.repaired+=n;}});g.autoSerial+=count;});return income;
 }
@@ -113,7 +181,12 @@ export function restore(raw,now=Date.now()) {
    if(!Array.isArray(g.tools)||g.tools.length!==5||g.tools.some(n=>!Number.isInteger(n)||n<1||n>10)||!Number.isInteger(g.robots)||g.robots<0||g.robots>6||!Number.isInteger(g.robotLevel)||g.robotLevel<1||g.robotLevel>10)throw Error('Invalid upgrades');
    for(const k of ['autoProgress','autoSerial','completed','earnings'])if(!Number.isFinite(g[k])||g[k]<0)throw Error('Invalid garage state');
    if(g.owned&&i>0&&!s.garages[i-1].owned)throw Error('Invalid progression');
-   if(g.job){const j=g.job;if(!pool(i).some(v=>v.id===j.vehicleId)||!Array.isArray(j.progress)||j.progress.length!==5||j.progress.some(p=>!Number.isFinite(p)||p<0||p>100)||!Array.isArray(j.required)||j.required.length!==5||!j.cells||!Array.isArray(j.bolts))throw Error('Invalid job');for(const k of ['wash','rust','paint'])if(!Array.isArray(j.cells[k])||j.cells[k].some(c=>!Number.isInteger(c)||c<0||c>=60))throw Error('Invalid cells');}
+   if(g.crew&&(!Array.isArray(g.crew)||g.crew.length!==5||g.crew.some(n=>!Number.isInteger(n)||n<0||n>6)||g.robots!==Math.max(...g.crew)))throw Error('Invalid crew');
+   if(g.job){const j=g.job;if(!pool(i).some(v=>v.id===j.vehicleId)||!Array.isArray(j.progress)||j.progress.length!==5||j.progress.some(p=>!Number.isFinite(p)||p<0||p>100)||!Array.isArray(j.required)||j.required.length!==5||!j.cells||!Array.isArray(j.bolts))throw Error('Invalid job');for(const k of ['wash','rust','paint'])if(!Array.isArray(j.cells[k])||j.cells[k].some(c=>!Number.isInteger(c)||c<0||c>=60))throw Error('Invalid cells');
+    if(j.surface){if(typeof j.surface!=='object'||Array.isArray(j.surface))throw Error('Invalid coating');for(const [type,marks] of Object.entries(j.surface))if(!['wash','rust','paint'].includes(type)||!Array.isArray(marks)||marks.length>5000||marks.some(m=>!Array.isArray(m)||m.length!==3||m.some(v=>!Number.isFinite(v))||m[0]<0||m[0]>900||m[1]<0||m[1]>360||m[2]<1||m[2]>80))throw Error('Invalid coating');}
+    if(j.wheelRepair){const w=j.wheelRepair;if(!['loosen','remove','mount','tighten','done'].includes(w.phase)||[w.bolts,w.tightened].some(a=>!Array.isArray(a)||new Set(a).size!==a.length||a.some(n=>!Number.isInteger(n)||n<0||n>4)))throw Error('Invalid repair');}
+    if(j.wires&&(!Array.isArray(j.wires)||new Set(j.wires).size!==j.wires.length||j.wires.some(n=>!Number.isInteger(n)||n<0||n>2)))throw Error('Invalid wiring');
+   }
  }
  for(const [id,c] of Object.entries(s.collection))if(!vehicleById(id)||!Number.isFinite(c.seen)||!Number.isFinite(c.repaired)||c.seen<0||c.repaired<0)throw Error('Invalid collection');
  if(s.receipt&&(!vehicleById(s.receipt.vehicleId)||!Number.isFinite(s.receipt.amount)||s.receipt.amount<0||!Number.isInteger(s.receipt.garage)||!s.garages[s.receipt.garage]?.owned))throw Error('Invalid receipt');

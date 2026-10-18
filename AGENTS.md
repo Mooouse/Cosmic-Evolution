@@ -12,3 +12,7 @@
 - Do not reward failed, cancelled or duplicate ads. Keep gameplay and input paused throughout ad requests/playback; mute only when ads start. Respect CrazyGames muteAudio and disabled SDK environments.
 - CrazyGames uses SDK.data as the authoritative store; never silently replace a failed cloud read with a local save.
 - Target GitHub repository and GitHub Pages, plus a CrazyGames upload package. Avoid adding unrelated hosting services.
+
+- Keep the garage as the main screen area. Arrivals and departures are animated; repair input is disabled while a vehicle moves.
+- Five robot professions work on the SAME job and parts as the player. Never add a simultaneous passive payout for the visible cooperative job. Background garages retain separate crews.
+- Cleaning and painting use continuous surface marks; never reintroduce visible grids or cell-clicking.
