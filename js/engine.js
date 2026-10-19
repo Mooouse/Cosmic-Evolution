@@ -1,5 +1,5 @@
-import { CARS, SHIPS } from './vehicles.js?v=0.2.0';
-import {inside,surfacePoints,strokeRadius} from './surface.js?v=0.2.0';
+import { CARS, SHIPS } from './vehicles.js?v=0.2.2';
+import {inside,surfacePoints,strokeRadius} from './surface.js?v=0.2.2';
 const coverageCache=new WeakMap();
 
 export const SAVE_KEY = 'garage-evolution.save.v1';
@@ -113,16 +113,23 @@ export function connectWire(s,from,to,index=s.active){
  const wires=j.wires ||= [];if(wires.includes(from))return false;wires.push(from);return true;
 }
 export function testEngine(s,quality,index=s.active){const j=s.garages[index]?.job;if(!j||j.wires?.length!==3)return false;return engineHit(s,quality,index);}
-export function robotAction(s,index=s.active){
+export function robotAction(s,index=s.active,{reserved=[],individual=false}={}){
  const g=s.garages[index],j=g?.job;if(!j)return null;const ti=taskIndex(j);if(ti<0)return {type:'deliver',task:ti,seconds:2};
  const count=crew(g)[ti];if(!count)return null;let act;
  if([0,1,4].includes(ti)){
   const type=TASKS[ti],marks=j.surface?.[type]||j.cells[type].map(c=>[100+c%12*63.33,166+Math.floor(c/12)*23,32]);
-  const points=surfacePoints(GARAGES[index].world==='space',vehicleById(j.vehicleId).surfacePoints);const point=points.find(([x,y])=>!marks.some(([a,b,r])=>(x-a)**2+(y-b)**2<=r*r));
+  const radius=strokeRadius(g.tools[ti]);
+  const points=surfacePoints(GARAGES[index].world==='space',vehicleById(j.vehicleId).surfacePoints);
+  const point=points.find(([x,y])=>!marks.some(([a,b,r])=>(x-a)**2+(y-b)**2<=r*r)&&!reserved.some(a=>a.type==='stroke'&&(x-a.point[0])**2+(y-a.point[1])**2<(radius*2)**2));
   if(!point)return null;act={type:'stroke',point,seconds:.72};
- }else if(ti===2){const w=wheelState(j);if(['loosen','tighten'].includes(w.phase)){const used=w.phase==='loosen'?w.bolts:w.tightened;act={type:'bolt',id:[0,1,2,3,4].find(i=>!used.includes(i)),phase:w.phase,seconds:3.4};}else act={type:'part',move:w.phase,seconds:7};
- }else{const wires=j.wires||[];act=wires.length<3?{type:'wire',id:[0,1,2].find(i=>!wires.includes(i)),seconds:8}:{type:'engine',hit:j.engineHits,seconds:8};}
- return {...act,task:ti,seconds:act.seconds/(count*(1+(g.robotLevel-1)*.2))};
+ }else if(ti===2){const w=wheelState(j);if(['loosen','tighten'].includes(w.phase)){
+  const used=w.phase==='loosen'?w.bolts:w.tightened,id=[0,1,2,3,4].find(i=>!used.includes(i)&&!reserved.some(a=>a.type==='bolt'&&a.id===i&&a.phase===w.phase));
+  if(id===undefined)return null;act={type:'bolt',id,phase:w.phase,seconds:3.4};
+ }else{if(reserved.some(a=>a.type==='part'))return null;act={type:'part',move:w.phase,seconds:7};}
+ }else{const wires=j.wires||[];if(wires.length<3){
+  const id=[0,1,2].find(i=>!wires.includes(i)&&!reserved.some(a=>a.type==='wire'&&a.id===i));if(id===undefined)return null;act={type:'wire',id,seconds:8};
+ }else{if(reserved.some(a=>a.type==='engine'))return null;act={type:'engine',hit:j.engineHits,seconds:8};}}
+ return {...act,task:ti,seconds:act.seconds/((individual?1:count)*(1+(g.robotLevel-1)*.2))};
 }
 export function performRobotAction(s,act,index=s.active){
  const j=s.garages[index]?.job;if(!j||taskIndex(j)!==act.task||!crew(s.garages[index])[act.task])return false;

@@ -1,4 +1,4 @@
-import {ART_SURFACES} from './vehicle-surfaces.js?v=0.2.0';
+import {ART_SURFACES} from './vehicle-surfaces.js?v=0.2.2';
 /**
  * Vehicle content and replaceable side-profile illustrations.
  * referenceModel is developer-only research metadata, never a display name.
