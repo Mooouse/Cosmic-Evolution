@@ -1,5 +1,5 @@
-import { CARS, SHIPS } from './vehicles.js?v=0.2.2';
-import {inside,surfacePoints,strokeRadius} from './surface.js?v=0.2.2';
+import { CARS, SHIPS } from './vehicles.js?v=0.2.3';
+import {inside,surfacePoints,strokeRadius} from './surface.js?v=0.2.3';
 const coverageCache=new WeakMap();
 
 export const SAVE_KEY = 'garage-evolution.save.v1';

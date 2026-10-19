@@ -1,10 +1,10 @@
 {
   "name": "idle-garage-evolution",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check js/app.js && node --check js/engine.js && node --check js/vehicles.js && node --check js/surface.js && node --check js/repairs.js && node --check js/robots.js && node --check js/audio.js && node --check js/robot-team.js"
+    "check": "node --check js/app.js && node --check js/engine.js && node --check js/vehicles.js && node --check js/surface.js && node --check js/repairs.js && node --check js/robots.js && node --check js/audio.js && node --check js/robot-team.js && node --check js/workshop-layout.js && node --check js/vehicle-motion.js"
   }
 }

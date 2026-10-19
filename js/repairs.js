@@ -1,6 +1,6 @@
-import {t} from './i18n.js?v=0.2.2';
-import {icon} from './icons.js?v=0.2.2';
-import {taskIndex,wheelState} from './engine.js?v=0.2.2';
+import {t} from './i18n.js?v=0.2.3';
+import {icon} from './icons.js?v=0.2.3';
+import {taskIndex,wheelState} from './engine.js?v=0.2.3';
 const positions=[[50,42],[53.8,60],[44,49],[56,49],[46.2,60]];
 export function repairHint(j,space){
  if(taskIndex(j)===2){const phase=wheelState(j).phase;return t((space?'module':'wheel')+phase);}

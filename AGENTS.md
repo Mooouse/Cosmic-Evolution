@@ -16,3 +16,6 @@
 - Keep the garage as the main screen area. Arrivals and departures are animated; repair input is disabled while a vehicle moves.
 - Five robot professions work on the SAME job and parts as the player. Never add a simultaneous passive payout for the visible cooperative job. Background garages retain separate crews.
 - Cleaning and painting use continuous surface marks; never reintroduce visible grids or cell-clicking.
+
+- Anchor car tyre contact points to the shared floor line, accounting for transparent image padding. Keep coating and hit testing in the same artwork frame.
+- Robot arms have two rigid links. Move their bases along the floor to reach targets; work only while stopped with the tool at its target. Vehicle wheels rotate with travel distance, with entry on the left and exit through a visible right-hand door.

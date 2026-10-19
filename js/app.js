@@ -1,15 +1,17 @@
-import * as E from './engine.js?v=0.2.2';
-import {bodyPath,strokeRadius} from './surface.js?v=0.2.2';
-import {repairMarkup,repairHint} from './repairs.js?v=0.2.2';
-import {robotSVG,ROBOT_COLORS,crewLayout,rigMarkup,setRigPose} from './robots.js?v=0.2.2';
-import {CARS,SHIPS,vehicleSVG} from './vehicles.js?v=0.2.2';
-import {t,setLanguage,garageName,garageDescription,fmt,duration,LANGUAGES} from './i18n.js?v=0.2.2';
-import {icon} from './icons.js?v=0.2.2';
-import {GarageAudio} from './audio.js?v=0.2.2';
-import {adsAvailable,showRewarded} from './ads.js?v=0.2.2';
-import {initPlatform} from './platform.js?v=0.2.2';
-import {RobotTeam} from './robot-team.js?v=0.2.2';
-const robotTeam=new RobotTeam(),robotPoses=new Map();let lastRobotDraw=-Infinity;
+import * as E from './engine.js?v=0.2.3';
+import {bodyPath,strokeRadius} from './surface.js?v=0.2.3';
+import {repairMarkup,repairHint} from './repairs.js?v=0.2.3';
+import {robotSVG,ROBOT_COLORS,crewLayout,rigMarkup,setRigPose,armGeometry,foldedTarget,drivePosition,moveBase} from './robots.js?v=0.2.3';
+import {CARS,SHIPS,vehicleSVG} from './vehicles.js?v=0.2.3';
+import {t,setLanguage,garageName,garageDescription,fmt,duration,LANGUAGES} from './i18n.js?v=0.2.3';
+import {icon} from './icons.js?v=0.2.3';
+import {GarageAudio} from './audio.js?v=0.2.3';
+import {adsAvailable,showRewarded} from './ads.js?v=0.2.3';
+import {initPlatform} from './platform.js?v=0.2.3';
+import {RobotTeam} from './robot-team.js?v=0.2.3';
+import {imageWheelMarkup,motionFrame,wheelAngle} from './vehicle-motion.js?v=0.2.3';
+import {vehiclePlacement} from './workshop-layout.js?v=0.2.3';
+const robotTeam=new RobotTeam(),robotPoses=new Map(),robotReady=new Map();let vehicleMotion=null;let lastRobotDraw=-Infinity;
 const platform=await initPlatform();
 window.GarageAds={isAvailable:()=>platform.canReward,showRewarded:()=>platform.requestRewarded()};
 
@@ -34,16 +36,16 @@ function progress(value,cls=''){return `<div class="progress ${cls}"><i style="w
 function pageHeading(eyebrow,title,desc,action=''){return `<header class="page-heading"><div><span class="eyebrow">${eyebrow}</span><h1>${title}</h1><p>${desc}</p></div>${action}</header>`;}
 function save(show=false){try{if(saveBlocked)throw Error('Original save is protected');platform.write(E.SAVE_KEY,E.serialize(state));if(show)toast(t('saved'),'check');return true;}catch{if(!saveFailed||show)toast(t('saveError'),'help');saveFailed=true;return false;}}
 function toast(message,i='check'){const node=document.createElement('div');node.className='toast';node.innerHTML=`${icon(i)}<span>${escape(message)}</span>`;$('#toasts').appendChild(node);setTimeout(()=>node.remove(),4200);}
-function getArt(v,uid,color){return v.image?`<img class="vehicle-png" src="./${escape(v.image)}" alt="${escape(v.name)}" draggable="false">`:vehicleSVG(v,{uid,color});}
+function getArt(v,uid,color){return v.image?`<img class="vehicle-png" src="./${escape(v.image)}" alt="${escape(v.name)}" draggable="false">${uid==='workshop'?imageWheelMarkup(v,uid):''}`:vehicleSVG(v,{uid,color});}
 function render(){
  document.documentElement.lang=state.settings.language;document.body.classList.toggle('reduced-motion',state.settings.reducedMotion);
  document.body.dataset.page=page;
  $('#app').innerHTML=`<div class="app-shell"><div class="app-main"><header class="topbar"><button class="simple-brand" data-action="nav" data-page="menu"><span class="brand-mark">G↗</span><span>GARAGE<small>EVOLUTION</small></span></button><nav class="main-nav" aria-label="${t('menu')}">${[['workshop','wrench'],['map','map'],['upgrades','plus'],['menu','home']].map(([id,i])=>`<button class="${page===id?'selected':''}" data-action="nav" data-page="${id}">${icon(i)}<span>${t(id)}</span></button>`).join('')}</nav><div class="top-values"><div class="income-chip"><small>${t('income')}</small><strong id="top-income">${fmt(E.totalRate(state)*60)} ${t('perMin')}</strong></div><div class="wallet">${icon('coin')}<strong id="top-money">${fmt(state.money)}</strong></div></div></header><main id="content" class="content ${page==='menu'?'menu-content':''}">${renderPage()}</main></div></div>`;
- robotTeam.reset();robotPoses.clear();lastRobotDraw=-Infinity;renderModal();if(page==='workshop'){updateWorkshop();beginArrival();}
+ robotTeam.reset();robotPoses.clear();robotReady.clear();lastRobotDraw=-Infinity;renderModal();if(page==='workshop'){updateWorkshop();positionWorkshop();beginArrival();}
 }
 function renderPage(){return ({menu:renderMenu,workshop:renderWorkshop,map:renderMap,collection:renderCollection,achievements:renderAchievements,statistics:renderStats,evolution:renderEvolution,settings:renderSettings,upgrades:renderUpgradePage}[page]||renderWorkshop)();}
 function renderMenu(){const v=E.vehicleById(state.garages[state.active].job?.vehicleId)||CARS[0];return `<section class="menu-hero"><div class="hero-copy"><span class="eyebrow">${t('menuTagline')}</span><h1>GARAGE<br><em>EVOLUTION</em></h1><p>${t('tagline')}</p><div class="hero-actions">${btn(`${icon('play')}${t(state.stats.manual?'continue':'start')}`,'start')}</div></div><div class="hero-car">${getArt(v,'hero',v.color)}</div></section><section class="menu-links">${[['map','map'],['collection','car'],['achievements','trophy'],['statistics','chart'],['evolution','evolution'],['settings','settings']].map(([p,i])=>`<button class="menu-card" data-action="nav" data-page="${p}"><span class="square-icon">${icon(i)}</span><h3>${t(p)} ${icon('arrow')}</h3></button>`).join('')}<button class="menu-card daily-card" data-action="daily"><span class="square-icon">${icon('gift')}</span><h3>${t('daily')} ${E.dailyInfo(state).available?'<i class="notification-dot"></i>':icon('check')}</h3></button></section>`;}
-function garageScene(v,job){const g=E.GARAGES[state.active];return `<div class="garage-scene ${g.id} tier-${g.tier} ${g.world==='space'?'space-scene':''} ${[2,3].includes(E.taskIndex(job))?'repairing':''}" style="--garage-accent:${g.color}"><div class="scene-wall"><div class="scene-window"><div class="window-landscape"></div></div><div class="roller-door"></div><div class="wall-tools"><i></i><i></i><i></i><i></i></div><div class="lamp lamp-one"></div><div class="lamp lamp-two"></div></div><div class="entry-gate"><i></i></div><div class="location-props"><i></i><i></i><i></i></div><div class="location-sign">${escape(garageName(g.id))}</div><div class="scene-info"><span class="live-badge"><i></i>${t('service')}</span><span class="bay">BAY ${String(state.active+1).padStart(2,'0')}</span></div><div class="scene-bench"><div></div><i></i><i></i></div><div class="scene-floor"></div><div class="lift"><i></i><i></i></div><div id="vehicle-area" class="vehicle-area" tabindex="0" aria-label="${t('keyboardHint')}"><div id="vehicle-art">${getArt(v,'workshop',v.color)}</div><svg id="work-overlay" viewBox="0 0 900 360" aria-hidden="true"></svg><div id="brush-cursor" class="brush-cursor">${icon(taskIcons[E.taskIndex(job)]||'spark')}</div></div><div id="repair-stage">${repairMarkup(job,g.world==='space')}</div><div class="scene-meta"><div><span>${String((CARS.includes(v)?CARS:SHIPS).indexOf(v)+1).padStart(3,'0')} / ${CARS.includes(v)?CARS.length:SHIPS.length}</span><h2>${escape(v.name)}</h2></div><div class="condition"><span>${t('condition')}</span><b id="condition-label">${t('neglected')}</b></div></div><svg id="robot-rig" class="robot-rig" aria-hidden="true"></svg><div id="robot-status" class="robot-status"></div></div>`;}
+function garageScene(v,job){const g=E.GARAGES[state.active];return `<div class="garage-scene ${g.id} tier-${g.tier} ${g.world==='space'?'space-scene':''} ${[2,3].includes(E.taskIndex(job))?'repairing':''}" style="--garage-accent:${g.color}"><div class="scene-wall"><div class="scene-window"><div class="window-landscape"></div></div><div class="roller-door"></div><div class="wall-tools"><i></i><i></i><i></i><i></i></div><div class="lamp lamp-one"></div><div class="lamp lamp-two"></div></div><div class="entry-gate"><i></i><b>‹</b></div><div class="exit-gate"><i></i><b>›</b></div><div class="location-props"><i></i><i></i><i></i></div><div class="location-sign">${escape(garageName(g.id))}</div><div class="scene-info"><span class="live-badge"><i></i>${t('service')}</span><span class="bay">BAY ${String(state.active+1).padStart(2,'0')}</span></div><div class="scene-bench"><div></div><i></i><i></i></div><div class="scene-floor"></div><div class="lift"><i></i><i></i></div><div id="vehicle-area" class="vehicle-area" tabindex="0" aria-label="${t('keyboardHint')}"><div id="vehicle-art">${getArt(v,'workshop',v.color)}</div><svg id="work-overlay" viewBox="0 0 900 360" aria-hidden="true"></svg><div id="brush-cursor" class="brush-cursor">${icon(taskIcons[E.taskIndex(job)]||'spark')}</div></div><div id="repair-stage">${repairMarkup(job,g.world==='space')}</div><div class="scene-meta"><div><span>${String((CARS.includes(v)?CARS:SHIPS).indexOf(v)+1).padStart(3,'0')} / ${CARS.includes(v)?CARS.length:SHIPS.length}</span><h2>${escape(v.name)}</h2></div><div class="condition"><span>${t('condition')}</span><b id="condition-label">${t('neglected')}</b></div></div><svg id="robot-parked" class="robot-parked" aria-hidden="true"></svg><svg id="robot-rig" class="robot-rig" aria-hidden="true"></svg><div id="robot-status" class="robot-status"></div></div>`;}
 function renderWorkshop(){
  const g=E.GARAGES[state.active],gs=state.garages[state.active];let j=gs.job;if(!j)j=E.createJob(state);const v=E.vehicleById(j.vehicleId),ti=E.taskIndex(j);
  return `<header class="workshop-heading"><div><span class="eyebrow">${t(g.world)}</span><h1>${garageName(g.id)}</h1></div>${btn(`${icon('help')}${t('help')}`,'help','secondary')}</header><div class="work-layout"><section class="work-column">${garageScene(v,j)}<div class="task-strip" aria-label="${t('activeTask')}">${E.TASKS.map((task,i)=>`<button class="task-card ${ti===i?'active':''} ${j.progress[i]>=100?'done':''} ${!j.required[i]?'not-needed':''}" data-action="task" data-task="${i}" aria-label="${taskName(i)}">${icon(taskIcons[i])}<strong>${taskName(i)}</strong><small id="task-status-${i}">${!j.required[i]?t('notNeeded'):j.progress[i]>=100?t('complete'):ti===i?`${Math.floor(j.progress[i])}%`:t('queued')}</small>${progress(j.progress[i])}</button>`).join('')}</div><section class="task-workspace" id="task-workspace">${renderInteraction()}</section><div class="order-summary"><div><span class="eyebrow">${t('reward')}</span><strong class="reward-value">${cash(E.reward(state))}</strong></div><div class="order-progress"><span><b id="overall-percent">${Math.floor(E.jobProgress(j))}%</b> ${t('complete').toLowerCase()}</span>${progress(E.jobProgress(j))}</div>${btn(`${t('finish')}${icon('arrow')}`,'deliver','primary',ti===-1?'':'disabled')}</div><details class="controls-help"><summary>${t('keyboardControls')}</summary><p>${t('keyboardHint')}</p></details></section></div>`;
@@ -94,7 +96,7 @@ function renderModal(){platform.setGameplay(page==='workshop'&&!modal&&!adBusy);
  root.querySelector('.modal-close')?.focus();
 }
 function updateBalances(){const money=$('#top-money');if(money)money.textContent=fmt(state.money);const inc=$('#top-income');if(inc)inc.innerHTML=`${fmt(E.totalRate(state)*60)} <span>${t('perMin')}</span>`;if(page==='workshop'||page==='upgrades'){const g=state.garages[state.active];const p=$('.robot-progress .progress i');if(p)p.style.width=g.autoProgress*100+'%';} }
-function changePage(p){clearTimeout(arrivalTimer);vehicleMoving=false;robotTeam.reset();brushDown=false;lastBrushPoint=null;drag=null;pickedWire=null;page=p;modal=null;if(p==='map'){world=E.GARAGES[state.active].world;selectedGarage=state.active;}render();window.scrollTo({top:0,behavior:'instant'});}
+function changePage(p){clearTimeout(arrivalTimer);vehicleMoving=false;vehicleMotion=null;robotTeam.reset();brushDown=false;lastBrushPoint=null;drag=null;pickedWire=null;page=p;modal=null;if(p==='map'){world=E.GARAGES[state.active].world;selectedGarage=state.active;}render();window.scrollTo({top:0,behavior:'instant'});}
 async function action(button){if(adBusy||vehicleMoving&&!['nav','settings','help','close-modal','start'].includes(button.dataset.action))return;audio.start();const name=button.dataset.action;if(name!=='calibrate')audio.click();
  switch(name){
  case 'nav': changePage(button.dataset.page);break;
@@ -166,13 +168,26 @@ document.addEventListener('keydown',e=>{
  if(e.code==='Space'&&document.activeElement?.tagName!=='BUTTON'){e.preventDefault();audio.start();if([0,1,4].includes(ti))brushCell(keyCell);else if(ti===3){const button=document.querySelector('[data-action="calibrate"]');if(button)action(button);}}
  if(ti===2&&/^[1-5]$/.test(e.key)){const b=$(`[data-bolt="${+e.key-1}"]`);if(b&&!b.disabled&&!(b.dataset.drag&&e.detail>0&&b.dataset.drag!=='wire'))action(b);}
 });
+function startVehicleMotion(kind){
+ const area=$('#vehicle-area'),scene=$('.garage-scene');
+ vehicleMoving=true;robotTeam.reset();vehicleMotion={kind,start:performance.now(),duration:state.settings.reducedMotion?0:1600,gateMs:state.settings.reducedMotion?0:380};
+ scene.classList.add(kind==='in'?'entry-open':'exit-open');area.classList.add(kind==='in'?'driving-in':'driving-out');
+ updateVehicleMotion(vehicleMotion.start);
+}
+function updateVehicleMotion(now){
+ if(!vehicleMotion)return;const area=$('#vehicle-area'),scene=$('.garage-scene');if(!area||!scene)return;
+ const width=scene.getBoundingClientRect().width||900,artWidth=parseFloat(area.style.width)||800;
+ const m=vehicleMotion,frame=motionFrame(m.kind,now-m.start,width,artWidth,{gateMs:m.gateMs,duration:m.duration||1});
+ area.style.translate=`${frame.offset}px 0`;
+ for(const wheel of area.querySelectorAll('.road-wheel'))wheel.setAttribute('transform',`rotate(${wheelAngle(frame.distance,artWidth,+wheel.dataset.wheelRadius)})`);
+}
 function beginArrival(){
- const j=state.garages[state.active].job;if(j.arrived||vehicleMoving)return;j.arrived=true;vehicleMoving=true;const area=$('#vehicle-area'),scene=$('.garage-scene');area.classList.add('driving-in');scene.classList.add('gate-open');
- arrivalTimer=setTimeout(()=>{area.classList.remove('driving-in');scene.classList.remove('gate-open');vehicleMoving=false;},state.settings.reducedMotion?0:1300);
+ const j=state.garages[state.active].job;if(j.arrived||vehicleMoving)return;j.arrived=true;startVehicleMotion('in');
+ arrivalTimer=setTimeout(()=>{const area=$('#vehicle-area');area?.classList.remove('driving-in');if(area)area.style.translate='0px 0';$('.garage-scene')?.classList.remove('entry-open');vehicleMotion=null;vehicleMoving=false;},state.settings.reducedMotion?0:1980);
 }
 function depart(automatic){
- const j=state.garages[state.active].job,index=state.active;if(!j||E.taskIndex(j)!==-1||vehicleMoving)return;vehicleMoving=true;robotTeam.reset();$('#vehicle-area')?.classList.add('driving-out');$('.garage-scene')?.classList.add('gate-open');
- arrivalTimer=setTimeout(()=>{vehicleMoving=false;if(state.active!==index||state.garages[index].job!==j)return;const r=E.completeJob(state,index,{automatic:automatic&&!j.helped});if(!r)return;audio.success();save();if(automatic){state.receipt=null;E.createJob(state);render();toast(`${t('robotDelivered')} +${fmt(r.amount)}`,'coin');}else{updateWorkshopAfterDelivery();openModal('receipt');}},state.settings.reducedMotion?0:900);
+ const j=state.garages[state.active].job,index=state.active;if(!j||E.taskIndex(j)!==-1||vehicleMoving)return;startVehicleMotion('out');
+ arrivalTimer=setTimeout(()=>{vehicleMoving=false;vehicleMotion=null;$('.garage-scene')?.classList.remove('exit-open');if(state.active!==index||state.garages[index].job!==j)return;const r=E.completeJob(state,index,{automatic:automatic&&!j.helped});if(!r)return;audio.success();save();if(automatic){state.receipt=null;E.createJob(state);render();toast(`${t('robotDelivered')} +${fmt(r.amount)}`,'coin');}else{updateWorkshopAfterDelivery();openModal('receipt');}},state.settings.reducedMotion?0:1980);
 }
 function robotTarget(act,bounds){
  let x=bounds.width*.6,y=bounds.height*.45,target=null;
@@ -184,40 +199,55 @@ function robotTarget(act,bounds){
  if(target){const r=target.getBoundingClientRect();x=r.left-bounds.left+r.width/2;y=r.top-bounds.top+r.height/2;target.classList.add('robot-target');}
  return {x,y};
 }
+function positionWorkshop(){
+ const scene=$('.garage-scene'),area=$('#vehicle-area');if(!scene||!area)return;
+ const r=scene.getBoundingClientRect(),width=r.width||900,height=r.height||600;
+ const v=E.vehicleById(state.garages[state.active].job?.vehicleId);if(!v)return;
+ const p=vehiclePlacement(v,width,height);area.style.width=p.width+'px';area.style.top=p.top+'px';area.style.bottom='auto';
+ scene.style.setProperty('--floor-line',p.ground+'px');scene.style.setProperty('--floor-bottom',height-p.ground+'px');
+ scene.style.setProperty('--door-top',Math.max(60,p.top+75*p.width/900-18)+'px');
+}
+window.addEventListener('resize',()=>{positionWorkshop();lastRobotDraw=-Infinity;});
 function drawRobots(now,paused=false){
- const scene=$('.garage-scene'),layer=$('#robot-rig');if(!scene||!layer||now-lastRobotDraw<32)return;
+ const scene=$('.garage-scene'),layer=$('#robot-rig'),parked=$('#robot-parked');if(!scene||!layer||now-lastRobotDraw<32)return;
  const dt=Math.min(80,now-lastRobotDraw);lastRobotDraw=now;
  const rect=scene.getBoundingClientRect(),bounds={left:rect.left,top:rect.top,width:rect.width||900,height:rect.height||600};
- const g=state.garages[state.active],task=E.taskIndex(g.job),layout=crewLayout(E.crew(g),paused?-1:task,bounds.width,bounds.height);
- layer.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
+ const g=state.garages[state.active],task=g.job?E.taskIndex(g.job):-1,layout=crewLayout(E.crew(g),paused?-1:task,bounds.width,bounds.height);
+ layer.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);parked.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
  document.querySelectorAll('.robot-target').forEach(el=>el.classList.remove('robot-target'));
- const key=[...E.crew(g),paused?-1:task,bounds.width,bounds.height,g.job?.color].join(':');
+ const key=[...E.crew(g),bounds.width,bounds.height,g.job?.color].join(':');
  if(layer.dataset.layout!==key){
-  robotPoses.clear();layer.dataset.layout=key;
-  const rows=[...new Set(layout.filter(u=>!u.active).map(u=>u.y))];
-  const docks=rows.map(y=>`<path d="M${bounds.width*.04} ${y+8}H${bounds.width*.96}" stroke="#607d90" stroke-width="3"/><path d="M${bounds.width*.06} ${y+10}v8m${bounds.width*.88} -8v8" stroke="#233c4d" stroke-width="5"/>`).join('');
-  layer.innerHTML=docks+layout.map(u=>rigMarkup(u,{x:u.x+25*u.scale,y:u.y-61*u.scale},false,g.job?.color)).join('');
+  layer.dataset.layout=key;parked.innerHTML='';
+  layer.innerHTML=layout.map(u=>{const base=robotPoses.get(u.id)?.base||u;return rigMarkup({...u,...base},foldedTarget({...u,...base}),false,g.job?.color);}).join('');
  }
- for(const u of layout.filter(u=>u.active)){
-  const pending=paused?null:robotTeam.pending.get(u.id),folded={x:u.x+25*u.scale,y:u.y-61*u.scale};
-  const target=pending?robotTarget(pending.act,bounds):folded;
-  const old=robotPoses.get(u.id)||folded,f=state.settings.reducedMotion?1:1-Math.exp(-dt/90);
-  const tip={x:old.x+(target.x-old.x)*f,y:old.y+(target.y-old.y)*f};robotPoses.set(u.id,tip);
-  setRigPose(layer.querySelector(`[data-robot-id="${u.id}"]`),u,tip,!!pending);
+ let working=0;
+ for(const home of layout){
+  const pending=paused?null:robotTeam.pending.get(home.id),target=pending?robotTarget(pending.act,bounds):null;
+  const old=robotPoses.get(home.id)||{base:{x:home.x,y:home.y},tip:foldedTarget(home)};
+  const goal=target?drivePosition(home,target):{x:home.x,y:home.y};
+  const base=moveBase(old.base,goal,dt/1000,home.scale),u={...home,...base};
+  const stopped=Math.hypot(base.x-goal.x,base.y-goal.y)<1;
+  const aim=target&&stopped?target:foldedTarget(u),f=state.settings.reducedMotion?1:1-Math.exp(-dt/70);
+  const requested={x:old.tip.x+(aim.x-old.tip.x)*f,y:old.tip.y+(aim.y-old.tip.y)*f};
+  const pose=armGeometry(u,requested,u.scale,-1),ready=!!target&&stopped&&Math.hypot(pose.tip.x-target.x,pose.tip.y-target.y)<2;
+  robotPoses.set(u.id,{base,tip:pose.tip});robotReady.set(u.id,{act:pending?.act,ready});
+  const node=scene.querySelector(`[data-robot-id="${u.id}"]`),parent=u.active?layer:parked;if(node.parentNode!==parent)parent.appendChild(node);setRigPose(node,u,pose.tip,ready);node.classList.toggle('is-driving',!stopped);
+  if(ready)working++;
  }
- const count=E.crewCount(g),working=paused?0:robotTeam.pending.size;
- $('#robot-status').innerHTML=count?`<i style="background:${ROBOT_COLORS[task]||'#8ae0b6'}"></i>${working?`${roleName(task)} · ${t('robotWorking')} ${working}/${count}`:`${t(paused||task<0?'crewStandby':'robotWaiting')} · ${count}`}`:'';
+ const count=E.crewCount(g);
+ $('#robot-status').innerHTML=count?`<i style="background:${ROBOT_COLORS[task]||'#8ae0b6'}"></i>${working?`${roleName(task)} · ${t('robotWorking')} ${working}/${count}`:`${t(paused||task<0?'crewStandby':robotTeam.pending.size?'crewMoving':'robotWaiting')} · ${count}`}`:'';
 }
 function advanceRobot(now){
  if(page!=='workshop')return;
  if(modal||adBusy||document.hidden||vehicleMoving){robotTeam.reset();drawRobots(now,true);return;}
- const result=robotTeam.step(state,now);
+ drawRobots(now);
+ const result=robotTeam.step(state,now,{ready:(id,p)=>robotReady.get(id)?.act===p.act&&robotReady.get(id).ready});
  if(result.done.length){const before=result.done[0].before;afterWork(before);if(result.done.some(p=>p.act.type!=='stroke'))refreshRepair();}
  if(result.deliver){depart(true);return;}
  drawRobots(now);
 }
 let animationFrame;
-function animate(now){if(!adBusy)calibration=(Math.sin(now/670)+1)/2;const needle=$('#meter-needle');if(needle)needle.style.left=`${calibration*100}%`;advanceRobot(now);animationFrame=requestAnimationFrame(animate);}
+function animate(now){updateVehicleMotion(now);if(!adBusy)calibration=(Math.sin(now/670)+1)/2;const needle=$('#meter-needle');if(needle)needle.style.left=`${calibration*100}%`;advanceRobot(now);animationFrame=requestAnimationFrame(animate);}
 function tickClock(){const now=Date.now(),delta=Math.max(0,(now-lastWall)/1000);if(document.hidden||adBusy)return;lastWall=now;const playBefore=state.stats.playSeconds,before=state.garages[state.active].job;E.tick(state,delta,{offline:delta>5,workingGarage:page==='workshop'?state.active:null});if(page!=='workshop'||modal)state.stats.playSeconds=playBefore;if(page==='workshop'&&delta>5&&!modal){if(state.garages[state.active].job!==before)render();else{updateWorkshop();refreshRepair();}}updateBalances();}
 setInterval(tickClock,1000);setInterval(()=>{if(!document.hidden&&!adBusy)save();},10000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){tickClock();save();audio.pause();robotTeam.reset();cancelAnimationFrame(animationFrame);}else{tickClock();audio.resume();robotTeam.reset();cancelAnimationFrame(animationFrame);animationFrame=requestAnimationFrame(animate);}});

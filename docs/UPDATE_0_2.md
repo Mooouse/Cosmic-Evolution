@@ -29,3 +29,12 @@ Original 72 BPM loop with swung eighths, soft electric keys, seventh/ninth chord
 - Saves and earlier robot purchases remain compatible. Original procedural Lo-Fi replaces the old music loop; music volume, ad pause and platform mute remain supported.
 
 Validation: 39 Node tests, JavaScript syntax checks, static build, and DOM simulation of 30 visible rigs, six simultaneous washers, tab hide/show and multiple automatic orders. New rig SVGs were also rasterized and inspected. DOM simulation and SVG inspection do not replace real-browser layout, audio or touch-device QA.
+
+## 0.2.3 — Ground contact, mobile robots and rolling arrivals
+
+- A shared floor coordinate anchors each car by the tyre contact point instead of its transparent image rectangle. Approved images have measured contact baselines; vector cars use their actual tyre radii. Artwork and coating move together, preserving hit testing.
+- Robot arms now use two constant-length links with an inverse-kinematics joint solution. Unreachable targets cannot stretch a link. Bases drive to a suitable point on the floor; pending work waits until the robot stops and its tool reaches the target. Waiting robots park on the floor behind the vehicle.
+- Left entry and right exit doors open before movement. Each car has two independently rotating wheel elements; image cars rotate regions from their existing rims, preserving their wheel design. Rotation follows actual travel distance and stops with the car. Spacecraft remain wheel-free.
+- Also protected the receipt screen from trying to animate a completed, cleared job.
+
+Validation: 45 unit tests including rigid-link lengths, travel/readiness, reach across car/ship surfaces, all car ground baselines, and door/wheel motion timing. DOM simulation covers 30 robots, entrance, wheel rotation, robot driving, manual assistance, manual receipt, automatic completion and tab resumption. New artwork placement was inspected in rasterized SVG composites. Real-browser rendering and touch-device QA remain unverified in this environment.

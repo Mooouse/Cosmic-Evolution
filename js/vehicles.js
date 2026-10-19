@@ -1,4 +1,4 @@
-import {ART_SURFACES} from './vehicle-surfaces.js?v=0.2.2';
+import {ART_SURFACES} from './vehicle-surfaces.js?v=0.2.3';
 /**
  * Vehicle content and replaceable side-profile illustrations.
  * referenceModel is developer-only research metadata, never a display name.
@@ -143,7 +143,7 @@ const escapeXML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':
 let serial=0;
 function wheel(x,y,r,uid,variant){
  const spokes=Array.from({length:variant%3===0?5:7},(_,i)=>{const angle=i*360/(variant%3===0?5:7);return `<path d="M-5 -6 L-8 -${r*.67} L-2 -${r*.76} L5 -10 Z" fill="url(#${uid}-metal)" transform="rotate(${angle})"/>`;}).join('');
- return `<g transform="translate(${x} ${y})"><circle r="${r}" fill="#090c10" stroke="#333940" stroke-width="2"/><circle r="${r-5}" fill="none" stroke="#262b30" stroke-width="2"/><circle r="${r*.78}" fill="#0c1117" stroke="#9fa9b3" stroke-width="2"/><circle r="${r*.57}" fill="#56616a" stroke="#77818a" stroke-width="2"/><circle r="${r*.48}" fill="none" stroke="#3a434c" stroke-width="2" stroke-dasharray="2 5"/><path d="M${r*.43} -${r*.37} Q${r*.7} 0 ${r*.43} ${r*.37}" fill="none" stroke="#d6a755" stroke-width="8" stroke-linecap="round"/>${spokes}<circle r="9" fill="#b5bdc4" stroke="#414a53" stroke-width="3"/><circle r="3" fill="#1c252e"/></g>`;
+ return `<g transform="translate(${x} ${y})"><g class="road-wheel" data-wheel-radius="${r}"><circle r="${r}" fill="#090c10" stroke="#333940" stroke-width="2"/><circle r="${r-5}" fill="none" stroke="#262b30" stroke-width="2"/><circle r="${r*.78}" fill="#0c1117" stroke="#9fa9b3" stroke-width="2"/><circle r="${r*.57}" fill="#56616a" stroke="#77818a" stroke-width="2"/><circle r="${r*.48}" fill="none" stroke="#3a434c" stroke-width="2" stroke-dasharray="2 5"/><path d="M${r*.43} -${r*.37} Q${r*.7} 0 ${r*.43} ${r*.37}" fill="none" stroke="#d6a755" stroke-width="8" stroke-linecap="round"/>${spokes}<circle r="9" fill="#b5bdc4" stroke="#414a53" stroke-width="3"/><circle r="3" fill="#1c252e"/></g></g>`;
 }
 function defs(uid,color){return `<defs><linearGradient id="${uid}-paint" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f4fbff" stop-opacity=".8"/><stop offset=".25" stop-color="${color}"/><stop offset=".55" stop-color="${color}"/><stop offset=".78" stop-color="#17222d"/><stop offset="1" stop-color="${color}"/></linearGradient><linearGradient id="${uid}-glass" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#839ca9"/><stop offset=".42" stop-color="#293e4c"/><stop offset="1" stop-color="#0c151e"/></linearGradient><linearGradient id="${uid}-metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dbe5e9"/><stop offset=".4" stop-color="#77858e"/><stop offset=".55" stop-color="#dce6e9"/><stop offset="1" stop-color="#45515c"/></linearGradient><linearGradient id="${uid}-engine"><stop stop-color="#79e6ff" stop-opacity="0"/><stop offset="1" stop-color="#b9f5ff"/></linearGradient></defs>`;}
 function carArt(v,uid){
