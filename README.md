@@ -25,3 +25,8 @@ Progress is saved under `cosmic-evolution-save-v1` in local browser storage. To 
 ## Deploy
 
 All game files are static. The included GitHub Actions workflow runs a syntax/smoke test and deploys the root folder to GitHub Pages. On GitHub, set **Settings → Pages → Build and deployment → Source: GitHub Actions** if it isn't already selected. The workflow retains its deploy artifacts for one day, and removes the temporary archive following successful publication, to reduce artifact storage usage.
+
+
+## Обновление v0.3
+
+Карта уровней заменена интерактивным атласом бесконечного пространства. Ресурсы генерируются детерминированно по координатам и не появляются повторно после сбора, в том числе после сохранения. При переходе в новую форму положение игрока не сбрасывается. Добавлены оригинальная фоновая музыка с регулировкой громкости, переработанные кнопки и отдельные визуальные изменения форм. Публикация выполняется автоматически через GitHub Actions на https://mooouse.github.io/Cosmic-Evolution/ .
