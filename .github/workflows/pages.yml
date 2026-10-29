@@ -25,9 +25,11 @@ jobs:
         with:
           name: crazygames-upload
           path: crazygames-upload.zip
+          retention-days: 1
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          retention-days: 1
   deploy:
     needs: test-and-package
     runs-on: ubuntu-latest
