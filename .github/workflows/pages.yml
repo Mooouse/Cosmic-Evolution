@@ -36,6 +36,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      actions: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -43,3 +44,16 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/deploy-pages@v4
         id: deployment
+
+      - name: Remove archives from older successful builds
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for archive_name in github-pages crazygames-upload; do
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${archive_name}&per_page=100" \
+              --jq '.artifacts[] | select(.workflow_run.id != (env.GITHUB_RUN_ID | tonumber)) | .id' |
+            while read -r artifact_id; do
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+            done
+          done
