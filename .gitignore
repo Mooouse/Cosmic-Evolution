@@ -1,6 +1,4 @@
-dist/
+.DS_Store
 node_modules/
 *.zip
-test-results/
-playwright-report/
-assets/vehicles/
+*.tar.gz

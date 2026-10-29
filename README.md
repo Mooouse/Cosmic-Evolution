@@ -1,60 +1,27 @@
-# Idle Garage Evolution
+# Cosmic Evolution — From Dust to Infinity
 
-Браузерная 2D-игра о реставрации автомобилей и космических кораблей. HTML, CSS и JavaScript без сборщика и игровых зависимостей.
+A complete **2D HTML5 Canvas** cosmic growth game. The old Garage Evolution source files have been replaced on the main branch, as requested. No 3D models, no build step, no heavy engine, no external gameplay dependencies.
 
-## Версия 0.2 — мастерская и совместный ремонт
+## Play
 
-- Свободная мойка, шлифовка и покраска кузова без клеток. Снятие старого колеса, установка нового и работа ключом. Соединение проводов двигателя и проверка запуска.
-- Крупный гараж, отдельное оформление каждой локации и анимация заезда / выезда.
-- Пять профессий роботов с видимыми инструментами и движениями: мойщик, шлифовщик, колёсный механик, моторист и маляр. Игрок помогает им на той же машине. Полная команда выполняет заказы сама.
-- 8 земных гаражей и 9 космических мастерских: Луна, Меркурий, Венера, Марс, орбиты Юпитера, Сатурна, Урана, Нептуна и Титан.
-- Отдельные инструменты и роботы в каждом гараже; автоматическое производство и до 8 часов офлайн-дохода.
-- Интерактивные карты, прибыль по каждому гаражу и общая прибыль сети.
-- Каталог 112 автомобилей и 100 кораблей, обнаружение и счётчик восстановлений.
-- 18 достижений, расширенная статистика, семидневная серия наград.
-- Эволюция: сброс текущего бизнеса с постоянным множителем прибыли.
-- English по умолчанию, русский и español; отдельные ползунки музыки и эффектов.
-- Автосохранение, импорт и экспорт прогресса; адаптация под телефон, сенсорный экран и клавиатуру.
-- CrazyGames SDK v3: загрузка, геймплей, muteAudio, наградная реклама и SDK Data Module.
+Open `index.html` in a browser, or use GitHub Pages. Controls: mouse or touch drag to move, WASD/arrow keys to steer, `E` gravitational pulse, `Shift`/`Space` dash, `M` evolution map, `P` pause.
 
-**Статус графики:** первые пять автомобилей используют одобренные отдельные изображения (WebP с прозрачностью из исходных PNG); остальные автомобили и корабли пока используют временные SVG-иллюстрации. Это не точные реалистичные изображения 112 реальных моделей. Вымышленные названия и отсутствие логотипов уже соблюдены. До релиза необходимо заменить рисунки на отдельные проверенные изображения точных прототипов. Поле `image` в каталоге поддерживает прозрачный PNG. Техническое поле `referenceModel` никогда не выводится в интерфейс.
+## Systems implemented
 
-## Запуск
+- Procedural starfield and nebula rendering, multi-layer parallax, orbit effects, energy trails, screen shake, particles, impact and evolution effects.
+- Gravity and absorption physics, rare relics, hazards, active pulse and boost abilities.
+- **28 evolution forms**, dust to universe, in six distinct epochs; stage objectives and stage-specific mass requirements.
+- Four permanent upgrades with geometric cost scaling; stage-based resource economy.
+- Auto-save using localStorage, settings, survival stats, map, and completion screen.
+- Responsive keyboard, pointer, and mobile touch controls.
+- Static deployment; no advertisements, trackers, or cloud calls. Google Fonts are optional; the game falls back to local fonts offline.
 
-Открой опубликованную GitHub Pages версию. Для локальной разработки запусти любой статический HTTP-сервер в корне репозитория, например `python3 -m http.server 8080`, и открой `http://localhost:8080`. Через `file://` ES-модули не работают.
+## Progression / game length
 
-## Проверки
+The content and high growth costs of later forms are meant to create a long-term **10+ hour target campaign**. Real playtime depends on skill, route, upgrade strategy, and device performance. **This is a design target, not a verified minimum**; it requires full playtesting and balance passes before a guarantee of a ten-hour minimum can be made.
 
-```sh
-npm test
-npm run check
-node scripts/simulate-balance.mjs
-node scripts/simulate-balance.mjs --prestige
-node scripts/build.mjs
-```
+Progress is saved under `cosmic-evolution-save-v1` in local browser storage. To reset during testing, remove that localStorage key in your browser console.
 
-`npm test` не требует установки зависимостей. Тесты проверяют экономику, игровой цикл, сохранения и контракт интеграции SDK с имитацией его ответов. Это не заменяет проверку реальной рекламы в CrazyGames Preview или визуальную проверку в браузерах.
+## Deploy
 
-## Публикация GitHub Pages
-
-Workflow **Test and publish game** проверяет игру и готовит `dist/` и ZIP для CrazyGames. Владелец репозитория один раз включает **Settings → Pages → Source: GitHub Actions**. После этого новые коммиты в `main` автоматически обновляют игру:
-
-https://Mooouse.github.io/Idle-Garage-Evolution/
-
-Если Pages ещё не включён или прав workflow недостаточно, тесты и архив всё равно доступны во вкладке Actions, а публикация требует включения Pages владельцем.
-
-## CrazyGames
-
-См. [интеграцию SDK и проверку перед подачей](docs/CRAZYGAMES.md). В настройках подачи нужно выбрать сохранения через **Data Module**. Реальная публикация на CrazyGames и проверка в их Preview ещё не выполнялись.
-
-## Структура
-
-- `js/engine.js`: игровая логика, экономика, валидация сохранений.
-- `js/app.js`, `styles.css`: интерфейс, интерактивные механики и карты.
-- `js/vehicles.js`: данные транспорта и заменяемый рисунок.
-- `js/i18n.js`: EN/RU/ES.
-- `js/platform.js`, `js/ads.js`: CrazyGames и реклама.
-- `js/audio.js`: оригинальная процедурная музыка и эффекты.
-- `tests/`: автоматические проверки; `scripts/`: сборка и симуляция баланса.
-
-См. [правила и баланс игры](docs/GAME_DESIGN.md).
+All game files are static. The included GitHub Actions workflow runs a syntax/smoke test and deploys the root folder to GitHub Pages. On GitHub, set **Settings → Pages → Build and deployment → Source: GitHub Actions** if it isn't already selected. The workflow retains its deploy artifacts for one day, and removes the temporary archive following successful publication, to reduce artifact storage usage.

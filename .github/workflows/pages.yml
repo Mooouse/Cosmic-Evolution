@@ -5,67 +5,45 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pages: write
+  id-token: write
+  actions: write
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
-  test-and-package:
+  test-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm test
-      - run: npm run check
-      - run: node scripts/build.mjs
-      - name: Create CrazyGames upload ZIP
-        run: cd dist && zip -r ../crazygames-upload.zip .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: crazygames-upload
-          path: crazygames-upload.zip
-          retention-days: 1
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-          retention-days: 1
-  deploy:
-    needs: test-and-package
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-      actions: write
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
-      - uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+      - name: Check game syntax and required files
+        run: |
+          node --check game.js
+          test -s index.html
+          test -s styles.css
+          test -s favicon.svg
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload game for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+          retention-days: 1
+      - name: Deploy to Pages
         id: deployment
-
-      - name: Remove all temporary build archives after deployment
-        if: success()
-        shell: bash
+        uses: actions/deploy-pages@v4
+      - name: Clean up temporary Pages archive
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          set -euo pipefail
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | [.id, .name, .size_in_bytes] | @tsv' \
-            > "${RUNNER_TEMP}/old-artifacts.tsv"
-          removed=0
-          bytes=0
-          while IFS=$'\t' read -r artifact_id artifact_name artifact_size; do
-            [[ -n "${artifact_id}" ]] || continue
-            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" >/dev/null
-            echo "Deleted ${artifact_name}: ${artifact_size} bytes (id ${artifact_id})"
-            removed=$((removed + 1))
-            bytes=$((bytes + artifact_size))
-          done < "${RUNNER_TEMP}/old-artifacts.tsv"
-          echo "Deleted ${removed} archives, ${bytes} bytes"
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | [.id, .name, .size_in_bytes] | @tsv' \
-            | tee "${RUNNER_TEMP}/remaining-artifacts.tsv"
-          test ! -s "${RUNNER_TEMP}/remaining-artifacts.tsv"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" --jq '.artifacts[].id' > "$RUNNER_TEMP/artifacts.txt" || true
+          while IFS= read -r artifact_id; do
+            [ -n "$artifact_id" ] || continue
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" >/dev/null || true
+          done < "$RUNNER_TEMP/artifacts.txt"
