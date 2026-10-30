@@ -38,7 +38,7 @@ const TA = [
  ['Группа галактик','Сверхмасштаб','Отдельные галактики становятся пылинками.','cluster','#a6b9ff'],
  ['Скопление галактик','Сверхмасштаб','Ты притягиваешь целые галактические миры.','cluster','#8de6f3'],
  ['Космическая паутина','Сверхмасштаб','Нити гравитации соединяют всё сущее.','web','#bf9bff'],
- ['ВСЕЛЕННАЯ','Бесконечность','От одной частицы — до всего, что существует.','universe','#e0cbff']
+ ['БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА','Бесконечность','Поглощай всё вокруг: горизонт событий продолжает расти.','blackhole','#ffb269']
 ].map((a,i)=>({name:a[0],epoch:a[1],desc:a[2],type:a[3],color:a[4],required:Math.round(180+100*Math.pow(i+1,1.47))}));
 const upgrades = [
  {id:'gravity',name:'Гравитация',label:'Радиус притяжения',glyph:'◎',base:35,growth:1.26,max:80},
@@ -68,11 +68,15 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'hold',flightFeel:'direct',worldX:0,worldY:0,complete:false,endless:false,visited:[],depleted:{},depletedMacro:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',controlV:2,worldX:0,worldY:0,complete:false,endless:false,visited:[],depleted:{},depletedMacro:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
   g={...fresh(),...s,upgrade:{...fresh().upgrade,...s.upgrade},visited:Array.isArray(s.visited)?s.visited:[],depleted:s.depleted&&typeof s.depleted==='object'?s.depleted:{},depletedMacro:s.depletedMacro&&typeof s.depletedMacro==='object'?s.depletedMacro:{},materials:{...fresh().materials,...s.materials}};
+  // Apply the new smooth cursor default once, preserving subsequent choices.
+  if(s.controlV!==2){g.controlMode='follow';g.flightFeel='smooth';g.controlV=2;}
+  // The last tier is always endless, including previously completed saves.
+  if(g.tier===TA.length-1){g.endless=true;g.complete=true;}
   // Respect the percentage of old stage progress instead of shrinking players after the rebalance.
   if(s.rebalanceV!==3){
    const oldReq=s.rebalanceV===2?Math.round(250+210*Math.pow(g.tier+1,2.18)):Math.round(110+45*Math.pow(g.tier,1.68));
@@ -88,8 +92,12 @@ let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTime
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
 function radiusAt(tier,fraction){return 13*Math.pow(1.125,tier+clamp(fraction,0,1));}
-function currentRadius(){const base=radiusAt(g.tier,stageFraction());return g.endless?base*(1+Math.log1p(Math.max(0,g.matter)/TA[g.tier].required)*.24):base;}
-const initialRadius=radiusAt(g.tier,stageFraction());
+function currentRadius(){
+ const base=radiusAt(g.tier,stageFraction());
+ if(g.tier===TA.length-1)return radiusAt(g.tier,0)*Math.pow(1+Math.max(0,g.matter)/TA[g.tier].required,.38);
+ return base;
+}
+const initialRadius=currentRadius();
 let player={x:Number.isFinite(g.worldX)?g.worldX:0,y:Number.isFinite(g.worldY)?g.worldY:0,vx:0,vy:0,r:initialRadius,targetR:initialRadius,rotation:0,shield:0,trail:[]};
 let camera={x:player.x,y:player.y,zoom:1};
 let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();const MACRO_SIZE=3200,MACRO_COUNT=9;const macroCache=new Map(),macroSpriteCache=new Map(),macroLoaded=new Set();let macroEntities=[],macroVisibleCount=0;if(!g.depletedMacro||typeof g.depletedMacro!=='object')g.depletedMacro={};
@@ -97,8 +105,8 @@ let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArc
 // Touch input uses the independent joystick surface, never mouse hover.
 let keys=new Set(),pointer={x:W/2,y:H/2,active:false,down:false,type:'mouse',id:null};
 const stick={active:false,id:null,x:0,y:0};
-if(!['hold','follow','keys'].includes(g.controlMode))g.controlMode='hold';
-if(!['direct','smooth'].includes(g.flightFeel))g.flightFeel='direct';
+if(!['hold','follow','keys'].includes(g.controlMode))g.controlMode='follow';
+if(!['direct','smooth'].includes(g.flightFeel))g.flightFeel='smooth';
 function clearFlightInput(){pointer.active=false;pointer.down=false;pointer.id=null;stick.active=false;stick.id=null;stick.x=stick.y=0;const thumb=$('stick-thumb'),pad=$('flight-stick'),marker=$('flight-marker');if(thumb)thumb.style.transform='translate(-50%, -50%)';if(pad)pad.classList.remove('engaged');if(marker)marker.classList.remove('visible');}
 function updateFlightMarker(){const mark=$('flight-marker');if(!mark)return;mark.style.left=pointer.x+'px';mark.style.top=pointer.y+'px';mark.classList.toggle('visible',running&&pointer.type==='mouse'&&g.controlMode!=='keys'&&(pointer.down||g.controlMode==='follow')&&!atlasVisible);}
 function updateStickPosition(e){const pad=$('flight-stick'),rect=pad.getBoundingClientRect();let dx=e.clientX-(rect.left+rect.width/2),dy=e.clientY-(rect.top+rect.height/2);const maxDist=Math.min(rect.width,rect.height)*.36,len=Math.hypot(dx,dy);if(len>maxDist){dx*=maxDist/len;dy*=maxDist/len;}stick.x=dx/maxDist;stick.y=dy/maxDist;const thumb=$('stick-thumb');thumb.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;}
@@ -181,17 +189,24 @@ function renderUI(force=false){
  const t=TA[g.tier],next=TA[g.tier+1],progress=clamp(g.matter/t.required,0,1);
  $('tier-number').innerHTML=`${String(g.tier+1).padStart(2,'0')} <span>/ ${TA.length}</span>`;
  $('epoch-name').textContent=t.epoch.toUpperCase();$('tier-title').textContent=t.name;$('tier-desc').textContent=t.desc;
- $('current-form').textContent=t.name;$('next-form').textContent=next?.name??(g.endless?'БЕСКОНЕЧНАЯ ЭКСПЕДИЦИЯ':'ЭВОЛЮЦИЯ ЗАВЕРШЕНА');
- $('progress-fill').style.width=(progress*100).toFixed(1)+'%';$('progress-percent').textContent=g.endless?'∞ СВОБОДНОЕ ИССЛЕДОВАНИЕ':progress>=1&&!missionsDone()?'ВЫПОЛНИ ЗАДАЧИ':Math.round(progress*100)+'%';
- const m=missionReq(),cs=[g.stageCollects>=m.collect,recipeDone(),g.stageExplored>=m.explore];
- $('mission-1-label').textContent='Нарасти массу';$('mission-1-val').textContent=`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
- $('mission-2-label').textContent='Собери рецепт';$('mission-2-val').textContent=`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
- $('mission-3-label').textContent='Исследуй сектора';$('mission-3-val').textContent=`${g.stageExplored}/${m.explore}`;
+ $('current-form').textContent=t.name;$('next-form').textContent=g.endless?'ГОРИЗОНТ СОБЫТИЙ РАСТЁТ ∞':next?.name??'БЕСКОНЕЧНОСТЬ';
+ if(g.endless){
+  const rank=Math.log2(1+Math.max(0,g.matter)/t.required),sub=(rank%1)*100;
+  $('progress-fill').style.width=sub.toFixed(1)+'%';
+  $('progress-percent').textContent=`∞ РОСТ · ×${(currentRadius()/radiusAt(g.tier,0)).toFixed(2)} РАДИУС`;
+ }else{
+  $('progress-fill').style.width=(progress*100).toFixed(1)+'%';
+  $('progress-percent').textContent=progress>=1&&!missionsDone()?'ВЫПОЛНИ ЗАДАЧИ':Math.round(progress*100)+'%';
+ }
+ const m=missionReq(),cs=g.endless?[true,true,true]:[g.stageCollects>=m.collect,recipeDone(),g.stageExplored>=m.explore];
+ $('mission-1-label').textContent=g.endless?'Поглощено в чёрную дыру':'Нарасти массу';$('mission-1-val').textContent=g.endless?fmt(g.matter):`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
+ $('mission-2-label').textContent=g.endless?'Радиус горизонта событий':'Собери рецепт';$('mission-2-val').textContent=g.endless?fmt(Math.round(player.r)):`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
+ $('mission-3-label').textContent=g.endless?'Исследовано секторов':'Исследуй сектора';$('mission-3-val').textContent=g.endless?fmt(visitedChunks.size):`${g.stageExplored}/${m.explore}`;
  const matRoot=$('materials-inventory');if(matRoot){
-  const active=stageRecipe();matRoot.innerHTML=active.map(({type,amount})=>{
+  const active=g.endless?[]:stageRecipe();matRoot.innerHTML=active.map(({type,amount})=>{
    const v=g.materials[type]||0,d=MATERIALS[type];return `<div class="material-row ${v>=amount?'ready':''}"><span style="color:${d.color}">${d.symbol}</span><span>${d.label}</span><b>${fmt(v)} / ${fmt(amount)}</b></div>`;
   }).join('');
-  $('resource-hint').textContent=stageRecipe().map(r=>MATERIALS[r.type].label).join(' · ');
+  $('resource-hint').textContent=g.endless?'Все виды материи поглощаются автоматически':stageRecipe().map(r=>MATERIALS[r.type].label).join(' · ');
  }
  cs.forEach((ok,i)=>{const e=$(`mission-${i+1}`);e.classList.toggle('done',ok);e.querySelector('.mission-mark').textContent=ok?'✓':'◇';});$('mission-done').textContent=cs.filter(Boolean).length+'/3';
  for(const u of upgrades){let b=$('upgrades').querySelector(`[data-upgrade="${u.id}"]`),lvl=g.upgrade[u.id],c=upgradeCost(u);b.querySelector('.upgrade-level').textContent=`ур. ${lvl}/${u.max}`;b.querySelector('.upgrade-price').textContent=lvl>=u.max?'MAX':fmt(c);b.disabled=g.credits<c||lvl>=u.max;}
@@ -476,11 +491,11 @@ function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.val
  if(mat==='plasma'||mat==='exotic')burst(e.x,e.y,9,MATERIALS[mat].color,.7);
  let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
- player.targetR=radiusAt(g.tier,stageFraction());
+ player.targetR=currentRadius();
  if(Math.random()<.08)popText(e.x,e.y,'+'+val);if(g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
 // Bodies larger than you stay in the universe; avoid them until you outgrow them.
 function collideWithGiant(e,dx,dy,dist){
- if(player.shield>0)return;
+ if(g.tier===TA.length-1||player.shield>0)return;
  const ux=dx/(dist||1),uy=dy/(dist||1);
  player.x+=ux*3;player.y+=uy*3;player.vx+=ux*130;player.vy+=uy*130;
  player.shield=.9;shake=5;
@@ -489,16 +504,17 @@ function collideWithGiant(e,dx,dy,dist){
  popText(player.x,player.y-player.r,'СЛИШКОМ БОЛЬШОЙ','#ffaba9');
  sound(135,'triangle',.16,.022);
 }
-function impact(e){if(player.shield>0){respawn(e);return;}const reduction=Math.max(.15,1-g.upgrade.shield*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
+function impact(e){if(g.tier===TA.length-1){e.kind='matter';e.material='plasma';e.value=Math.max(15,e.value||0);absorb(e);return;}if(player.shield>0){respawn(e);return;}const reduction=Math.max(.15,1-g.upgrade.shield*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
 function evolve(){
  if(g.complete)return;
- if(g.tier===TA.length-1){g.complete=true;g.endless=false;running=false;save();showFinal();return;}
+ if(g.tier===TA.length-1){g.complete=true;g.endless=true;save();return;}
  const before=g.tier;
  spendRecipe();g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ if(g.tier===TA.length-1){g.complete=true;g.endless=true;}
  // Never alter world coordinates, velocity, camera center or nearby sectors on evolution.
  morph={from:before,time:0,duration:2.1};screenFlash=.9;
  // No size reset on evolution: the new tier begins exactly where the previous ended.
- player.targetR=radiusAt(g.tier,0);player.shield=3;shake=6;
+ player.targetR=currentRadius();player.shield=3;shake=6;
  shockwaves.push({x:player.x,y:player.y,r:12,life:2.2,max:2.2,color:TA[g.tier].color,range:210});
  burst(player.x,player.y,100,TA[g.tier].color,2.1);
  energyArcs.push({x:player.x,y:player.y,life:2.2,max:2.2,r:player.r*2.5,color:TA[g.tier].color});
@@ -534,13 +550,9 @@ function update(dt){
  for(const e of entities.concat(macroEntities)){if(!running)break;let dx=player.x-e.x,dy=player.y-e.y,dist2=dx*dx+dy*dy;
    const reach=gravRange+e.r+80;if(dist2>reach*reach)continue;
    const dist=Math.sqrt(dist2)||1;
-   if(e.kind!=='hazard'&&e.r<=player.r*.82&&dist<gravRange*(e.material==='gas'?1.4:1)){const pull=(gravRange-dist)/gravRange;e.vx+=dx/dist*(150+pull*520)*dt;e.vy+=dy/dist*(150+pull*520)*dt;}
+   if((e.kind!=='hazard'||g.tier===TA.length-1)&&(e.r<=player.r*.82||g.tier===TA.length-1&&e.kind==='hazard')&&dist<gravRange*(e.material==='gas'?1.4:1)){const pull=(gravRange-dist)/gravRange;e.vx+=dx/dist*(150+pull*520)*dt;e.vy+=dy/dist*(150+pull*520)*dt;}
    e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
    if(Math.hypot(player.x-e.x,player.y-e.y)<collectR+e.r){
-     if((e.material==='plasma'||e.material==='exotic')&&!e.primed&&e.kind==='matter'){
-       if(!e.hintAt||g.time-e.hintAt>4){e.hintAt=g.time;popText(e.x,e.y,'НАЖМИ E, ЧТОБЫ ДОБЫТЬ',MATERIALS[e.material].color);}
-       continue;
-     }
      if(e.kind==='hazard')impact(e);
      else if(e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
      else absorb(e);
@@ -555,8 +567,10 @@ function update(dt){
  texts.forEach(p=>{p.y-=dt*28;p.life-=dt;});texts=texts.filter(p=>p.life>0);
  // Tasty-Planet-style zoom: the camera follows physical size rather than abstract levels.
  // It deliberately zooms out slower than the body grows, so screen size also increases.
- const zTarget=clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
- camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*2));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
+ const horizonRadius=Math.max(player.r,player.targetR);
+ const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-8,2.5):clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
+ const zoomResponse=g.endless&&zTarget<camera.zoom?9:2;
+ camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*zoomResponse));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
  uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
  if(saveTimer>12){saveTimer=0;save();}
 }
@@ -609,6 +623,37 @@ function paintGalaxy(x,y,r,color,time){ctx.save();ctx.translate(x,y);ctx.rotate(
 function paintBody(x,y,r,kind,color,time,shadow=true){if(shadow){ctx.save();ctx.fillStyle='rgba(0,0,0,.19)';ctx.beginPath();ctx.ellipse(x+3,y+r*.8,r*.75,r*.25,0,0,TAU);ctx.fill();ctx.restore();}
  if(kind==='dust'){glowDot(x,y,r*.7,color,2);glowDot(x-r*.13,y-r*.2,r*.2,'#ffffff',1.3);}else if(kind==='rock')paintRock(x,y,r,color,time*.1);else if(kind==='planet'||kind==='gas')paintPlanet(x,y,r,color,kind==='gas');else if(kind==='star')paintStar(x,y,r,color);else if(kind==='nebula'){paintGalaxy(x,y,r,color,time);glowDot(x,y,r*.28,color,1);}else if(kind==='galaxy')paintGalaxy(x,y,r,color,time);else if(kind==='cluster'||kind==='web'||kind==='universe'){paintGalaxy(x,y,r*1.1,color,time);ctx.save();for(let i=0;i<11;i++){let a=i*TAU/11+time*.06,R=r*(.75+.2*(i%3));glowDot(x+Math.cos(a)*R,y+Math.sin(a)*R*.68,r*.045,i%3?'#a3d7ff':'#ffddab',.5);}ctx.restore();}else glowDot(x,y,r,color);}
 // A different silhouette and surface treatment for all 28 evolution stages.
+function paintBlackHole(x,y,r,time){
+ const scale=Math.max(8,r),phase=time*.23;
+ ctx.save();ctx.translate(x,y);
+ const halo=ctx.createRadialGradient(0,0,scale*.62,0,0,scale*1.93);
+ halo.addColorStop(0,'rgba(0,0,0,0)');halo.addColorStop(.47,'rgba(77,115,220,.13)');
+ halo.addColorStop(.70,'rgba(250,139,65,.17)');halo.addColorStop(1,'rgba(0,0,0,0)');
+ ctx.fillStyle=halo;ctx.beginPath();ctx.arc(0,0,scale*1.93,0,TAU);ctx.fill();
+ ctx.save();ctx.rotate(phase*.38);ctx.scale(1,.62);
+ for(let i=0;i<5;i++){
+  const rad=scale*(.97+i*.118);ctx.lineWidth=scale*(i===0?.17:.09);
+  ctx.strokeStyle=['#ffe7a6','#ffbb58','#fb7c52','#b56ff0','#6365c1'][i];
+  ctx.globalAlpha=.92-i*.14;ctx.beginPath();ctx.arc(0,0,rad,phase*(i%2?-.9:.7),phase*(i%2?-.9:.7)+Math.PI*1.82);ctx.stroke();
+ }
+ ctx.globalAlpha=1;ctx.restore();
+ ctx.fillStyle='#020307';ctx.beginPath();ctx.arc(0,0,scale*.86,0,TAU);ctx.fill();
+ ctx.strokeStyle='#ffdb92';ctx.lineWidth=Math.max(1.2,scale*.055);
+ ctx.globalAlpha=.94;ctx.beginPath();ctx.arc(0,0,scale*.89,-2.5,.7);ctx.stroke();
+ ctx.strokeStyle='#94b7ff';ctx.lineWidth=Math.max(1,scale*.025);
+ ctx.globalAlpha=.7;ctx.beginPath();ctx.arc(0,0,scale*.95,.55,2.8);ctx.stroke();ctx.globalAlpha=1;
+ ctx.rotate(-phase*.65);
+ for(let arm=0;arm<3;arm++){
+  ctx.beginPath();for(let j=0;j<=18;j++){
+   const t=j/18,rr=scale*(1.05+t*.65),a=arm*TAU/3+t*1.8;
+   const xx=Math.cos(a)*rr,yy=Math.sin(a)*rr;
+   if(j===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);
+  }
+  ctx.strokeStyle=arm%2?'rgba(249,162,112,.24)':'rgba(164,170,255,.28)';
+  ctx.lineWidth=Math.max(1,scale*.028);ctx.stroke();
+ }
+ ctx.restore();
+}
 function paintPlayerForm(x,y,r,time,tier=g.tier){
  const t=TA[tier],phase=time*.42;
  ctx.save();
@@ -643,7 +688,7 @@ function paintPlayerForm(x,y,r,time,tier=g.tier){
   else if(tier===23){paintGalaxy(x,y,r*1.3,t.color,time);}
   else if(tier===24||tier===25){const num=tier===24?3:6;for(let i=0;i<num;i++){let a=i*TAU/num+phase*.17;let radius=r*(tier===24?.64:.88);paintGalaxy(x+Math.cos(a)*radius,y+Math.sin(a)*radius*.8,r*(tier===24?.45:.30),i%2?'#79dff7':t.color,time+i);}}
   else if(tier===26){const nodes=[];for(let i=0;i<13;i++){let a=i*2.399+phase*.07;nodes.push([x+Math.cos(a)*r*(.3+i*.08),y+Math.sin(a)*r*(.25+i*.05)]);}ctx.strokeStyle='rgba(182,145,255,.6)';ctx.lineWidth=1.3;for(let i=0;i<nodes.length-2;i++){ctx.beginPath();ctx.moveTo(...nodes[i]);ctx.lineTo(...nodes[(i+5)%nodes.length]);ctx.stroke();}for(const [nx,ny]of nodes)glowDot(nx,ny,r*.09,'#d3c9ff',.5);}
-  else{const halo=ctx.createRadialGradient(x,y,0,x,y,r*2.1);halo.addColorStop(0,'#ffffff');halo.addColorStop(.2,'#c3a8ff');halo.addColorStop(.55,'rgba(74,80,210,.30)');halo.addColorStop(1,'rgba(36,42,90,0)');ctx.fillStyle=halo;ctx.beginPath();ctx.arc(x,y,r*2.1,0,TAU);ctx.fill();for(let i=0;i<5;i++){ctx.strokeStyle=i%2?'#9fcaff':'#e1c6ff';ctx.globalAlpha=.65;ctx.lineWidth=1.7;ctx.beginPath();ctx.ellipse(x,y,r*(.8+i*.23),r*(.34+i*.15),phase*.1+i*.7,0,TAU);ctx.stroke();}ctx.globalAlpha=1;glowDot(x,y,r*.25,'#ffffff');}
+  else paintBlackHole(x,y,r,time);
  }
  // Each individual stage adds distinctive silhouettes and surface features, not only new colors.
  paintEvolutionDetails(x,y,r,time,tier);
@@ -685,7 +730,7 @@ function paintEvolutionDetails(x,y,r,time,tier){
   case 24: for(let i=0;i<3;i++)orbit(r*(.6+i*.31),r*(.22+i*.12),rot*.08+i*.8,'#b4d6ff77',Math.max(1,r*.013));break;
   case 25: for(let i=0;i<5;i++){let a=rot*.09+i*TAU/5;orbit(r*(.35+i*.15),r*(.2+i*.1),a,'#b7daff55',Math.max(.9,r*.012));}break;
   case 26: for(let i=0;i<9;i++){let a=i*2.399;moon(a,r*(.28+(i%4)*.26),r*.055,'#d8c7ff');}break;
-  case 27: for(let i=0;i<6;i++){let a=i*TAU/6+rot*.1;orbit(r*(.45+i*.20),r*(.30+i*.13),a,'#ebd3ff66',Math.max(1,r*.016));}break;
+  case 27: /* Rendered by the event-horizon accretion disk. */break;
  }
  ctx.restore();
 }
@@ -779,15 +824,17 @@ function drawAtlas(){
  c.fillStyle='#06101e';c.fillRect(0,0,w,h);
  const size=27*atlas.zoom,px=atlas.x/CHUNK,py=atlas.y/CHUNK;
  const left=Math.floor(px-w/(2*size))-1,right=Math.ceil(px+w/(2*size))+1,top=Math.floor(py-h/(2*size))-1,bottom=Math.ceil(py+h/(2*size))+1;
+ const tiles=(right-left+1)*(bottom-top+1),sampleStep=Math.max(1,Math.ceil(Math.sqrt(tiles/3200)));
+ const drawSize=size*sampleStep;
  const colors={normal:'#7d9eb5',rich:'#a9e4bc',nebula:'#c59eff',void:'#9bd9ef',relic:'#f3d58e',anomaly:'#d691ef'};
  let exhausted=0,charted=0;
- for(let cy=top;cy<=bottom;cy++)for(let cx=left;cx<=right;cx++){
+ for(let cy=top;cy<=bottom;cy+=sampleStep)for(let cx=left;cx<=right;cx+=sampleStep){
   const x=w/2+(cx-px)*size,y=h/2+(cy-py)*size,key=chunkKey(cx,cy),surveyed=visitedChunks.has(key),info=chunkInfo(cx,cy),quota=sectorQuota(info,cx,cy),mask=(g.depleted[key]||0)>>>0,removed=popcount32(mask&(quota===32?0xffffffff:((1<<quota)-1)>>>0)),remaining=quota-removed;
   if(surveyed)charted++;if(remaining===0)exhausted++;
-  c.strokeStyle=surveyed?'rgba(122,186,215,.22)':'rgba(91,127,169,.095)';c.lineWidth=.8;c.strokeRect(x+.5,y+.5,size,size);
-  if(surveyed){c.fillStyle=remaining===0?'rgba(75,93,114,.15)':info.biome==='rich'?'rgba(74,166,121,.12)':info.biome==='nebula'?'rgba(148,105,218,.13)':info.biome==='relic'?'rgba(218,174,88,.12)':'rgba(55,113,153,.09)';c.fillRect(x+1,y+1,size-2,size-2);}
-  if(size>=9){const col=colors[info.biome];let d=Math.max(1,Math.min(3.7,size*.125));c.globalAlpha=surveyed?Math.max(.15,remaining/quota):.13;c.fillStyle=remaining===0?'#52677c':col;c.beginPath();c.arc(x+size*.5,y+size*.5,d,0,TAU);c.fill();c.globalAlpha=1;}
-  if(surveyed&&remaining>0&&size>=25){c.fillStyle=colors[info.biome];c.globalAlpha=.52;for(let j=0;j<3;j++){let seed=seedHash(cx+j*7,cy-j*3),xx=x+(seed%70+15)/100*size,yy=y+((seed>>>8)%70+15)/100*size;c.fillRect(xx,yy,1.4,1.4);}c.globalAlpha=1;}
+  if(sampleStep===1){c.strokeStyle=surveyed?'rgba(122,186,215,.22)':'rgba(91,127,169,.095)';c.lineWidth=.8;c.strokeRect(x+.5,y+.5,size,size);}
+  if(surveyed||sampleStep>1){c.fillStyle=remaining===0?'rgba(75,93,114,.35)':info.biome==='rich'?'rgba(74,166,121,.29)':info.biome==='nebula'?'rgba(148,105,218,.29)':info.biome==='relic'?'rgba(218,174,88,.29)':'rgba(55,113,153,.23)';c.fillRect(x,y,drawSize+.4,drawSize+.4);}
+  if(sampleStep===1&&size>=9){const col=colors[info.biome];let d=Math.max(1,Math.min(3.7,size*.125));c.globalAlpha=surveyed?Math.max(.15,remaining/quota):.13;c.fillStyle=remaining===0?'#52677c':col;c.beginPath();c.arc(x+size*.5,y+size*.5,d,0,TAU);c.fill();c.globalAlpha=1;}
+  if(sampleStep===1&&surveyed&&remaining>0&&size>=25){c.fillStyle=colors[info.biome];c.globalAlpha=.52;for(let j=0;j<3;j++){let seed=seedHash(cx+j*7,cy-j*3),xx=x+(seed%70+15)/100*size,yy=y+((seed>>>8)%70+15)/100*size;c.fillRect(xx,yy,1.4,1.4);}c.globalAlpha=1;}
  }
  // Spawn is an actual origin marker, never a teleport destination.
  const ox=w/2-atlas.x/CHUNK*size,oy=h/2-atlas.y/CHUNK*size;
@@ -797,30 +844,30 @@ function drawAtlas(){
  // Coordinate axes remain visible at every zoom level.
  c.strokeStyle='rgba(147,200,234,.17)';c.beginPath();c.moveTo(w/2-13,h/2);c.lineTo(w/2+13,h/2);c.moveTo(w/2,h/2-13);c.lineTo(w/2,h/2+13);c.stroke();
  $('atlas-coords').textContent=`X ${Math.floor(atlas.x/CHUNK)} · Y ${Math.floor(atlas.y/CHUNK)}  /  масштаб ${atlas.zoom.toFixed(1)}×`;
- $('atlas-count').textContent=`Исследовано ${visitedChunks.size} · Опустошённых на карте: ${exhausted}`;
+ $('atlas-count').textContent=sampleStep===1?`Исследовано ${visitedChunks.size} · Опустошённых на карте: ${exhausted}`:`Исследовано ${visitedChunks.size} · Обзор ${sampleStep}×${sampleStep} секторов`;
  atlas.dirty=false;
 }
 function showMap(){
  atlas={x:player.x,y:player.y,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
  show(`<div class="atlas-top"><div><div class="eyebrow">ГАЛАКТИЧЕСКАЯ НАВИГАЦИЯ</div><div class="overlay-title">БЕСКОНЕЧНАЯ КАРТА</div></div><span class="atlas-north">N ↑</span></div>
- <p class="atlas-description">Каждый сектор существует на постоянных координатах. Поглощённая материя не восстанавливается — ищи новые месторождения дальше от пройденного маршрута.</p>
+ <p class="atlas-description">Каждый сектор существует на постоянных координатах. Поглощённая материя не восстанавливается. Исследуй новые области и отдаляй карту до масштаба скоплений галактик.</p>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Интерактивная процедурная карта галактики — перетаскивайте, чтобы перемещать карту"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить">−</button><button id="atlas-center" class="atlas-control center" title="Показать моё местоположение">⌖</button></div></div>
  <div class="atlas-legend"><span><i class="atlas-mark you"></i>ТЫ</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span><i class="atlas-mark rich"></i>КРИСТАЛЛЫ</span><span><i class="atlas-mark relic"></i>ПЛАЗМА</span><span style="color:#91d8f9">❄ ЛЁД</span><span style="color:#b49afe">◌ ГАЗ</span><span style="color:#d68af2">✧ ЭКЗОМАТЕРИЯ</span><span><i class="atlas-mark empty"></i>ОПУСТОШЕНО</span></div>
- <div class="atlas-footer"><small>Перетаскивай карту · Колёсико или +/− меняют масштаб · Тёмные области ещё не исследованы</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
+ <div class="atlas-footer"><small>Перетаскивай карту · Колёсико или +/− меняют масштаб вплоть до 0,008× · Дальние сектора отображаются группами</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;atlas.dirty=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';
  cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
  cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;const f=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/f;atlas.y-=(ev.clientY-atlas.lastY)/f;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
  cv.addEventListener('pointerup',()=>atlas.drag=false);cv.addEventListener('pointercancel',()=>atlas.drag=false);
- cv.addEventListener('wheel',ev=>{ev.preventDefault();atlas.zoom=clamp(atlas.zoom*(ev.deltaY>0?.82:1.22),.28,4.2);atlas.dirty=true;},{passive:false});
- $('atlas-zoom-in').onclick=()=>{atlas.zoom=clamp(atlas.zoom*1.3,.28,4.2);atlas.dirty=true;};
- $('atlas-zoom-out').onclick=()=>{atlas.zoom=clamp(atlas.zoom/1.3,.28,4.2);atlas.dirty=true;};
+ cv.addEventListener('wheel',ev=>{ev.preventDefault();atlas.zoom=clamp(atlas.zoom*(ev.deltaY>0?.82:1.22),.008,4.2);atlas.dirty=true;},{passive:false});
+ $('atlas-zoom-in').onclick=()=>{atlas.zoom=clamp(atlas.zoom*1.3,.008,4.2);atlas.dirty=true;};
+ $('atlas-zoom-out').onclick=()=>{atlas.zoom=clamp(atlas.zoom/1.3,.008,4.2);atlas.dirty=true;};
  $('atlas-center').onclick=()=>{atlas.x=player.x;atlas.y=player.y;atlas.dirty=true;};
  requestAnimationFrame(drawAtlas);
 }
 function showPause(){show(`<div class="hero-kicker">ПУТЕШЕСТВИЕ ПРИОСТАНОВЛЕНО</div><div class="overlay-title">ПАУЗА</div><p class="overlay-copy">Твоё место во Вселенной сохранено. Материя и улучшения останутся с тобой.</p><div class="stat-list"><div><strong>${fmt(g.total)}</strong><small>Всего материи</small></div><div><strong>${timeFmt(g.time)}</strong><small>Игровое время</small></div><div><strong>${g.collects}</strong><small>Поглощено объектов</small></div><div><strong>${g.rare}</strong><small>Реликвий найдено</small></div></div><div class="modal-actions">${continueButton()}<button id="pause-map" class="secondary-button">Карта</button></div>`);attachContinue();$('pause-map').onclick=showMap;}
-function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. Мышь — удерживай левую кнопку и направляй. На телефоне — левый джойстик. E / Shift — способности.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
+function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function restartCampaign(){
  if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
@@ -853,8 +900,8 @@ function testerToggle(force){
 function testerSetTier(tier){
  const next=clamp(Math.round(tier),0,TA.length-1),from=g.tier;
  if(next===from)return;
- g.tier=next;g.complete=false;g.endless=false;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
- morph={from,time:0,duration:1.5};player.targetR=radiusAt(next,0);
+ g.tier=next;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ morph={from,time:0,duration:1.5};player.targetR=currentRadius();
  player.r=player.targetR;screenFlash=.5;
  burst(player.x,player.y,35,TA[next].color);
  renderUI(true);testerRefresh();
@@ -876,7 +923,7 @@ function testerInit(){
    const key=input.dataset.test,value=Number(input.value);
    if(!Number.isFinite(value))return;
    if(key==='progress'){g.matter=Math.round(TA[g.tier].required*value/100);
-    player.targetR=radiusAt(g.tier,stageFraction());
+    player.targetR=currentRadius();
     $('test-progress-val').textContent=value+'%';}
    else if(Object.hasOwn(TEST_DEFAULTS,key)){
     const previous=tester[key];tester[key]=key==='density'?Math.round(value):value;
@@ -910,7 +957,7 @@ function panelValue(key,v){
 }
 testerInit();
 $('btn-new-game').onclick=restartCampaign;
-function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">ТЫ СТАЛ ВСЕЛЕННОЙ</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Ты завершил путь Cosmic Evolution.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поздравляем с завершением космической эволюции!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('btn-new-universe').onclick=restartCampaign;}
+function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Теперь горизонт событий растёт бесконечно.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поглощай материю и продолжай увеличиваться без предела!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('btn-new-universe').onclick=restartCampaign;}
 $('btn-start').onclick=()=>{running=true;startMusic();$('modal').classList.add('off');last=performance.now();if(!g.time)toast('✦ ИССЛЕДУЙ КОСМОС · ПОГЛОЩАЙ МАТЕРИЮ');};if(g.time>10)$('btn-start').innerHTML='ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ <span>→</span>';
 $('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=showMap;$('btn-pause').onclick=()=>running?showPause():(running=true,$('modal').classList.add('off'));$('btn-settings').onclick=showSettings;
 $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
@@ -930,7 +977,7 @@ canvas.addEventListener('pointerdown',e=>{
  pointer.down=true;pointer.active=true;pointer.id=e.pointerId;pointer.type='mouse';pointer.x=e.clientX;pointer.y=e.clientY;
  try{canvas.setPointerCapture(e.pointerId);}catch(_){}updateFlightMarker();
 });
-const releaseMouse=e=>{if(e.pointerId!==pointer.id)return;pointer.down=false;pointer.id=null;pointer.active=false;updateFlightMarker();};
+const releaseMouse=e=>{if(e.pointerId!==pointer.id)return;pointer.down=false;pointer.id=null;pointer.active=g.controlMode==='follow';updateFlightMarker();};
 canvas.addEventListener('pointerup',releaseMouse);
 canvas.addEventListener('pointercancel',releaseMouse);
 canvas.addEventListener('lostpointercapture',releaseMouse);
@@ -943,5 +990,5 @@ addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
-Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
+Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,baseRadius:radiusAt(g.tier,0),endlessRadiusMultiplier:g.tier===TA.length-1?currentRadius()/radiusAt(g.tier,0):1,atlasZoom:atlas.zoom,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
 })();
