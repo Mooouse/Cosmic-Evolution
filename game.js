@@ -5,6 +5,8 @@ const $ = id => document.getElementById(id);
 const canvas = $('universe');
 let ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 const TAU = Math.PI * 2;
+// The painted black disk, its lens and its physical absorption use one radius.
+const BLACK_HOLE_CORE_FRACTION = .245;
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 const rand = (a,b) => a + Math.random()*(b-a);
 const choose = a => a[Math.floor(Math.random()*a.length)];
@@ -553,7 +555,7 @@ function harvestCosmicLOD(dt){
  cosmicHarvestTimer+=dt;
  if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
- const radius=player.r,view=cosmicVisibleLOD();
+ const radius=blackHoleCoreWorldRadius(),view=cosmicVisibleLOD();
  // Check only cells intersecting the horizon, but do not silently skip the
  // actual layer shown by the renderer as happened on level-zero and LOD fades.
  let budget=10,changed=false;
@@ -829,13 +831,13 @@ function update(dt){
  player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
- let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20)),collectR=Math.min(player.r,MACRO_SIZE*20)+4;
+ let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20)),collectR=g.endless?blackHoleCoreWorldRadius():Math.min(player.r,MACRO_SIZE*20)+4;
  const giantMode=g.endless&&player.r>CHUNK*5;
  // Fixed collection rate, independent of render FPS or the number of bodies
  // touched by the enormous horizon. This prevents a thousand simultaneous
  // harvests and the audible/visual 'batch' stutter every streaming tick.
  absorptionTokens=giantMode?Math.min(12,absorptionTokens+dt*clamp(60+Math.log10(Math.max(1,player.r/CHUNK))*12,60,130)):0;
- const captureRadius=giantMode?Math.min(player.r,MACRO_SIZE*16):player.r;
+ const captureRadius=giantMode?blackHoleCoreWorldRadius():collectR;
  const nearReach=giantMode?captureRadius+MACRO_SIZE:gravRange;
  const nearReachSq=nearReach*nearReach;
  const nearbyObjects=entities.concat(macroEntities);
@@ -890,6 +892,12 @@ function update(dt){
  if(saveTimer>12){saveTimer=0;save();}
 }
 function project(x,y){return {x:(x-camera.x)*camera.zoom+W/2,y:(y-camera.y)*camera.zoom+H/2};}
+function blackHoleCoreWorldRadius(){
+ const zoom=Math.max(1e-12,camera.zoom);
+ // Account for the visual size cap: nothing should disappear outside the black disk.
+ const paintedRadius=clamp(player.r*zoom,8,Math.max(W,H)*.54);
+ return paintedRadius*BLACK_HOLE_CORE_FRACTION/zoom;
+}
 const dotCache=new Map();
 function glowDot(x,y,r,color,intensity=1){
  if(r<1.7){ctx.fillStyle=color;ctx.fillRect(x-r*.5,y-r*.5,Math.max(1,r),Math.max(1,r));return;}
@@ -1039,7 +1047,7 @@ function renderBlackHoleLensing(){
  lensInputCtx.drawImage(canvas,left*dpr,top*dpr,width*dpr,height*dpr,0,0,sw,sh);
  const a=lensInputCtx.getImageData(0,0,sw,sh).data;
  const warped=lensOutputCtx.createImageData(sw,sh),b=warped.data;
- const sampleX=sw/width,sampleY=sh/height,core=R*.245,soft=R*.22;
+ const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION,soft=R*.22;
  const outerStart=outer*.72,outerLength=Math.max(1,outer-outerStart);
  for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
   const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
@@ -1063,15 +1071,22 @@ function renderBlackHoleLensing(){
  ctx.drawImage(lensOutput,left,top,width,height);ctx.restore();
 }
 function paintBlackHole(x,y,r,time){
- const R=clamp(r,8,Math.max(W,H)*.54),core=R*.245;
+ const R=clamp(r,8,Math.max(W,H)*.54),core=R*BLACK_HOLE_CORE_FRACTION;
  ctx.save();
- const edge=ctx.createRadialGradient(x,y,core*.82,x,y,core*1.12);
- edge.addColorStop(0,'rgba(1,2,5,1)');
- edge.addColorStop(.76,'rgba(1,2,5,1)');
- edge.addColorStop(.91,'rgba(6,9,14,.95)');
- edge.addColorStop(1,'rgba(25,31,38,0)');
- ctx.fillStyle=edge;ctx.beginPath();ctx.arc(x,y,core*1.12,0,TAU);ctx.fill();
- ctx.fillStyle='#010205';ctx.beginPath();ctx.arc(x,y,core*.96,0,TAU);ctx.fill();
+ ctx.globalAlpha=1;
+ ctx.globalCompositeOperation='source-over';
+ // Stable, cool illumination outside the horizon. No pulse, orange ring or disk.
+ const halo=ctx.createRadialGradient(x,y,core*.88,x,y,core*1.92);
+ halo.addColorStop(0,'rgba(1,2,5,1)');
+ halo.addColorStop(.31,'rgba(1,2,5,1)');
+ halo.addColorStop(.47,'rgba(153,209,255,.22)');
+ halo.addColorStop(.63,'rgba(122,180,255,.13)');
+ halo.addColorStop(.82,'rgba(93,134,218,.045)');
+ halo.addColorStop(1,'rgba(60,95,168,0)');
+ ctx.fillStyle=halo;
+ ctx.beginPath();ctx.arc(x,y,core*1.92,0,TAU);ctx.fill();
+ // Always opaque, always the same radius; lensing affects only the background.
+ ctx.fillStyle='#010205';ctx.beginPath();ctx.arc(x,y,core,0,TAU);ctx.fill();
  ctx.restore();
 }
 
@@ -1199,15 +1214,15 @@ function renderEntity(e,time){
  }
 }
 function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=Math.min(player.r*camera.zoom,Math.max(W,H)*.54);ctx.save();
- for(const tr of player.trail){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,Math.min(Math.max(W,H)*3,tr.r*camera.zoom*(.45+alpha*.3)),0,TAU);ctx.fill();}
+ for(const tr of (g.endless?[]:player.trail)){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,Math.min(Math.max(W,H)*3,tr.r*camera.zoom*(.45+alpha*.3)),0,TAU);ctx.fill();}
  // Gravity field ring and orbiting shards.
- let range=Math.min(Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20))*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);ctx.strokeStyle=cssColor(t.color,g.endless?.04:.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);
+ let range=Math.min(Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20))*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);if(!g.endless){ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);}
  let count=g.endless?0:Math.min(18,3+Math.floor(g.tier/2));for(let i=0;i<count;i++){let a=player.rotation*(i%2?1:-1)*(0.65+(i%4)*.08)+i*TAU/count,R=r*(1.8+(i%3)*.24),xx=Math.cos(a)*R,yy=Math.sin(a)*R*.65;ctx.fillStyle=i%3?'#96baf8':'#ffdcaa';ctx.beginPath();ctx.arc(xx,yy,i%5===0?2.6:1.5,0,TAU);ctx.fill();}ctx.restore();
- if(morph){let f=clamp(morph.time/morph.duration,0,1);ctx.save();ctx.globalAlpha=(1-f)*.94;paintPlayerForm(p.x,p.y,r*(1.12-f*.12),time,morph.from);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,f*1.65);paintPlayerForm(p.x,p.y,r*(.52+f*.48),time);ctx.restore();}else paintPlayerForm(p.x,p.y,r,time);
+ if(morph&&!g.endless){let f=clamp(morph.time/morph.duration,0,1);ctx.save();ctx.globalAlpha=(1-f)*.94;paintPlayerForm(p.x,p.y,r*(1.12-f*.12),time,morph.from);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,f*1.65);paintPlayerForm(p.x,p.y,r*(.52+f*.48),time);ctx.restore();}else paintPlayerForm(p.x,p.y,r,time);
  // Swirling energy currents and magnetic filaments.
  if(g.particles&&!g.endless){ctx.save();ctx.globalAlpha=.18+.10*Math.sin(time*1.5);ctx.strokeStyle=t.color;ctx.lineWidth=1.2;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(p.x,p.y,r*(1.7+i*.27),time*.55+i*1.9,time*.55+i*1.9+1.65);ctx.stroke();}ctx.restore();}
- if(player.shield>0){ctx.strokeStyle=`rgba(132,236,255,${.2+.35*Math.sin(time*16)**2})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,r*1.35,0,TAU);ctx.stroke();}
- if(boostTime>0){ctx.strokeStyle='rgba(187,143,255,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,r*1.55+Math.sin(time*12)*3,0,TAU);ctx.stroke();}
+ if(player.shield>0&&!g.endless){ctx.strokeStyle=`rgba(132,236,255,${.2+.35*Math.sin(time*16)**2})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,r*1.35,0,TAU);ctx.stroke();}
+ if(boostTime>0&&!g.endless){ctx.strokeStyle='rgba(187,143,255,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,r*1.55+Math.sin(time*12)*3,0,TAU);ctx.stroke();}
  ctx.restore();}
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
