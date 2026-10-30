@@ -509,14 +509,17 @@ function macroLODNodes(gx,gy,level){
  const key=level+':'+gx+':'+gy;
  let nodes=macroLODCache.get(key);if(nodes)return nodes;
  const stride=2**level;
- const seed=seedHash(gx*37+level*103,gy*71-level*47),rng=chunkRandom(seed);
+ // Hash local cell indices, never enormous world coordinates. At scale
+ // 10^60+ hashing gx as a float collapses many distinct galaxies to one seed.
+ const cellX=Math.round(gx/stride),cellY=Math.round(gy/stride);
+ const seed=seedHash(cellX*37+level*103,cellY*71-level*47),rng=chunkRandom(seed);
  const span=MACRO_SIZE*stride;
  const anchorX=(gx+rng()*stride)*MACRO_SIZE,anchorY=(gy+rng()*stride)*MACRO_SIZE;
  nodes=[];const count=2+(seed%4);
  for(let j=0;j<count;j++){
   const a=rng()*TAU,dist=(j===0?0:(.10+.32*rng())*span);
   const rx=anchorX+Math.cos(a)*dist,ry=anchorY+Math.sin(a)*dist;
-  const sub=seedHash(gx+j*113,gy-j*191);
+  const sub=seedHash(cellX+j*113,cellY-j*191);
   const shape=(sub>>>4)%3,style=(sub>>>7)%8,palette=(sub>>>19)%9;
   const hole=j===0&&(sub%17===0),isUniverse=j===1&&sub%31===0,holeType=(sub>>>13)%3;
   const r=Math.max(30,Math.min(span*.34,span*(.09+rng()*.16)));
@@ -1066,7 +1069,9 @@ function renderBlackHoleLensing(){
  // Render near native screen resolution. The former 300px lens texture
  // was enlarged 3-8x on desktop and produced large blocky galaxies.
  // Dynamic quality scaling retains FPS on weaker hardware.
- const qualityTarget=Math.round(clamp(1120*Math.max(.6,performanceScale),700,1250));
+ const qualityTarget=Math.round(clamp(
+  (W*H>=4000000?1450:1250)*Math.max(.7,performanceScale),900,1750
+ ));
  const scale=Math.min(1,qualityTarget/Math.max(width,height));
  const sw=Math.max(1,Math.round(width*scale)),sh=Math.max(1,Math.round(height*scale));
  if(!lensInput){
@@ -1082,19 +1087,31 @@ function renderBlackHoleLensing(){
  const warped=lensOutputCtx.createImageData(sw,sh),b=warped.data;
  const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION;
  const outerStart=Math.max(core+R*.35,outer-R*.50),outerLength=Math.max(1,outer-outerStart);
- for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
-  const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
-  const d=Math.hypot(dx,dy),idx=(iy*sw+ix)*4;
-  if(d<core*.99||d>=outer)continue;
-  // A strong, broad lens with smoothly fading edges instead of rays.
-  const u=Math.max(0,(d-core)/(R*.76));
+ // Precompute the radial lens once per frame. At native HD resolutions,
+ // recomputing exp/pow/sin/cos for *every pixel* was prohibitively slow.
+ const LUT=4096,ratioLut=new Float32Array(LUT+1),
+  cosLut=new Float32Array(LUT+1),sinLut=new Float32Array(LUT+1),
+  opacityLut=new Float32Array(LUT+1);
+ const lutStep=outer/LUT;
+ for(let k=0;k<=LUT;k++){
+  const d=k*lutStep,u=Math.max(0,(d-core)/(R*.76));
   const strength=Math.exp(-Math.pow(u,1.65));
   const border=clamp((outer-d)/Math.max(1,R*.50),0,1);
   const feather=border*border*(3-2*border);
   const bend=R*.34*strength*feather;
   const twist=.040*strength*feather;
-  const rr=(d+bend)/d;
-  const cosine=Math.cos(twist),sine=Math.sin(twist);
+  const f=clamp((outer-d)/outerLength,0,1);
+  ratioLut[k]=(d+bend)/Math.max(1e-6,d);
+  cosLut[k]=Math.cos(twist);
+  sinLut[k]=Math.sin(twist);
+  opacityLut[k]=f*f*(3-2*f);
+ }
+ for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
+  const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
+  const d=Math.hypot(dx,dy),idx=(iy*sw+ix)*4;
+  if(d<core*.99||d>=outer)continue;
+  const k=Math.min(LUT,Math.floor(d/lutStep));
+  const rr=ratioLut[k],cosine=cosLut[k],sine=sinLut[k];
   const sx=(p.x+(dx*cosine-dy*sine)*rr-left)*sampleX-.5;
   const sy=(p.y+(dx*sine+dy*cosine)*rr-top)*sampleY-.5;
   if(sx<0||sy<0||sx>=sw-1||sy>=sh-1)continue;
@@ -1104,8 +1121,7 @@ function renderBlackHoleLensing(){
   b[idx]=a[p00]*w00+a[p01]*w01+a[p10]*w10+a[p11]*w11;
   b[idx+1]=a[p00+1]*w00+a[p01+1]*w01+a[p10+1]*w10+a[p11+1]*w11;
   b[idx+2]=a[p00+2]*w00+a[p01+2]*w01+a[p10+2]*w10+a[p11+2]*w11;
-  const fade=Math.min(1,Math.max(0,(outer-d)/outerLength));
-  b[idx+3]=Math.round(255*fade*fade*(3-2*fade));
+  b[idx+3]=Math.round(255*opacityLut[k]);
  }
  lensOutputCtx.putImageData(warped,0,0);
  ctx.save();ctx.imageSmoothingEnabled=true;
