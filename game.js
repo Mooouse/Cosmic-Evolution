@@ -851,12 +851,13 @@ function update(dt){
   let dx=player.x-e.x,dy=player.y-e.y;
   // Broad phase: no sqrt, movement or sound for distant objects.
   const dist2=dx*dx+dy*dy;
-  const reach=nearReach+e.r+20;if(dist2>reach*reach)continue;
+  const reach=giantMode?Math.max(nearReach+e.r+20,blackHoleTouchDistance(e,captureRadius)):nearReach+e.r+20;
+   if(dist2>reach*reach)continue;
   const dist=Math.sqrt(dist2)||1;
   if(giantMode){
    // Macro deposits are fixed astronomical bodies, not projectiles. Do not
    // pull them across sectors and then restore them on reload.
-   if(dist<=Math.max(0,captureRadius-e.r*.15)&&e.r<=captureRadius*.92&&absorptionTokens>=1){startAbsorption(e);absorptionTokens--;}
+   if(dist<=blackHoleTouchDistance(e,captureRadius)&&absorptionTokens>=1){startAbsorption(e);absorptionTokens--;}
    continue;
   }
   if((e.kind!=='hazard'||g.tier===TA.length-1)&&
@@ -868,9 +869,9 @@ function update(dt){
   }
   e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);
   e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
-  if(Math.hypot(player.x-e.x,player.y-e.y)<collectR+e.r){
+  if(Math.hypot(player.x-e.x,player.y-e.y)<(g.endless?blackHoleTouchDistance(e,collectR):collectR+e.r)){
    if(e.kind==='hazard'){e.kind='matter';e.material='crystal';absorb(e);}
-   else if(e.r>player.r*(g.endless?.92:.82))collideWithGiant(e,dx,dy,dist);
+   else if(!g.endless&&e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
    else absorb(e);
   }
  }
@@ -899,6 +900,16 @@ function blackHoleCoreWorldRadius(){
  // Account for the visual size cap: nothing should disappear outside the black disk.
  const paintedRadius=clamp(player.r*zoom,8,Math.max(W,H)*.54);
  return paintedRadius*BLACK_HOLE_CORE_FRACTION/zoom;
+}
+// True screen-size contact, including the minimum size of distant cached
+// galaxy sprites. At extreme magnification ordinary world radii disagree
+// with painted artwork, which previously made those galaxies untouchable.
+function blackHoleTouchDistance(e,core=blackHoleCoreWorldRadius()){
+ const zoom=Math.max(1e-12,camera.zoom);
+ const paintedPixels=(e.macro||e.cosmic)
+  ? clamp(e.r*zoom*1.15,1.8,112)
+  : Math.max(.3,e.r*zoom);
+ return core+Math.min(core*.32,paintedPixels*.91/zoom);
 }
 const dotCache=new Map();
 function glowDot(x,y,r,color,intensity=1){
