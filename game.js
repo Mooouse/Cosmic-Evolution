@@ -1061,6 +1061,7 @@ function getAccretionTexture(type=2){
 }
 // True gravitational lensing of the existing stars/galaxies. No gas or disk.
 let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
+let blackHoleLensRetryAt=0;
 function renderBlackHoleLensing(){
  if(g.tier!==TA.length-1)return;
  const p=project(player.x,player.y),R=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
@@ -1300,7 +1301,12 @@ function render(time){
  ctx.save();
  if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));
  for(const e of entities)renderEntity(e,time);
- renderBlackHoleLensing();
+ // A temporary Canvas readback failure must not abort this frame before
+ // drawing the opaque horizon. Keep the lens optional, not the black hole.
+ if(time>=blackHoleLensRetryAt){
+  try{renderBlackHoleLensing();}
+  catch(_){blackHoleLensRetryAt=time+2;}
+ }
  renderPlayer(time);renderParticles();
  ctx.restore();
  if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
