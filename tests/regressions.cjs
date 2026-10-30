@@ -48,4 +48,41 @@ for(const zoom of [1e-3,1e-15,1e-60,1e-110]){
  const cameraSpeed=140/zoom;
  assert.ok(Math.abs(cameraSpeed*zoom-140)<.000001,'Movement ceases at extreme camera zoom');
 }
+// Regression: the black-hole core may never be a transient overlay.
+// Inspect both render order and actual opaque output at different times.
+assert.match(game,/if\(g\.tier===TA\.length-1\)return;\s*const t=TA\[g\.tier\]/,
+ 'Do not paint final black hole via ordinary player morphs');
+assert.match(game,/renderPlayer\(time\);renderParticles\(\);[\s\S]*?paintBlackHole\(p\.x,p\.y,r,time\);/,
+ 'Black-hole core must be composited AFTER particles and other effects');
+assert.match(game,/if\(!g\.endless&&frameFps<42/,
+ 'Final-tier canvas must not be reset by adaptive resolution changes');
+assert.match(game,/try\{renderBlackHoleLensing\(\);\}[\s\S]*?catch\(_\)\{blackHoleLensRetryAt=/,
+ 'Failed lensing must not abort drawing the event horizon');
+const beginBlack=game.indexOf('function paintBlackHole(x,y,r,time){');
+const endBlack=game.indexOf('\nfunction paintPlayerForm(',beginBlack);
+assert.ok(beginBlack>0&&endBlack>beginBlack,'Cannot locate final black-hole painter');
+const paintSnippet=game.slice(beginBlack,endBlack);
+function traceBlackHole(time){
+ const recorded=[];
+ const ctx={
+  globalAlpha:1,globalCompositeOperation:'source-over',fillStyle:null,
+  save(){recorded.push(['save'])},restore(){recorded.push(['restore'])},
+  createRadialGradient(){const stops=[];return {addColorStop(p,color){stops.push([p,color])}}},
+  beginPath(){},arc(x,y,r){recorded.push(['arc',x,y,r])},
+  fill(){recorded.push(['fill',this.fillStyle,this.globalAlpha])}
+ };
+ const sandbox={ctx,W:1920,H:1080,TAU:Math.PI*2,
+  clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+ vm.createContext(sandbox);
+ vm.runInContext(paintSnippet,sandbox,{timeout:1000});
+ vm.runInContext('paintBlackHole(960,540,220,'+time+')',sandbox,{timeout:1000});
+ return recorded.filter(x=>x[0]==='arc'||x[0]==='fill');
+}
+const paintedA=traceBlackHole(0),paintedB=traceBlackHole(10000);
+assert.equal(JSON.stringify(paintedA),JSON.stringify(paintedB),
+ 'Black-hole core or halo changed over time');
+assert.ok(paintedA.some(x=>x[0]==='fill'&&x[1]==='#010205'&&x[2]===1),
+ 'Black-hole core must remain completely opaque');
+console.log('PASS: opaque event horizon stays stable over time and remains visible if lens fails');
+
 console.log('PASS: lens resolution, fast lens lookup, stable backdrop, 4 astronomical zoom levels, LOD, galaxy collision and movement');
