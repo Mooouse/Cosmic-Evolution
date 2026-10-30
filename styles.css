@@ -78,3 +78,13 @@
 
 .top-actions .square-button[hidden]{display:none!important}
 .tester-actions .tester-copy{grid-column:1/-1;background:#20334c}
+
+.resource-panel{padding:14px 16px;margin:12px 0 4px;border:1px solid rgba(104,160,187,.23);background:rgba(9,28,43,.63);border-radius:7px}
+.resource-header{display:flex;justify-content:space-between;align-items:center;gap:5px;font-size:10px;letter-spacing:1px;font-weight:900;color:#aedcf0;margin-bottom:9px}
+.resource-header small{font-size:8px;color:#668ca0;letter-spacing:.4px}
+.materials-inventory{display:grid;gap:5px}
+.material-row{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:8px;padding:5px 7px;background:rgba(7,22,34,.5);font-size:11px;border-radius:4px;color:#b2cbd9}
+.material-row b{font-size:10px;color:#f0c6ac;font-variant-numeric:tabular-nums}
+.material-row.ready b{color:#89e5bc}
+.resource-help{display:block;color:#6d94aa;line-height:1.5;font-size:9px;margin-top:10px}
+.resource-hint{font-size:9px;letter-spacing:.2px;color:#8ccedc;margin-top:9px}

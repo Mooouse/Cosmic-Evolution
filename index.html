@@ -7,7 +7,7 @@
   <meta name="description" content="Cosmic Evolution — 2D космическая игра про гравитацию, рост и эволюцию от пылинки до Вселенной." />
   <title>Cosmic Evolution — From Dust to Infinity</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="styles.css?v=2.3.0" />
+  <link rel="stylesheet" href="styles.css?v=2.4.0" />
 </head>
 <body>
   <canvas id="universe" aria-label="Игровое поле Cosmic Evolution"></canvas>
@@ -27,7 +27,7 @@
       <div class="tier-display"><span class="eyebrow" id="epoch-name">ЭПОХА ЗАРОЖДЕНИЯ</span><div id="tier-number" class="tier-index">01 <span>/ 28</span></div><h2 id="tier-title">Космическая пыль</h2><p id="tier-desc">Каждая Вселенная начинается с малого.</p></div>
       <div class="upgrades-header"><span>УЛУЧШЕНИЯ</span><small>ПОСТОЯННЫЕ</small></div>
       <div id="upgrades" class="upgrades"></div>
-      <div class="mission-panel"><div class="mission-title">ИССЛЕДОВАНИЕ ЭПОХИ <span id="mission-done">0/3</span></div><div class="mission" id="mission-1"><span class="mission-mark">◇</span><span id="mission-1-label">Соберите материю</span><b id="mission-1-val">0/0</b></div><div class="mission" id="mission-2"><span class="mission-mark">◇</span><span id="mission-2-label">Найдите реликвии</span><b id="mission-2-val">0/0</b></div><div class="mission" id="mission-3"><span class="mission-mark">◇</span><span id="mission-3-label">Примените импульс</span><b id="mission-3-val">0/0</b></div></div>
+      <div class="resource-panel"><div class="resource-header"><span>СИНТЕЗ ЭВОЛЮЦИИ</span><small>ДОБЫЧА В КОСМОСЕ</small></div><div id="materials-inventory" class="materials-inventory"></div><div id="resource-hint" class="resource-hint">Минералы</div><small class="resource-help">Месторождения отмечены разными цветами. Газ захватывается гравитацией, плазму и экзоматерию активируй импульсом (E).</small></div><div class="mission-panel"><div class="mission-title">ИССЛЕДОВАНИЕ ЭПОХИ <span id="mission-done">0/3</span></div><div class="mission" id="mission-1"><span class="mission-mark">◇</span><span id="mission-1-label">Соберите материю</span><b id="mission-1-val">0/0</b></div><div class="mission" id="mission-2"><span class="mission-mark">◇</span><span id="mission-2-label">Найдите реликвии</span><b id="mission-2-val">0/0</b></div><div class="mission" id="mission-3"><span class="mission-mark">◇</span><span id="mission-3-label">Примените импульс</span><b id="mission-3-val">0/0</b></div></div>
     </aside>
     <button id="btn-show-sidebar" class="show-sidebar hidden" aria-label="Показать улучшения">◈ УЛУЧШЕНИЯ</button>
     <div class="world-label"><span class="live-dot"></span><span id="world-label">НЕИЗВЕДАННЫЙ СЕКТОР</span><small id="world-subtitle">ПРОЦЕДУРНО СОЗДАВАЕМАЯ ВСЕЛЕННАЯ</small></div>
@@ -44,7 +44,7 @@
     <label class="tester-line"><span>Скорость полёта <b data-test-value="speed">1×</b></span><input data-test="speed" type="range" min=".25" max="6" step=".25" value="1"></label>
     <label class="tester-line"><span>Гравитация <b data-test-value="gravity">1×</b></span><input data-test="gravity" type="range" min=".5" max="8" step=".25" value="1"></label>
     <label class="tester-line"><span>Сбор материи <b data-test-value="loot">1×</b></span><input data-test="loot" type="range" min=".25" max="30" step=".25" value="1"></label>
-    <label class="tester-line"><span>Масштаб камеры <b data-test-value="zoom">1×</b></span><input data-test="zoom" type="range" min=".5" max="3" step=".1" value="1"></label>
+    <label class="tester-line"><span>Масштаб камеры <b data-test-value="zoom">1×</b></span><input data-test="zoom" type="range" min=".2" max="6" step=".1" value="1"></label>
     <label class="tester-line"><span>Плотность сектора <b data-test-value="density">32/32</b></span><input data-test="density" type="range" min="8" max="32" step="1" value="32"></label>
     <label class="tester-line"><span>Звёздная пыль (баланс)</span><input id="tester-credits" type="number" min="0" max="1000000000000" step="1000" value="0"></label>
     <div class="tester-actions">
@@ -52,11 +52,11 @@
       <button id="tester-next" type="button">↑ Следующая форма</button>
       <button id="tester-jump" type="button">➤ +10 секторов</button>
       <button id="tester-reset-mods" type="button">↻ Сбросить множители</button>
-      <button id="tester-new-game" type="button" class="danger">⟲ Новая игра</button><button id="tester-copy-save" type="button" class="tester-copy">⧉ Копировать основной прогресс</button>
+      <button id="tester-new-game" type="button" class="danger">⟲ Новая игра</button><button id="tester-copy-save" class="tester-copy" type="button">⇄ Копировать сохранение</button>
     </div>
     <p class="tester-note">Тестовые параметры сохраняются отдельно. Изменения стадии и валюты влияют на текущее сохранение. Сектора и собранная материя остаются постоянными.</p>
   </section>
   <div id="modal" class="modal-backdrop"><div class="modal-card intro-card"><div class="hero-art" aria-hidden="true"><div class="hero-ring r1"></div><div class="hero-ring r2"></div><div class="hero-ring r3"></div><div class="hero-core"></div><span class="hero-star s1">✦</span><span class="hero-star s2">✦</span><span class="hero-star s3">✧</span></div><div class="hero-kicker">ТВОЯ ВСЕЛЕННАЯ НАЧИНАЕТСЯ ЗДЕСЬ</div><h1>COSMIC<br/><span>EVOLUTION</span></h1><p class="modal-lead">Начни с одной частицы. Поглощай материю, развивай гравитацию и вырасти в целую Вселенную.</p><div class="intro-features"><span>✧ 28 форм эволюции</span><span>◉ Свободный космос</span><span>◈ Исследуй новые секторы</span></div><button id="btn-start" class="primary-button">НАЧАТЬ ЭВОЛЮЦИЮ <span>→</span></button><small class="intro-note">Мышь / WASD — движение · E — импульс · Shift — рывок · Оригинальная космическая музыка · Автосохранение</small></div></div>
-  <script src="game.js?v=2.3.0" defer></script>
+  <script src="game.js?v=2.4.0" defer></script>
 </body>
 </html>

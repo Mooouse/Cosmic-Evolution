@@ -39,13 +39,22 @@ const TA = [
  ['Скопление галактик','Сверхмасштаб','Ты притягиваешь целые галактические миры.','cluster','#8de6f3'],
  ['Космическая паутина','Сверхмасштаб','Нити гравитации соединяют всё сущее.','web','#bf9bff'],
  ['ВСЕЛЕННАЯ','Бесконечность','От одной частицы — до всего, что существует.','universe','#e0cbff']
-].map((a,i)=>({name:a[0],epoch:a[1],desc:a[2],type:a[3],color:a[4],required:Math.round(250+210*Math.pow(i+1,2.18))}));
+].map((a,i)=>({name:a[0],epoch:a[1],desc:a[2],type:a[3],color:a[4],required:Math.round(180+100*Math.pow(i+1,1.47))}));
 const upgrades = [
  {id:'gravity',name:'Гравитация',label:'Радиус притяжения',glyph:'◎',base:35,growth:1.26,max:80},
  {id:'speed',name:'Движение',label:'Скорость полёта',glyph:'➤',base:50,growth:1.29,max:60},
  {id:'harvest',name:'Синтез материи',label:'Бонус к поглощению',glyph:'✦',base:65,growth:1.31,max:65},
  {id:'shield',name:'Стабильность',label:'Защита от опасностей',glyph:'⬡',base:80,growth:1.28,max:45}
 ];
+const MATERIALS={ore:{label:'Минералы',symbol:'⬡',color:'#8ebcf4'},crystal:{label:'Кристаллы',symbol:'◆',color:'#75e3f5'},ice:{label:'Лёд',symbol:'❄',color:'#a2eaff'},gas:{label:'Газ',symbol:'◌',color:'#b6a8fa'},plasma:{label:'Плазма',symbol:'✺',color:'#ffba77'},exotic:{label:'Экзоматерия',symbol:'✧',color:'#df95f7'}};
+const MATERIAL_KEYS=Object.keys(MATERIALS);
+function stageRecipe(t=g.tier){
+ // Gradually introduce one new resource every epoch. No deliberately huge mass caps.
+ const types=['ore'];if(t>=4)types.push('crystal');if(t>=8)types.push('ice');
+ if(t>=12)types.push('gas');if(t>=17)types.push('plasma');if(t>=22)types.push('exotic');
+ const recent=types.slice(-Math.min(3,types.length));
+ return recent.map((type,i)=>({type,amount:Math.round((3+t*1.25)*(i===0?1:.64))}));
+}
 const TEST_MODE = new URLSearchParams(location.search).get('tester')==='1';
 const SAVE_KEY = TEST_MODE?'cosmic-evolution-tester-save-v1':'cosmic-evolution-save-v1';
 const TEST_KEY = 'cosmic-evolution-tester-v1';
@@ -58,16 +67,18 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify(tester));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,worldX:0,worldY:0,complete:false,visited:[],depleted:{},stageExplored:0,rebalanceV:2});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,worldX:0,worldY:0,complete:false,visited:[],depleted:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
-  g={...fresh(),...s,upgrade:{...fresh().upgrade,...s.upgrade},visited:Array.isArray(s.visited)?s.visited:[],depleted:s.depleted&&typeof s.depleted==='object'?s.depleted:{}};
+  g={...fresh(),...s,upgrade:{...fresh().upgrade,...s.upgrade},visited:Array.isArray(s.visited)?s.visited:[],depleted:s.depleted&&typeof s.depleted==='object'?s.depleted:{},materials:{...fresh().materials,...s.materials}};
   // Respect the percentage of old stage progress instead of shrinking players after the rebalance.
-  if(s.rebalanceV!==2){
-   const oldReq=Math.round(110+45*Math.pow(g.tier,1.68));
+  if(s.rebalanceV!==3){
+   const oldReq=s.rebalanceV===2?Math.round(250+210*Math.pow(g.tier+1,2.18)):Math.round(110+45*Math.pow(g.tier,1.68));
    g.matter=Math.round(clamp(g.matter/oldReq,0,1)*TA[g.tier].required);
-   g.rebalanceV=2;
+   // Existing players get a little starter material, preventing a hard lock on upgrade.
+   const previous=stageRecipe(g.tier);for(const entry of previous)g.materials[entry.type]=Math.max(g.materials[entry.type]||0,Math.floor(entry.amount*.25));
+   g.rebalanceV=3;
   }
  }
 }catch(_){/* storage may be unavailable */}
@@ -143,8 +154,12 @@ addEventListener('resize',resize);resize();
 function toast(message,kind=''){let el=document.createElement('div');el.className=`toast ${kind}`;el.textContent=message;$('toast-root').append(el);setTimeout(()=>el.remove(),3100);}
 // The campaign is tuned for many hours of exploring fresh, non-respawning sectors.
 // Requirements are distance and discovery goals, not artificial AFK timers.
-function missionReq(){return {rare:Math.round(6+g.tier*4.5),explore:Math.round(120+130*g.tier),collect:Math.round(TA[g.tier].required*.22)}}
-function missionsDone(){const m=missionReq();return g.stageCollects>=m.collect&&g.stageRare>=m.rare&&g.stageExplored>=m.explore;}
+function missionReq(){return {rare:0,explore:Math.round(3+Math.min(24,g.tier*1.1)),collect:Math.round(TA[g.tier].required*.45)};}
+function recipeDone(){return stageRecipe().every(({type,amount})=>(g.materials[type]||0)>=amount);}
+function missionsDone(){const m=missionReq();return g.stageCollects>=m.collect&&recipeDone()&&g.stageExplored>=m.explore;}
+function spendRecipe(){for(const r of stageRecipe())g.materials[r.type]=Math.max(0,(g.materials[r.type]||0)-r.amount);}
+function resourceOf(e){return e.material||'ore';}
+
 function upgradeCost(u){return Math.round(u.base*Math.pow(u.growth,g.upgrade[u.id]));}
 function buy(id){const u=upgrades.find(x=>x.id===id);if(!u)return;const cost=upgradeCost(u);if(g.upgrade[id]>=u.max||g.credits<cost){toast('Недостаточно звёздной пыли');return;}g.credits-=cost;g.upgrade[id]++;sound(590,'triangle',.13);burst(player.x,player.y,20,'#81e5ec',1);renderUI(true);save();}
 function populateUpgrades(){const root=$('upgrades');root.textContent='';for(const u of upgrades){let b=document.createElement('button');b.className='upgrade';b.dataset.upgrade=u.id;b.addEventListener('click',()=>buy(u.id));b.innerHTML=`<span class="upgrade-icon">${u.glyph}</span><span class="upgrade-description"><strong>${u.name}</strong><small>${u.label} · <span class="upgrade-level"></span></small></span><span class="upgrade-cost"><span class="upgrade-price"></span><small>✦ цена</small></span>`;root.append(b);}}
@@ -156,16 +171,22 @@ function renderUI(force=false){
  $('epoch-name').textContent=t.epoch.toUpperCase();$('tier-title').textContent=t.name;$('tier-desc').textContent=t.desc;
  $('current-form').textContent=t.name;$('next-form').textContent=next?.name??'ЭВОЛЮЦИЯ ЗАВЕРШЕНА';
  $('progress-fill').style.width=(progress*100).toFixed(1)+'%';$('progress-percent').textContent=progress>=1&&!missionsDone()?'ВЫПОЛНИ ЗАДАЧИ':Math.round(progress*100)+'%';
- const m=missionReq(),cs=[g.stageCollects>=m.collect,g.stageRare>=m.rare,g.stageExplored>=m.explore];
- $('mission-1-label').textContent='Поглощай материю';$('mission-1-val').textContent=`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
- $('mission-2-label').textContent='Найди реликвии';$('mission-2-val').textContent=`${g.stageRare}/${m.rare}`;
- $('mission-3-label').textContent='Открой новые секторы';$('mission-3-val').textContent=`${g.stageExplored}/${m.explore}`;
+ const m=missionReq(),cs=[g.stageCollects>=m.collect,recipeDone(),g.stageExplored>=m.explore];
+ $('mission-1-label').textContent='Нарасти массу';$('mission-1-val').textContent=`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
+ $('mission-2-label').textContent='Собери рецепт';$('mission-2-val').textContent=`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
+ $('mission-3-label').textContent='Исследуй сектора';$('mission-3-val').textContent=`${g.stageExplored}/${m.explore}`;
+ const matRoot=$('materials-inventory');if(matRoot){
+  const active=stageRecipe();matRoot.innerHTML=active.map(({type,amount})=>{
+   const v=g.materials[type]||0,d=MATERIALS[type];return `<div class="material-row ${v>=amount?'ready':''}"><span style="color:${d.color}">${d.symbol}</span><span>${d.label}</span><b>${fmt(v)} / ${fmt(amount)}</b></div>`;
+  }).join('');
+  $('resource-hint').textContent=stageRecipe().map(r=>MATERIALS[r.type].label).join(' · ');
+ }
  cs.forEach((ok,i)=>{const e=$(`mission-${i+1}`);e.classList.toggle('done',ok);e.querySelector('.mission-mark').textContent=ok?'✓':'◇';});$('mission-done').textContent=cs.filter(Boolean).length+'/3';
  for(const u of upgrades){let b=$('upgrades').querySelector(`[data-upgrade="${u.id}"]`),lvl=g.upgrade[u.id],c=upgradeCost(u);b.querySelector('.upgrade-level').textContent=`ур. ${lvl}/${u.max}`;b.querySelector('.upgrade-price').textContent=lvl>=u.max?'MAX':fmt(c);b.disabled=g.credits<c||lvl>=u.max;}
  $('pulse-cooldown').textContent=pulseCd>0?pulseCd.toFixed(1)+'с':'E · ГОТОВ';$('boost-cooldown').textContent=boostCd>0?boostCd.toFixed(1)+'с':'SHIFT · ГОТОВ';
  $('pulse-fill').style.transform=`scaleX(${clamp(1-pulseCd/13,0,1)})`;$('boost-fill').style.transform=`scaleX(${clamp(1-boostCd/6,0,1)})`;
  $('zoom-label').textContent=`РАЗМЕР ${player.r.toFixed(1)} · КАМЕРА ${camera.zoom.toFixed(2)}×`;
- $('btn-music').textContent=g.music?'♫':'♪̸';$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`СЕКТОР ${sx} : ${sy}  ·  ОТКРЫТО ${visitedChunks.size}`;
+ $('btn-music').textContent=g.music?'♫':'♪̸';$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`СЕКТОР ${sx} : ${sy}  ·  ${BIOME_NAMES[chunkInfo(sx,sy).biome]}  ·  ОТКРЫТО ${visitedChunks.size}`;
  const stats=$('tester-stats');
  if(stats)stats.textContent=`${Math.round(frameFps)} FPS · ${entities.length} объектов · ${loadedChunks.size} секторов · ${Math.floor(player.x/CHUNK)}:${Math.floor(player.y/CHUNK)}`;
  if(force)save();
@@ -182,7 +203,28 @@ function spawn(x,y,forced,rng=Math.random){
 function seedHash(a,b){let x=Math.imul(a,374761393)^Math.imul(b,668265263)^WORLD_SEED;x=Math.imul(x^(x>>>13),1274126177);return (x^(x>>>16))>>>0;}
 function chunkRandom(seed){return ()=>{seed+=0x6D2B79F5;let t=seed;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 function chunkKey(x,y){return `${x},${y}`;}
-function chunkInfo(cx,cy){let seed=seedHash(cx,cy),h=seed%100;return {biome:h<11?'nebula':h<26?'rich':h<35?'void':h<41?'relic':'normal',seed};}
+const BIOME_NAMES={normal:'ПОЯС АСТЕРОИДОВ',rich:'КРИСТАЛЬНЫЙ ПОЯС',nebula:'ГАЗОВАЯ ТУМАННОСТЬ',void:'ЛЕДЯНОЙ ПОТОК',relic:'ЗВЁЗДНЫЙ ФРОНТ',anomaly:'ТЁМНАЯ МАТЕРИЯ'};
+function chunkInfo(cx,cy){
+ const seed=seedHash(cx,cy),region=seedHash(Math.floor(cx/6),Math.floor(cy/6)),h=region%100;
+ const biome=h<17?'nebula':h<35?'rich':h<49?'void':h<68?'relic':h<79?'anomaly':'normal';
+ return {biome,seed};
+}
+function materialFor(biome,dist,rng){
+ const d=rng();
+ if(biome==='rich')return d<.58?'crystal':'ore';
+ if(biome==='void')return d<.62?'ice':'ore';
+ if(biome==='nebula')return d<.72?'gas':'ore';
+ if(biome==='relic')return d<.58?(dist>15?'plasma':'crystal'):'ore';
+ if(biome==='anomaly')return d<.38&&dist>35?'exotic':d<.67?'plasma':'ore';
+ return d<.11?'crystal':'ore';
+}
+function sectorType(info,r){
+ const h=info.biome;
+ return h==='relic'?(r<.14?'relic':r<.19?'hazard':'matter'):
+ h==='anomaly'?(r<.10?'relic':r<.17?'hazard':'matter'):
+ r<.055?'relic':r<.115?'hazard':'matter';
+}
+
 function visitPosition(){
  const cx=Math.floor(player.x/CHUNK),cy=Math.floor(player.y/CHUNK),key=chunkKey(cx,cy);
  if(!visitedChunks.has(key)){visitedChunks.add(key);g.visited.push(key);g.stageExplored=(g.stageExplored||0)+1;if(g.stageExplored%10===0)toast(`◈ Открыто ${g.stageExplored} новых секторов`);}
@@ -197,27 +239,27 @@ function makeChunk(cx,cy){
  const info=chunkInfo(cx,cy),rng=chunkRandom(info.seed),mask=(g.depleted[key]||0)>>>0;
  for(let i=0;i<32;i++){
   const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK;
-  const r=rng(),v=rng();let kind=info.biome==='void'?(r<.64?'matter':r<.78?'relic':'hazard'):
-       info.biome==='relic'?(r<.24?'relic':r<.29?'hazard':'matter'):
-       info.biome==='rich'?(r<.08?'relic':r<.13?'hazard':'matter'):
-       info.biome==='nebula'?(r<.075?'relic':r<.11?'hazard':'matter'):
-       r<.038?'relic':r<.10?'hazard':'matter';
+  const r=rng();let kind=sectorType(info,r);
   // Starting area is accessible without early fatal hazards.
   if(Math.hypot(px,py)<110)kind='matter';
   // Always advance RNG for every index (including harvested ones). Otherwise,
   // depleted bodies silently shift all later positions when the sector reloads.
   let e=spawn(px,py,kind,rng);
+  const dist=Math.hypot(cx,cy);e.material=materialFor(info.biome,dist,rng);
   if((mask&(1<<i))!==0||i>=tester.density)continue;
   e.chunk=key;e.index=i;
   // Regions farther from the origin contain physically larger, richer bodies.
   // Grade depends only on sector coordinates, never on player tier, so revisits stay consistent.
-  const dist=Math.hypot(cx,cy),grade=clamp(Math.floor(Math.log(1+dist/3)/Math.log(1.46)),0,27);
+  const grade=clamp(Math.floor(Math.log(1+dist/3)/Math.log(1.46)),0,27);
   const sizeMultiplier=Math.pow(1.125,grade);
   e.grade=grade;
   e.r*=sizeMultiplier*(i%17===0?1.45:1);
   e.value*=1+Math.pow(sizeMultiplier,1.65)*.42;
   if(info.biome==='rich')e.value*=2.1;
-  if(info.biome==='nebula')e.hue=285;
+  if(e.material==='gas'||e.material==='exotic')e.hue=285;
+  if(e.material==='plasma')e.hue=18;
+  if(e.material==='ice')e.hue=195;
+  if(e.material==='crystal')e.hue=252;
   entities.push(e);
  }
 }
@@ -237,46 +279,62 @@ function streamField(){
 // A harvested body never reappears, even in this low-detail distant view.
 function distantSamples(cx,cy){
  const key=chunkKey(cx,cy);
- let result=distantChunkCache.get(key);
- if(result)return result;
+ let result=distantChunkCache.get(key);if(result)return result;
  const info=chunkInfo(cx,cy),rng=chunkRandom(info.seed);result=[];
  for(let i=0;i<32;i++){
-  const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK,r=rng(),v=rng();
-  const kind=info.biome==='void'?(r<.64?'matter':r<.78?'relic':'hazard'):
-   info.biome==='relic'?(r<.24?'relic':r<.29?'hazard':'matter'):
-   info.biome==='rich'?(r<.08?'relic':r<.13?'hazard':'matter'):
-   info.biome==='nebula'?(r<.075?'relic':r<.11?'hazard':'matter'):
-   r<.038?'relic':r<.10?'hazard':'matter';
-  const stableKind=Math.hypot(px,py)<110?'matter':kind;
-  const e=spawn(px,py,stableKind,rng);
-  if(i%3===0)result.push({x:px,y:py,r:e.r,index:i,kind:stableKind});
+  const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK;
+  const r=rng();let kind=sectorType(info,r);
+  if(Math.hypot(px,py)<110)kind='matter';
+  const e=spawn(px,py,kind,rng),material=materialFor(info.biome,Math.hypot(cx,cy),rng);
+  result.push({x:px,y:py,index:i,kind,material,r:e.r});
  }
- if(distantChunkCache.size>1200)distantChunkCache.clear();
- distantChunkCache.set(key,result);
- return result;
+ if(distantChunkCache.size>1250)distantChunkCache.clear();
+ distantChunkCache.set(key,result);return result;
 }
 function renderDistantBodies(){
- // Cover the entire visible world, not only the seven-by-seven active bubble.
- // A hard screen-space budget preserves FPS on 2K/4K monitors.
- const zoom=Math.max(.15,camera.zoom);
- const minX=Math.floor((camera.x-W*.5/zoom)/CHUNK)-1,maxX=Math.floor((camera.x+W*.5/zoom)/CHUNK)+1;
- const minY=Math.floor((camera.y-H*.5/zoom)/CHUNK)-1,maxY=Math.floor((camera.y+H*.5/zoom)/CHUNK)+1;
- const step=Math.max(1,Math.ceil(Math.sqrt(((maxX-minX+1)*(maxY-minY+1))/650)));
+ const zoom=Math.max(.014,camera.zoom),dx=W*.5/zoom,dy=H*.5/zoom;
+ const minX=Math.floor((camera.x-dx)/CHUNK)-1,maxX=Math.floor((camera.x+dx)/CHUNK)+1;
+ const minY=Math.floor((camera.y-dy)/CHUNK)-1,maxY=Math.floor((camera.y+dy)/CHUNK)+1;
+ const total=(maxX-minX+1)*(maxY-minY+1);
+ // Huge fields are represented by stable, procedural nebula knots. No fake
+ // physical objects are created or revived; full nodes render at nearer zooms.
+ const step=Math.max(1,Math.ceil(Math.sqrt(total/380)));
+ const full=total<120?32:total<550?10:4;
  ctx.save();
  for(let cy=minY;cy<=maxY;cy+=step)for(let cx=minX;cx<=maxX;cx+=step){
-  const key=chunkKey(cx,cy);
-  if(loadedChunks.has(key))continue;
-  const info=chunkInfo(cx,cy),mask=(g.depleted[key]||0)>>>0;
-  const color=info.biome==='nebula'?'#b6a6f9':info.biome==='rich'?'#9adff0':
-    info.biome==='relic'?'#ffe0a0':'#86a9c5';
+  const key=chunkKey(cx,cy),info=chunkInfo(cx,cy),seed=seedHash(cx,cy);
+  const x=(cx+.5-camera.x/CHUNK)*CHUNK*zoom+W*.5;
+  const y=(cy+.5-camera.y/CHUNK)*CHUNK*zoom+H*.5;
+  if(x<-120||x>W+120||y<-120||y>H+120)continue;
+  const palette={normal:'#8ebcf4',rich:'#68d4e7',void:'#9ddcf8',nebula:'#a78dee',relic:'#f2bd74',anomaly:'#ca73f3'};
+  const color=palette[info.biome];
+  const spread=Math.max(1.5,Math.min(57,CHUNK*zoom*step*.55));
+  // Decorative background knots are explicitly not collectible matter.
+  if(!loadedChunks.has(key)&&step>1){
+   // Sparse irregular wisps, not a visible checkerboard of nebula ovals.
+   const fleck=seed%101,theta=((seed>>>9)/0x7fffff)*TAU;
+   if(fleck<29){
+     const length=spread*(.7+(seed%23)/8),height=Math.max(1.5,length*(.1+(seed%13)/48));
+     ctx.globalAlpha=.04+(seed%8)*.008;ctx.fillStyle=color;
+     ctx.save();ctx.translate(x+(seed%39-19)*spread/55,y+((seed>>>8)%39-19)*spread/55);ctx.rotate(theta);
+     ctx.beginPath();ctx.ellipse(0,0,length,height,0,0,TAU);ctx.fill();ctx.restore();
+   }
+   if(fleck<64){
+     ctx.globalAlpha=.22+(seed%17)*.012;ctx.fillStyle=color;
+     const a=theta*2,dd=spread*(.15+(seed%37)/56),sz=Math.max(.8,Math.min(2.5,zoom*27));
+     ctx.fillRect(x+Math.cos(a)*dd,y+Math.sin(a)*dd,sz,sz);
+     if(seed%7<2)ctx.fillRect(x-Math.sin(a)*dd*.6,y+Math.cos(a)*dd*.6,sz*.7,sz*.7);
+   }
+  }
+  if(step!==1||loadedChunks.has(key))continue;
+  const mask=(g.depleted[key]||0)>>>0,nodes=distantSamples(cx,cy);
   ctx.fillStyle=color;
-  for(const e of distantSamples(cx,cy)){
-   if(e.index>=tester.density||(mask&(1<<e.index))!==0)continue;
+  for(let j=0;j<nodes.length;j+=Math.max(1,Math.floor(32/full))){
+   const e=nodes[j];if(e.index>=tester.density||(mask&(1<<e.index))!==0)continue;
    const sx=(e.x-camera.x)*zoom+W*.5,sy=(e.y-camera.y)*zoom+H*.5;
    if(sx<-8||sy<-8||sx>W+8||sy>H+8)continue;
-   const radius=clamp(e.r*zoom*.55,.9,3.7);
-   ctx.globalAlpha=e.kind==='hazard'?.27:e.kind==='relic'?.84:.58;
-   ctx.fillRect(sx-radius,sy-radius,radius*2,radius*2);
+   ctx.globalAlpha=e.kind==='hazard'?.27:e.kind==='relic'?.82:.66;
+   const rad=clamp(e.r*zoom*.8,1,4.2);ctx.fillRect(sx-rad,sy-rad,rad*2,rad*2);
   }
  }
  ctx.restore();
@@ -285,7 +343,11 @@ function respawn(e){markHarvested(e);e.dead=true;}
 visitPosition();streamField();
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
-function absorb(e){const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter+=val;g.total+=val;g.stageCollects+=val;g.collects++;let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.stageRare++;g.rare++;burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(Math.random()<.24){burst(e.x,e.y,4,'#8bdcfb',.35);}
+function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter+=val;g.total+=val;g.stageCollects+=val;g.collects++;
+ const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
+ g.materials[mat]=(g.materials[mat]||0)+gain;
+ if(mat==='plasma'||mat==='exotic')burst(e.x,e.y,9,MATERIALS[mat].color,.7);
+ let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
  player.targetR=radiusAt(g.tier,stageFraction());
  if(Math.random()<.08)popText(e.x,e.y,'+'+val);if(g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(g.matter>=TA[g.tier].required&&missionsDone())evolve();}
@@ -304,7 +366,7 @@ function impact(e){if(player.shield>0){respawn(e);return;}const reduction=Math.m
 function evolve(){
  if(g.tier===TA.length-1){g.complete=true;running=false;save();showFinal();return;}
  const before=g.tier;
- g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ spendRecipe();g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  // Never alter world coordinates, velocity, camera center or nearby sectors on evolution.
  morph={from:before,time:0,duration:2.1};screenFlash=.9;
  // No size reset on evolution: the new tier begins exactly where the previous ended.
@@ -316,7 +378,7 @@ function evolve(){
  toast(`✦ НОВАЯ ФОРМА: ${TA[g.tier].name.toUpperCase()}`,'golden');sound(440,'triangle',.6,.055);
  renderUI(true);
 }
-function activatePulse(){if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;const range=270+g.upgrade.gravity*7;shockwaves.push({x:player.x,y:player.y,r:10,max:1.2,life:1.2,color:'#84dfff',range});for(let e of entities){let dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy);if(d<range){if(e.kind==='hazard'){burst(e.x,e.y,18,'#ffb6a5');e.kind='relic';e.r=11;e.value=30+g.tier*2;}else{e.vx+=(player.x-e.x)/(d||1)*Math.max(110,650-d*1.5);e.vy+=(player.y-e.y)/(d||1)*Math.max(110,650-d*1.5);}}}shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();}
+function activatePulse(){if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;const range=270+g.upgrade.gravity*7;shockwaves.push({x:player.x,y:player.y,r:10,max:1.2,life:1.2,color:'#84dfff',range});for(let e of entities){let dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy);if(d<range){if(e.material==='plasma'||e.material==='exotic'){e.primed=true;burst(e.x,e.y,8,MATERIALS[e.material].color,.6);}if(e.kind==='hazard'){burst(e.x,e.y,18,'#ffb6a5');e.kind='relic';e.material='plasma';e.r=11;e.value=30+g.tier*2;}else{e.vx+=(player.x-e.x)/(d||1)*Math.max(110,650-d*1.5);e.vy+=(player.y-e.y)/(d||1)*Math.max(110,650-d*1.5);}}}shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();}
 function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=1.15;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
 function update(dt){
  g.time+=dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
@@ -325,7 +387,7 @@ function update(dt){
  let mag=Math.hypot(ax,ay);if(mag>0){ax/=mag;ay/=mag;}
  player.targetR=radiusAt(g.tier,stageFraction());
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
- const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.35)*(boostTime>0?2.5:1),lerp=1-Math.exp(-dt*9);player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
+ const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.75)*(boostTime>0?2.5:1),lerp=1-Math.exp(-dt*9);player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
  player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
@@ -333,9 +395,13 @@ function update(dt){
  for(const e of entities){let dx=player.x-e.x,dy=player.y-e.y,dist2=dx*dx+dy*dy;
    const reach=gravRange+e.r+80;if(dist2>reach*reach)continue;
    const dist=Math.sqrt(dist2)||1;
-   if(e.kind!=='hazard'&&e.r<=player.r*.82&&dist<gravRange){const pull=(gravRange-dist)/gravRange;e.vx+=dx/dist*(150+pull*520)*dt;e.vy+=dy/dist*(150+pull*520)*dt;}
+   if(e.kind!=='hazard'&&e.r<=player.r*.82&&dist<gravRange*(e.material==='gas'?1.4:1)){const pull=(gravRange-dist)/gravRange;e.vx+=dx/dist*(150+pull*520)*dt;e.vy+=dy/dist*(150+pull*520)*dt;}
    e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
    if(Math.hypot(player.x-e.x,player.y-e.y)<collectR+e.r){
+     if((e.material==='plasma'||e.material==='exotic')&&!e.primed&&e.kind==='matter'){
+       if(!e.hintAt||g.time-e.hintAt>4){e.hintAt=g.time;popText(e.x,e.y,'НАЖМИ E, ЧТОБЫ ДОБЫТЬ',MATERIALS[e.material].color);}
+       continue;
+     }
      if(e.kind==='hazard')impact(e);
      else if(e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
      else absorb(e);
@@ -350,7 +416,7 @@ function update(dt){
  texts.forEach(p=>{p.y-=dt*28;p.life-=dt;});texts=texts.filter(p=>p.life>0);
  // Tasty-Planet-style zoom: the camera follows physical size rather than abstract levels.
  // It deliberately zooms out slower than the body grows, so screen size also increases.
- const zTarget=clamp(tester.zoom*1.45/Math.pow(1+player.r/70,.62),.18,2.5);camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*3.5));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
+ const zTarget=clamp(tester.zoom*1.58/Math.pow(1+player.r/44,1.67),.036,2.5);camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*3.5));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
  uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
  if(saveTimer>12){saveTimer=0;save();}
 }
@@ -490,9 +556,26 @@ function renderEntity(e,time){
  const r=e.r*camera.zoom;
  if(px<-r-12||px>W+r+12||py<-r-12||py>H+r+12)return;
  const near=(e.x-player.x)**2+(e.y-player.y)**2<560*560;
- if(r<1.6){ctx.fillStyle=e.kind==='hazard'?'#ed6d88':e.kind==='relic'?'#ffd790':'#8bc9ed';ctx.fillRect(px,py,1.8,1.8);return;}
+ if(r<1.6){ctx.fillStyle=e.kind==='hazard'?'#ed6d88':e.kind==='relic'?'#ffd790':MATERIALS[e.material]?.color||'#8bc9ed';ctx.fillRect(px,py,1.8,1.8);return;}
  if(e.kind==='matter'){
-  const color=e.hue===285?'#ac8df4':e.hue<210?'#6dccfa':e.hue<250?'#93a4e9':'#b7a0f3';
+  const mat=e.material;
+  if(near&&r>=5&&(mat==='crystal'||mat==='ice'||mat==='plasma'||mat==='exotic'||mat==='gas')){
+    ctx.save();ctx.translate(px,py);ctx.rotate(e.spin*.25);
+    const color=MATERIALS[mat].color;ctx.strokeStyle=color;ctx.fillStyle=color;
+    if(mat==='gas'){
+      ctx.globalAlpha=.37;for(let i=0;i<4;i++){const x=Math.cos(i*TAU/4)*r*.45,y=Math.sin(i*TAU/4)*r*.45;
+      ctx.beginPath();ctx.arc(x,y,r*.55,0,TAU);ctx.fill();}
+    }else if(mat==='plasma'){
+      ctx.lineWidth=Math.max(1,r*.13);for(let i=0;i<6;i++){const a=i*TAU/6+e.spin*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.25,Math.sin(a)*r*.25);ctx.lineTo(Math.cos(a+.14)*r*1.25,Math.sin(a+.14)*r*1.25);ctx.stroke();}
+      ctx.beginPath();ctx.arc(0,0,r*.45,0,TAU);ctx.fill();
+    }else{
+      const n=mat==='crystal'?6:mat==='ice'?8:5;ctx.beginPath();
+      for(let i=0;i<n;i++){const a=i*TAU/n;const R=r*(mat==='exotic'&&i%2?.54:1);if(!i)ctx.moveTo(Math.cos(a)*R,Math.sin(a)*R);else ctx.lineTo(Math.cos(a)*R,Math.sin(a)*R);}
+      ctx.closePath();ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#effcff';ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-r*.35,-r*.12);ctx.lineTo(0,r*.5);ctx.lineTo(r*.35,-r*.12);ctx.stroke();
+    }ctx.restore();return;
+  }
+  const color=MATERIALS[e.material]?.color||(e.hue===285?'#ac8df4':e.hue<210?'#6dccfa':e.hue<250?'#93a4e9':'#b7a0f3');
   if(!near||r<6){ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,Math.max(1.5,r*.77),0,TAU);ctx.fill();return;}
   if(e.grade>=12&&r>13)paintPlanet(px,py,r,color,e.grade>=17);
   else if(e.grade>=5&&r>10)paintRock(px,py,r,color,e.spin*.08,3);
@@ -555,7 +638,7 @@ function drawAtlas(){
  c.fillStyle='#06101e';c.fillRect(0,0,w,h);
  const size=27*atlas.zoom,px=atlas.x/CHUNK,py=atlas.y/CHUNK;
  const left=Math.floor(px-w/(2*size))-1,right=Math.ceil(px+w/(2*size))+1,top=Math.floor(py-h/(2*size))-1,bottom=Math.ceil(py+h/(2*size))+1;
- const colors={normal:'#7d9eb5',rich:'#a9e4bc',nebula:'#c59eff',void:'#ea969a',relic:'#f3d58e'};
+ const colors={normal:'#7d9eb5',rich:'#a9e4bc',nebula:'#c59eff',void:'#9bd9ef',relic:'#f3d58e',anomaly:'#d691ef'};
  let exhausted=0,charted=0;
  for(let cy=top;cy<=bottom;cy++)for(let cx=left;cx<=right;cx++){
   const x=w/2+(cx-px)*size,y=h/2+(cy-py)*size,key=chunkKey(cx,cy),surveyed=visitedChunks.has(key),info=chunkInfo(cx,cy),removed=popcount32(g.depleted[key]||0),remaining=32-removed;
@@ -582,7 +665,7 @@ function showMap(){
  <p class="atlas-description">Каждый сектор существует на постоянных координатах. Поглощённая материя не восстанавливается — ищи новые месторождения дальше от пройденного маршрута.</p>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Интерактивная процедурная карта галактики — перетаскивайте, чтобы перемещать карту"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить">−</button><button id="atlas-center" class="atlas-control center" title="Показать моё местоположение">⌖</button></div></div>
- <div class="atlas-legend"><span><i class="atlas-mark you"></i>ТЫ</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span><i class="atlas-mark rich"></i>БОГАТЫЙ СЕКТОР</span><span><i class="atlas-mark relic"></i>РЕЛИКВИИ</span><span><i class="atlas-mark empty"></i>ОПУСТОШЕНО</span></div>
+ <div class="atlas-legend"><span><i class="atlas-mark you"></i>ТЫ</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span><i class="atlas-mark rich"></i>КРИСТАЛЛЫ</span><span><i class="atlas-mark relic"></i>ПЛАЗМА</span><span style="color:#91d8f9">❄ ЛЁД</span><span style="color:#b49afe">◌ ГАЗ</span><span style="color:#d68af2">✧ ЭКЗОМАТЕРИЯ</span><span><i class="atlas-mark empty"></i>ОПУСТОШЕНО</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · Колёсико или +/− меняют масштаб · Тёмные области ещё не исследованы</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;atlas.dirty=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';
@@ -665,7 +748,7 @@ function testerInit(){
  });
  $('tester-missions').onclick=()=>{const m=missionReq();
   g.stageCollects=Math.max(g.stageCollects,m.collect);g.stageRare=Math.max(g.stageRare,m.rare);
-  g.stageExplored=Math.max(g.stageExplored,m.explore);renderUI(true);toast('Задачи текущей формы выполнены');};
+  g.stageExplored=Math.max(g.stageExplored,m.explore);for(const r of stageRecipe())g.materials[r.type]=Math.max(g.materials[r.type]||0,r.amount);renderUI(true);toast('Рецепт и задачи выполнены');};
  $('tester-next').onclick=()=>testerSetTier(g.tier+1);
  $('tester-jump').onclick=()=>{player.x+=CHUNK*10;player.vx=player.vy=0;camera.x=player.x;camera.y=player.y;
   visitPosition();testerRemakeNearby();renderUI(true);toast('Перемещение в новый сектор (тест)');};
@@ -705,5 +788,5 @@ addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
-Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size})});
+Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
 })();
