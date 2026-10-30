@@ -924,10 +924,14 @@ function blackHoleCoreWorldRadius(){
 // with painted artwork, which previously made those galaxies untouchable.
 function blackHoleTouchDistance(e,core=blackHoleCoreWorldRadius()){
  const zoom=Math.max(1e-155,camera.zoom);
- const paintedPixels=(e.macro||e.cosmic)
-  ? clamp(e.r*zoom*1.15,1.8,112)
-  : Math.max(.3,e.r*zoom);
- return core+Math.min(core*.32,paintedPixels*.91/zoom);
+ if(e.macro||e.cosmic){
+  const spriteRadius=clamp(e.r*zoom*1.15,1.8,112);
+  // Collide with the *drawn* silhouette, even when a galaxy looks
+  // larger than the player. A cap tied to core size made giant bodies
+  // untouchable despite visibly overlapping the black horizon.
+  return core+spriteRadius*(e.kind==='blackhole'?.90:1.12)/zoom;
+ }
+ return core+Math.max(.3,e.r*zoom)/zoom;
 }
 const dotCache=new Map();
 function glowDot(x,y,r,color,intensity=1){
