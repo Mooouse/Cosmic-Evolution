@@ -4,7 +4,7 @@ A complete **2D HTML5 Canvas** cosmic growth game. The old Garage Evolution sour
 
 ## Play
 
-Open `index.html` in a browser, or use GitHub Pages. Controls: mouse or touch drag to move, WASD/arrow keys to steer, `E` gravitational pulse, `Shift`/`Space` dash, `M` evolution map, `P` pause.
+Open `index.html` in a browser, or use GitHub Pages. Controls: mouse or touch drag to move, WASD/arrow keys to steer, `E` gravitational pulse, `Shift`/`Space` dash, `M` live infinite-space atlas, `P` pause.
 
 ## Systems implemented
 
@@ -12,9 +12,15 @@ Open `index.html` in a browser, or use GitHub Pages. Controls: mouse or touch dr
 - Gravity and absorption physics, rare relics, hazards, active pulse and boost abilities.
 - **28 evolution forms**, dust to universe, in six distinct epochs; stage objectives and stage-specific mass requirements.
 - Four permanent upgrades with geometric cost scaling; stage-based resource economy.
-- Auto-save using localStorage, settings, survival stats, map, and completion screen.
+- Auto-save using localStorage, settings, survival stats, **interactive infinite atlas** with draggable coordinates/zoom, and completion screen.
+- Spatially deterministic sectors: resources do not refill when revisited. Collected objects stay removed after reload. Endless exploration is necessary for further progression.
+- Unique 28-stage visual changes are animated in place, without world-position resets. Ambient cinematic original WebAudio score, adjustable volume, and redesigned navigation controls.
 - Responsive keyboard, pointer, and mobile touch controls.
 - Static deployment; no advertisements, trackers, or cloud calls. Google Fonts are optional; the game falls back to local fonts offline.
+
+## World persistence and navigation
+
+The old 28-stage-list map has been replaced with a procedural atlas. Press **M** to view the real sector grid and position, pan with mouse/touch, zoom with the mouse wheel or +/- buttons, recenter with the target button. Sectors with more matter, relics, voids and nebulas are computed from the world seed. Objects in each sector have stable identities; harvested bodies are recorded as compact 32-bit bitmasks. A consumed resource **never respawns**, even after leaving a region or reloading the game; the player must keep exploring. The finite browser storage limit may eventually be reached on extremely large expeditions; if saving fails the console warns. Existing saves are migrated to the new world representation without resetting progress, although depletion from before the update cannot be reconstructed.
 
 ## Progression / game length
 
@@ -27,6 +33,11 @@ Progress is saved under `cosmic-evolution-save-v1` in local browser storage. To 
 All game files are static. The included GitHub Actions workflow runs a syntax/smoke test and deploys the root folder to GitHub Pages. On GitHub, set **Settings → Pages → Build and deployment → Source: GitHub Actions** if it isn't already selected. The workflow retains its deploy artifacts for one day, and removes the temporary archive following successful publication, to reduce artifact storage usage.
 
 
-## Обновление v0.3
+## Обновление баланса и производительности (2026-10-30)
 
-Карта уровней заменена интерактивным атласом бесконечного пространства. Ресурсы генерируются детерминированно по координатам и не появляются повторно после сбора, в том числе после сохранения. При переходе в новую форму положение игрока не сбрасывается. Добавлены оригинальная фоновая музыка с регулировкой громкости, переработанные кнопки и отдельные визуальные изменения форм. Публикация выполняется автоматически через GitHub Actions на https://mooouse.github.io/Cosmic-Evolution/ .
+- Ограничена активная область физических объектов вокруг игрока; дальний космос отрисовывается как фоновое звёздное поле.
+- Убрано дорогое освещение для далёких объектов; сгруппированы уровни детализации и закэшированы свечения и туманности.
+- Уменьшена плотность внутренних пикселей на дисплеях 2K/4K, добавлено автоматическое снижение разрешения при падении FPS.
+- Для продвижения нужны материальные ресурсы, находки и исследование большого количества **новых** секторов. Расчётная цель кампании — 10+ часов, подлежит игровому тестированию и дальнейшему балансу.
+- Сохранения старой версии импортируются с сохранением относительного прогресса в текущем этапе. Сохранённые координаты и информация об истощённых секторах не сбрасываются.
+- В меню настроек и после финала доступна **Новая игра** с подтверждением: прежнее сохранение резервируется в localStorage под `cosmic-evolution-save-v1-backup`.

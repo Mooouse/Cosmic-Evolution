@@ -7,7 +7,7 @@
   <meta name="description" content="Cosmic Evolution — 2D космическая игра про гравитацию, рост и эволюцию от пылинки до Вселенной." />
   <title>Cosmic Evolution — From Dust to Infinity</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2.2" />
 </head>
 <body>
   <canvas id="universe" aria-label="Игровое поле Cosmic Evolution"></canvas>
@@ -20,14 +20,14 @@
         <div class="stat"><span class="stat-icon gold">✦</span><div><small>ЗВЁЗДНАЯ ПЫЛЬ</small><strong id="credit-value">0</strong></div></div>
         <div class="stat timer-stat"><span class="stat-icon clock">◷</span><div><small>В КОСМОСЕ</small><strong id="time-value">00:00</strong></div></div>
       </div>
-      <div class="top-actions"><button id="btn-music" class="square-button" title="Музыка" aria-label="Выключить музыку">♫</button><button id="btn-map" class="square-button" title="Карта космоса (M)" aria-label="Карта космоса">◎</button><button id="btn-pause" class="square-button" title="Пауза (P)" aria-label="Пауза">Ⅱ</button><button id="btn-settings" class="square-button" title="Настройки" aria-label="Настройки">⚙</button></div>
+      <div class="top-actions"><button id="btn-music" class="square-button" title="Включить / выключить музыку" aria-label="Музыка">♫</button><button id="btn-map" class="square-button" title="Карта Вселенной (M)" aria-label="Карта Вселенной">◎</button><button id="btn-pause" class="square-button" title="Пауза (P)" aria-label="Пауза">Ⅱ</button><button id="btn-settings" class="square-button" title="Настройки" aria-label="Настройки">⚙</button></div>
     </header>
     <aside class="sidebar" id="sidebar">
       <div class="side-header"><span>ЛАБОРАТОРИЯ ЭВОЛЮЦИИ</span><button id="btn-sidebar" aria-label="Свернуть улучшения">‹</button></div>
       <div class="tier-display"><span class="eyebrow" id="epoch-name">ЭПОХА ЗАРОЖДЕНИЯ</span><div id="tier-number" class="tier-index">01 <span>/ 28</span></div><h2 id="tier-title">Космическая пыль</h2><p id="tier-desc">Каждая Вселенная начинается с малого.</p></div>
       <div class="upgrades-header"><span>УЛУЧШЕНИЯ</span><small>ПОСТОЯННЫЕ</small></div>
       <div id="upgrades" class="upgrades"></div>
-      <div class="mission-panel"><div class="mission-title">ЗАДАЧИ ЭПОХИ <span id="mission-done">0/3</span></div><div class="mission" id="mission-1"><span class="mission-mark">◇</span><span id="mission-1-label">Соберите материю</span><b id="mission-1-val">0/0</b></div><div class="mission" id="mission-2"><span class="mission-mark">◇</span><span id="mission-2-label">Найдите реликвии</span><b id="mission-2-val">0/0</b></div><div class="mission" id="mission-3"><span class="mission-mark">◇</span><span id="mission-3-label">Примените импульс</span><b id="mission-3-val">0/0</b></div></div>
+      <div class="mission-panel"><div class="mission-title">ИССЛЕДОВАНИЕ ЭПОХИ <span id="mission-done">0/3</span></div><div class="mission" id="mission-1"><span class="mission-mark">◇</span><span id="mission-1-label">Соберите материю</span><b id="mission-1-val">0/0</b></div><div class="mission" id="mission-2"><span class="mission-mark">◇</span><span id="mission-2-label">Найдите реликвии</span><b id="mission-2-val">0/0</b></div><div class="mission" id="mission-3"><span class="mission-mark">◇</span><span id="mission-3-label">Примените импульс</span><b id="mission-3-val">0/0</b></div></div>
     </aside>
     <button id="btn-show-sidebar" class="show-sidebar hidden" aria-label="Показать улучшения">◈ УЛУЧШЕНИЯ</button>
     <div class="world-label"><span class="live-dot"></span><span id="world-label">НЕИЗВЕДАННЫЙ СЕКТОР</span><small id="world-subtitle">ПРОЦЕДУРНО СОЗДАВАЕМАЯ ВСЕЛЕННАЯ</small></div>
@@ -36,7 +36,7 @@
     <div class="zoom-indicator"><span>◌</span><span id="zoom-label">МАСШТАБ 1×</span></div>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
   </div>
-  <div id="modal" class="modal-backdrop"><div class="modal-card intro-card"><div class="hero-art" aria-hidden="true"><div class="hero-ring r1"></div><div class="hero-ring r2"></div><div class="hero-ring r3"></div><div class="hero-core"></div><span class="hero-star s1">✦</span><span class="hero-star s2">✦</span><span class="hero-star s3">✧</span></div><div class="hero-kicker">ТВОЯ ВСЕЛЕННАЯ НАЧИНАЕТСЯ ЗДЕСЬ</div><h1>COSMIC<br/><span>EVOLUTION</span></h1><p class="modal-lead">Начни с одной частицы. Поглощай материю, развивай гравитацию и вырасти в целую Вселенную.</p><div class="intro-features"><span>✧ 28 форм эволюции</span><span>◉ Свободный космос</span><span>◈ Долгая прогрессия</span></div><button id="btn-start" class="primary-button">НАЧАТЬ ЭВОЛЮЦИЮ <span>→</span></button><small class="intro-note">Мышь / WASD — движение · E — импульс · Shift — рывок · Музыка · Автосохранение</small></div></div>
-  <script src="game.js" defer></script>
+  <div id="modal" class="modal-backdrop"><div class="modal-card intro-card"><div class="hero-art" aria-hidden="true"><div class="hero-ring r1"></div><div class="hero-ring r2"></div><div class="hero-ring r3"></div><div class="hero-core"></div><span class="hero-star s1">✦</span><span class="hero-star s2">✦</span><span class="hero-star s3">✧</span></div><div class="hero-kicker">ТВОЯ ВСЕЛЕННАЯ НАЧИНАЕТСЯ ЗДЕСЬ</div><h1>COSMIC<br/><span>EVOLUTION</span></h1><p class="modal-lead">Начни с одной частицы. Поглощай материю, развивай гравитацию и вырасти в целую Вселенную.</p><div class="intro-features"><span>✧ 28 форм эволюции</span><span>◉ Свободный космос</span><span>◈ Исследуй новые секторы</span></div><button id="btn-start" class="primary-button">НАЧАТЬ ЭВОЛЮЦИЮ <span>→</span></button><small class="intro-note">Мышь / WASD — движение · E — импульс · Shift — рывок · Оригинальная космическая музыка · Автосохранение</small></div></div>
+  <script src="game.js?v=2.2" defer></script>
 </body>
 </html>
