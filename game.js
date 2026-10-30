@@ -67,11 +67,11 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify(tester));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,worldX:0,worldY:0,complete:false,visited:[],depleted:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,worldX:0,worldY:0,complete:false,endless:false,visited:[],depleted:{},depletedMacro:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
-  g={...fresh(),...s,upgrade:{...fresh().upgrade,...s.upgrade},visited:Array.isArray(s.visited)?s.visited:[],depleted:s.depleted&&typeof s.depleted==='object'?s.depleted:{},materials:{...fresh().materials,...s.materials}};
+  g={...fresh(),...s,upgrade:{...fresh().upgrade,...s.upgrade},visited:Array.isArray(s.visited)?s.visited:[],depleted:s.depleted&&typeof s.depleted==='object'?s.depleted:{},depletedMacro:s.depletedMacro&&typeof s.depletedMacro==='object'?s.depletedMacro:{},materials:{...fresh().materials,...s.materials}};
   // Respect the percentage of old stage progress instead of shrinking players after the rebalance.
   if(s.rebalanceV!==3){
    const oldReq=s.rebalanceV===2?Math.round(250+210*Math.pow(g.tier+1,2.18)):Math.round(110+45*Math.pow(g.tier,1.68));
@@ -87,10 +87,11 @@ let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTime
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
 function radiusAt(tier,fraction){return 13*Math.pow(1.125,tier+clamp(fraction,0,1));}
+function currentRadius(){const base=radiusAt(g.tier,stageFraction());return g.endless?base*(1+Math.log1p(Math.max(0,g.matter)/TA[g.tier].required)*.24):base;}
 const initialRadius=radiusAt(g.tier,stageFraction());
 let player={x:Number.isFinite(g.worldX)?g.worldX:0,y:Number.isFinite(g.worldY)?g.worldY:0,vx:0,vy:0,r:initialRadius,targetR:initialRadius,rotation:0,shield:0,trail:[]};
 let camera={x:player.x,y:player.y,zoom:1};
-let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();
+let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();const MACRO_SIZE=3200,MACRO_COUNT=16;const macroCache=new Map(),macroSpriteCache=new Map(),macroLoaded=new Set();let macroEntities=[],macroVisibleCount=0;if(!g.depletedMacro||typeof g.depletedMacro!=='object')g.depletedMacro={};
 let keys=new Set(),pointer={x:W/2,y:H/2,active:false,down:false,type:'mouse'};
 let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
 let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
@@ -169,8 +170,8 @@ function renderUI(force=false){
  const t=TA[g.tier],next=TA[g.tier+1],progress=clamp(g.matter/t.required,0,1);
  $('tier-number').innerHTML=`${String(g.tier+1).padStart(2,'0')} <span>/ ${TA.length}</span>`;
  $('epoch-name').textContent=t.epoch.toUpperCase();$('tier-title').textContent=t.name;$('tier-desc').textContent=t.desc;
- $('current-form').textContent=t.name;$('next-form').textContent=next?.name??'ЭВОЛЮЦИЯ ЗАВЕРШЕНА';
- $('progress-fill').style.width=(progress*100).toFixed(1)+'%';$('progress-percent').textContent=progress>=1&&!missionsDone()?'ВЫПОЛНИ ЗАДАЧИ':Math.round(progress*100)+'%';
+ $('current-form').textContent=t.name;$('next-form').textContent=next?.name??(g.endless?'БЕСКОНЕЧНАЯ ЭКСПЕДИЦИЯ':'ЭВОЛЮЦИЯ ЗАВЕРШЕНА');
+ $('progress-fill').style.width=(progress*100).toFixed(1)+'%';$('progress-percent').textContent=g.endless?'∞ СВОБОДНОЕ ИССЛЕДОВАНИЕ':progress>=1&&!missionsDone()?'ВЫПОЛНИ ЗАДАЧИ':Math.round(progress*100)+'%';
  const m=missionReq(),cs=[g.stageCollects>=m.collect,recipeDone(),g.stageExplored>=m.explore];
  $('mission-1-label').textContent='Нарасти массу';$('mission-1-val').textContent=`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
  $('mission-2-label').textContent='Собери рецепт';$('mission-2-val').textContent=`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
@@ -231,7 +232,7 @@ function visitPosition(){
 }
 function markHarvested(e){
  if(e.chunk!==undefined&&Number.isInteger(e.index)){
-  const bit=(1<<e.index)>>>0;g.depleted[e.chunk]=((g.depleted[e.chunk]||0)|bit)>>>0;
+  const bit=(1<<e.index)>>>0;const bag=e.macro?g.depletedMacro:g.depleted;bag[e.chunk]=((bag[e.chunk]||0)|bit)>>>0;
  }
 }
 function makeChunk(cx,cy){
@@ -263,6 +264,113 @@ function makeChunk(cx,cy){
   entities.push(e);
  }
 }
+
+// Large, permanent cosmic deposits for galaxy-scale play.
+// They are generated from position only and their depletion is saved.
+function macroKey(cx,cy){return cx+':'+cy;}
+function macroNodes(cx,cy){
+ const key=macroKey(cx,cy);
+ let saved=macroCache.get(key);if(saved)return saved;
+ const rng=chunkRandom(seedHash(cx*31+731,cy*37-419)^0x9f4e8b21);
+ const biome=chunkInfo(cx*6,cy*6).biome;
+ saved=[];
+ for(let i=0;i<MACRO_COUNT;i++){
+  const x=(cx+.09+rng()*.82)*MACRO_SIZE,y=(cy+.09+rng()*.82)*MACRO_SIZE;
+  const r=i<7?75+Math.pow(rng(),.7)*450:20+rng()*105;
+  const roll=rng(),material=biome==='anomaly'?(roll<.5?'exotic':'plasma'):
+   biome==='nebula'?(roll<.55?'gas':'exotic'):
+   biome==='void'?(roll<.6?'ice':'crystal'):
+   biome==='relic'?(roll<.55?'plasma':'exotic'):
+   biome==='rich'?(roll<.6?'crystal':'ore'):
+   roll<.22?'gas':roll<.42?'crystal':'ore';
+  saved.push({x,y,r,index:i,chunk:key,macro:true,material,kind:'matter',grade:18,
+   value:Math.round(20+r*.38),vx:0,vy:0,spin:rng()*TAU,twinkle:rng()*TAU,
+   primed:false,dead:false,shape:Math.floor(rng()*3),hue:230});
+ }
+ if(macroCache.size>850)macroCache.clear();
+ macroCache.set(key,saved);
+ return saved;
+}
+function streamMacroBodies(){
+ if(g.tier<13){macroEntities=[];macroLoaded.clear();return;}
+ const cx0=Math.floor(player.x/MACRO_SIZE),cy0=Math.floor(player.y/MACRO_SIZE),active=new Set();
+ for(let cy=cy0-1;cy<=cy0+1;cy++)for(let cx=cx0-1;cx<=cx0+1;cx++){
+  const key=macroKey(cx,cy);active.add(key);
+  if(macroLoaded.has(key))continue;
+  macroLoaded.add(key);
+  const depleted=(g.depletedMacro[key]||0)>>>0;
+  for(const e of macroNodes(cx,cy))if(!(depleted&(1<<e.index)))macroEntities.push({...e});
+ }
+ for(const key of macroLoaded)if(!active.has(key))macroLoaded.delete(key);
+ macroEntities=macroEntities.filter(e=>!e.dead&&active.has(e.chunk));
+}
+function cosmicSprite(material,shape){
+ const key=material+':'+shape;
+ let cv=macroSpriteCache.get(key);if(cv)return cv;
+ cv=document.createElement('canvas');cv.width=cv.height=144;
+ let c=cv.getContext('2d'),rng=chunkRandom(seedHash(shape+13,material.length*163));
+ let color=MATERIALS[material]?.color||'#b8aaff';
+ const halo=c.createRadialGradient(72,72,0,72,72,70);
+ halo.addColorStop(0,'rgba(245,252,255,.7)');
+ halo.addColorStop(.14,color);halo.addColorStop(.44,color+'66');
+ halo.addColorStop(1,'rgba(0,0,0,0)');
+ c.globalAlpha=.72;c.fillStyle=halo;c.fillRect(0,0,144,144);c.globalAlpha=1;
+ c.save();c.translate(72,72);c.rotate(shape*.4);
+ for(let arm=0;arm<3;arm++)for(let i=0;i<65;i++){
+  let t=i/65,a=t*4.1+arm*TAU/3,spread=t*57;
+  let x=Math.cos(a)*spread+(rng()-.5)*8,y=Math.sin(a)*spread*.66+(rng()-.5)*7;
+  c.fillStyle=rng()<.28?'#fff5d5':color;c.globalAlpha=.3+rng()*.7;
+  c.beginPath();c.arc(x,y,.55+rng()*1.55,0,TAU);c.fill();
+ }
+ c.restore();c.globalAlpha=1;c.fillStyle='#fffaf0';
+ c.beginPath();c.arc(72,72,3,0,TAU);c.fill();
+ if(macroSpriteCache.size>20)macroSpriteCache.clear();
+ macroSpriteCache.set(key,cv);
+ return cv;
+}
+function drawMacro(e,time,zoom){
+ const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5;
+ const radius=e.r*zoom;
+ if(x<-radius*1.6||x>W+radius*1.6||y<-radius*1.6||y>H+radius*1.6)return false;
+ const drawR=clamp(radius*1.15,2,115),canEat=e.r<=player.r*.82;
+ ctx.globalAlpha=clamp(.65+radius*.02,.55,1);
+ if(e.index>=7||drawR<5){
+  ctx.fillStyle=MATERIALS[e.material]?.color||'#9cb5ff';
+  ctx.beginPath();ctx.arc(x,y,Math.max(1.5,drawR*.55),0,TAU);ctx.fill();
+ } else {
+  const cv=cosmicSprite(e.material,e.shape);
+  ctx.drawImage(cv,x-drawR*1.5,y-drawR*1.5,drawR*3,drawR*3);
+  if(e.macro&&macroLoaded.has(e.chunk)&&drawR>12){
+   ctx.strokeStyle=canEat?'rgba(115,230,205,.20)':'rgba(245,151,171,.19)';
+   ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,radius,0,TAU);ctx.stroke();
+  }
+ }
+ return true;
+}
+function renderMacroField(time){
+ macroVisibleCount=0;
+ if(g.tier<13)return;
+ const zoom=Math.max(.025,camera.zoom);
+ const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
+ const right=Math.floor((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
+ const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1;
+ const bottom=Math.floor((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
+ const total=(right-left+1)*(bottom-top+1);
+ const step=Math.max(1,Math.ceil(Math.sqrt(total/210)));
+ ctx.save();
+ for(let cy=top;cy<=bottom;cy+=step)for(let cx=left;cx<=right;cx+=step){
+  const key=macroKey(cx,cy);if(macroLoaded.has(key))continue;
+  const depleted=(g.depletedMacro[key]||0)>>>0;
+  for(const e of macroNodes(cx,cy)){
+   if(depleted&(1<<e.index))continue;
+   if(W*H>=2200000&&e.index===5||W*H>=2200000&&e.index===6)continue;
+   if(drawMacro(e,time,zoom))macroVisibleCount++;
+  }
+ }
+ for(const e of macroEntities)if(drawMacro(e,time,zoom))macroVisibleCount++;
+ ctx.restore();
+}
+
 function streamField(){
  // Physics and individual sprites exist only around the player. The far field uses stars/nebulae.
  // This prevents 4K zoom-outs from loading thousands of gradient/shadow draw calls.
@@ -273,6 +381,7 @@ function streamField(){
  }
  for(const k of loadedChunks)if(!active.has(k))loadedChunks.delete(k);
  entities=entities.filter(e=>!e.dead&&active.has(e.chunk));
+ streamMacroBodies();
 }
 // Render world-anchored low-cost proxies outside the physics bubble. Unlike
 // decorative stars these exactly sample the same 32 deterministic sector bodies.
@@ -292,6 +401,8 @@ function distantSamples(cx,cy){
  distantChunkCache.set(key,result);return result;
 }
 function renderDistantBodies(){
+ // At giant scales real cosmic deposits replace microscopic dust.
+ if(g.tier>=18&&camera.zoom<.13)return;
  const zoom=Math.max(.014,camera.zoom),dx=W*.5/zoom,dy=H*.5/zoom;
  const minX=Math.floor((camera.x-dx)/CHUNK)-1,maxX=Math.floor((camera.x+dx)/CHUNK)+1;
  const minY=Math.floor((camera.y-dy)/CHUNK)-1,maxY=Math.floor((camera.y+dy)/CHUNK)+1;
@@ -309,21 +420,14 @@ function renderDistantBodies(){
   const palette={normal:'#8ebcf4',rich:'#68d4e7',void:'#9ddcf8',nebula:'#a78dee',relic:'#f2bd74',anomaly:'#ca73f3'};
   const color=palette[info.biome];
   const spread=Math.max(1.5,Math.min(57,CHUNK*zoom*step*.55));
-  // Decorative background knots are explicitly not collectible matter.
+  // Keep distant stars tiny and unobtrusive; no giant fake oval clouds.
   if(!loadedChunks.has(key)&&step>1){
-   // Sparse irregular wisps, not a visible checkerboard of nebula ovals.
    const fleck=seed%101,theta=((seed>>>9)/0x7fffff)*TAU;
-   if(fleck<29){
-     const length=spread*(.7+(seed%23)/8),height=Math.max(1.5,length*(.1+(seed%13)/48));
-     ctx.globalAlpha=.04+(seed%8)*.008;ctx.fillStyle=color;
-     ctx.save();ctx.translate(x+(seed%39-19)*spread/55,y+((seed>>>8)%39-19)*spread/55);ctx.rotate(theta);
-     ctx.beginPath();ctx.ellipse(0,0,length,height,0,0,TAU);ctx.fill();ctx.restore();
-   }
-   if(fleck<64){
-     ctx.globalAlpha=.22+(seed%17)*.012;ctx.fillStyle=color;
-     const a=theta*2,dd=spread*(.15+(seed%37)/56),sz=Math.max(.8,Math.min(2.5,zoom*27));
-     ctx.fillRect(x+Math.cos(a)*dd,y+Math.sin(a)*dd,sz,sz);
-     if(seed%7<2)ctx.fillRect(x-Math.sin(a)*dd*.6,y+Math.cos(a)*dd*.6,sz*.7,sz*.7);
+   if(fleck<88){
+    ctx.globalAlpha=.25+(seed%17)*.022;ctx.fillStyle=color;
+    const a=theta*2,dd=spread*(.15+(seed%37)/56),sz=Math.max(.85,Math.min(2.1,zoom*30));
+    ctx.fillRect(x+Math.cos(a)*dd,y+Math.sin(a)*dd,sz,sz);
+    if(seed%7<3)ctx.fillRect(x-Math.sin(a)*dd*.6,y+Math.cos(a)*dd*.6,sz*.65,sz*.65);
    }
   }
   if(step!==1||loadedChunks.has(key))continue;
@@ -350,7 +454,7 @@ function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.val
  let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
  player.targetR=radiusAt(g.tier,stageFraction());
- if(Math.random()<.08)popText(e.x,e.y,'+'+val);if(g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(g.matter>=TA[g.tier].required&&missionsDone())evolve();}
+ if(Math.random()<.08)popText(e.x,e.y,'+'+val);if(g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
 // Bodies larger than you stay in the universe; avoid them until you outgrow them.
 function collideWithGiant(e,dx,dy,dist){
  if(player.shield>0)return;
@@ -364,7 +468,8 @@ function collideWithGiant(e,dx,dy,dist){
 }
 function impact(e){if(player.shield>0){respawn(e);return;}const reduction=Math.max(.15,1-g.upgrade.shield*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
 function evolve(){
- if(g.tier===TA.length-1){g.complete=true;running=false;save();showFinal();return;}
+ if(g.complete)return;
+ if(g.tier===TA.length-1){g.complete=true;g.endless=false;running=false;save();showFinal();return;}
  const before=g.tier;
  spendRecipe();g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  // Never alter world coordinates, velocity, camera center or nearby sectors on evolution.
@@ -385,14 +490,14 @@ function update(dt){
  let ax=0,ay=0;if(keys.has('w')||keys.has('arrowup'))ay-=1;if(keys.has('s')||keys.has('arrowdown'))ay+=1;if(keys.has('a')||keys.has('arrowleft'))ax-=1;if(keys.has('d')||keys.has('arrowright'))ax+=1;
  if(ax===0&&ay===0&&pointer.active){ax=(pointer.x-W/2)/Math.max(100,W*.26);ay=(pointer.y-H/2)/Math.max(100,H*.29);if(Math.hypot(ax,ay)<.11)ax=ay=0;}
  let mag=Math.hypot(ax,ay);if(mag>0){ax/=mag;ay/=mag;}
- player.targetR=radiusAt(g.tier,stageFraction());
+ player.targetR=currentRadius();
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
  const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.75)*(boostTime>0?2.5:1),lerp=1-Math.exp(-dt*9);player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
  player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
  let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,player.r*2.8),collectR=player.r+4;
- for(const e of entities){let dx=player.x-e.x,dy=player.y-e.y,dist2=dx*dx+dy*dy;
+ for(const e of entities.concat(macroEntities)){if(!running)break;let dx=player.x-e.x,dy=player.y-e.y,dist2=dx*dx+dy*dy;
    const reach=gravRange+e.r+80;if(dist2>reach*reach)continue;
    const dist=Math.sqrt(dist2)||1;
    if(e.kind!=='hazard'&&e.r<=player.r*.82&&dist<gravRange*(e.material==='gas'?1.4:1)){const pull=(gravRange-dist)/gravRange;e.vx+=dx/dist*(150+pull*520)*dt;e.vy+=dy/dist*(150+pull*520)*dt;}
@@ -408,7 +513,7 @@ function update(dt){
    }
    // Objects outside the viewport are unloaded by streamField, never marked as consumed.
  }
- entities=entities.filter(e=>!e.dead);if(streamTimer>.32){streamTimer=0;streamField();}
+ entities=entities.filter(e=>!e.dead);macroEntities=macroEntities.filter(e=>!e.dead);if(streamTimer>.32){streamTimer=0;streamField();}
  // No random refill events: only unexplored, persistent sectors supply new matter.
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*2);p.vy*=Math.exp(-dt*2);p.life-=dt;}
  particles=particles.filter(p=>p.life>0);
@@ -556,6 +661,7 @@ function renderEntity(e,time){
  const r=e.r*camera.zoom;
  if(px<-r-12||px>W+r+12||py<-r-12||py>H+r+12)return;
  const near=(e.x-player.x)**2+(e.y-player.y)**2<560*560;
+ if(g.tier>=18&&camera.zoom<.13&&r<2.25)return;
  if(r<1.6){ctx.fillStyle=e.kind==='hazard'?'#ed6d88':e.kind==='relic'?'#ffd790':MATERIALS[e.material]?.color||'#8bc9ed';ctx.fillRect(px,py,1.8,1.8);return;}
  if(e.kind==='matter'){
   const mat=e.material;
@@ -604,7 +710,7 @@ function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=pl
  ctx.restore();}
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
-function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);renderDistantBodies();ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
+function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);renderDistantBodies();renderMacroField(time);ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
@@ -683,7 +789,7 @@ function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТ
 function restartCampaign(){
  if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
- const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();entities=[];
+ const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroEntities=[];entities=[];
  if(TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
  player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);
  player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
@@ -712,14 +818,14 @@ function testerToggle(force){
 function testerSetTier(tier){
  const next=clamp(Math.round(tier),0,TA.length-1),from=g.tier;
  if(next===from)return;
- g.tier=next;g.complete=false;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ g.tier=next;g.complete=false;g.endless=false;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  morph={from,time:0,duration:1.5};player.targetR=radiusAt(next,0);
  player.r=player.targetR;screenFlash=.5;
  burst(player.x,player.y,35,TA[next].color);
  renderUI(true);testerRefresh();
 }
 function testerRemakeNearby(){
- loadedChunks.clear();entities=[];distantChunkCache.clear();streamField();
+ loadedChunks.clear();entities=[];distantChunkCache.clear();macroLoaded.clear();macroEntities=[];streamField();
 }
 function testerInit(){
  if(!TEST_MODE){$('btn-tester').hidden=true;return;}
@@ -769,7 +875,7 @@ function panelValue(key,v){
 }
 testerInit();
 $('btn-new-game').onclick=restartCampaign;
-function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">ТЫ СТАЛ ВСЕЛЕННОЙ</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Ты завершил путь Cosmic Evolution.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поздравляем с завершением космической эволюции!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{running=true;$('modal').classList.add('off');last=performance.now();};$('btn-new-universe').onclick=restartCampaign;}
+function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">ТЫ СТАЛ ВСЕЛЕННОЙ</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Ты завершил путь Cosmic Evolution.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поздравляем с завершением космической эволюции!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('btn-new-universe').onclick=restartCampaign;}
 $('btn-start').onclick=()=>{running=true;startMusic();$('modal').classList.add('off');last=performance.now();if(!g.time)toast('✦ ИССЛЕДУЙ КОСМОС · ПОГЛОЩАЙ МАТЕРИЮ');};if(g.time>10)$('btn-start').innerHTML='ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ <span>→</span>';
 $('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=showMap;$('btn-pause').onclick=()=>running?showPause():(running=true,$('modal').classList.add('off'));$('btn-settings').onclick=showSettings;
 $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
@@ -788,5 +894,5 @@ addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
-Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
+Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
 })();
