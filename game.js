@@ -977,32 +977,41 @@ function drawAtlas(){
    c.fillRect(x,y,Math.max(2,tileSize),Math.max(2,tileSize));c.globalAlpha=1;
   }
  }
- // Massive black holes reveal a real circular footprint. Store and display
- // those explored areas as compact circles instead of billions of tile records.
- for(const [x,y,r] of g.discoveryDiscs){
-  const sx=w/2+(x-px)*size,sy=h/2+(y-py)*size,rad=Math.max(3,r*size);
-  if(sx+rad<0||sy+rad<0||sx-rad>w||sy-rad>h)continue;
-  c.fillStyle='rgba(71,195,220,.24)';c.strokeStyle='#79dfee';c.lineWidth=1.4;
-  if(rad>Math.max(w,h)*3){
-   // Canvas arcs with astronomical radii can stall or overflow the rasterizer.
-   const farCorner=Math.hypot(Math.max(Math.abs(sx),Math.abs(sx-w)),Math.max(Math.abs(sy),Math.abs(sy-h)));
-   if(rad>=farCorner)c.fillRect(0,0,w,h);
-   else {
-    const cell=18;
-    for(let yy=0;yy<h;yy+=cell)for(let xx=0;xx<w;xx+=cell){
-     const ddx=xx+cell*.5-sx,ddy=yy+cell*.5-sy;
-     if(Math.hypot(ddx,ddy)<=rad)c.fillRect(xx,yy,Math.min(cell,w-xx),Math.min(cell,h-yy));
-    }
+ // The exploration discs are stored geometry, not map artwork. Rasterize
+ // their UNION onto aligned sector blocks; never draw overlapping circles.
+ const group=Math.pow(2,Math.max(0,Math.ceil(Math.log2(7/size))));
+ const groupPx=size*group;
+ const baseX=Math.floor(left/group)*group,baseY=Math.floor(top/group)*group;
+ const columns=Math.min(220,Math.ceil((right-baseX)/group)+1);
+ const rows=Math.min(170,Math.ceil((bottom-baseY)/group)+1);
+ const explored=new Uint8Array(columns*rows);
+ const discs=Array.isArray(g.discoveryDiscs)?g.discoveryDiscs:[];
+ for(const d of discs){
+  if(!Array.isArray(d)||d.length!==3)continue;
+  const [cx,cy,r]=d;if(![cx,cy,r].every(Number.isFinite)||r<0)continue;
+  const minX=Math.max(0,Math.floor((cx-r-baseX)/group)-1),maxX=Math.min(columns-1,Math.floor((cx+r-baseX)/group)+1);
+  const minY=Math.max(0,Math.floor((cy-r-baseY)/group)-1),maxY=Math.min(rows-1,Math.floor((cy+r-baseY)/group)+1);
+  const r2=r*r;
+  for(let gy=minY;gy<=maxY;gy++){
+   const y0=baseY+gy*group,y1=y0+group,dy=cy<y0?y0-cy:cy>y1?cy-y1:0;
+   if(dy*dy>r2)continue;
+   for(let gx=minX;gx<=maxX;gx++){
+    const x0=baseX+gx*group,x1=x0+group,dx=cx<x0?x0-cx:cx>x1?cx-x1:0;
+    if(dx*dx+dy*dy<=r2)explored[gy*columns+gx]=1;
    }
-  } else {c.beginPath();c.arc(sx,sy,rad,0,TAU);c.fill();c.stroke();}
+  }
  }
- // Even a huge zoom out preserves the explored region around the player.
+ c.save();c.fillStyle='#42afcc';c.globalAlpha=group>8?.53:.41;
+ for(let gy=0;gy<rows;gy++)for(let gx=0;gx<columns;gx++){
+  if(!explored[gy*columns+gx])continue;
+  const x=w/2+(baseX+gx*group-px)*size,y=h/2+(baseY+gy*group-py)*size;
+  if(x>=w||y>=h||x+groupPx<=0||y+groupPx<=0)continue;
+  c.fillRect(x+.25,y+.25,Math.max(.5,groupPx-.5),Math.max(.5,groupPx-.5));
+ }
+ c.restore();
+ // Keep the player's marker small even when its physical horizon covers
+ // millions of sectors. Local scale is shown in the separate 11x11 grid.
  const mx=w/2+(player.x-atlas.x)*size/CHUNK,my=h/2+(player.y-atlas.y)*size/CHUNK;
- const br=player.r/CHUNK*size;
- if(mx+br>=0&&my+br>=0&&mx-br<w&&my-br<h){
-  c.strokeStyle='rgba(131,246,239,.7)';c.lineWidth=1.25;
-  if(br>Math.max(w,h)*3)c.strokeRect(.6,.6,w-1.2,h-1.2);else {c.beginPath();c.arc(mx,my,Math.max(3,br),0,TAU);c.stroke();}
- }
  // Readable local sector grid, independent of atlas zoom. The previous
  // atlas became sub-pixel at 0.008x, hiding every adjacent discovered cell.
  const insetCell=15,insetN=11,insetSize=insetCell*insetN;
