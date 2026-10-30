@@ -12,7 +12,7 @@ has('ratioLut[k]', 'Lens must sample a precomputed warp');
 lacks('const scale=Math.min(1,300/', 'Never shrink lens to 300 px');
 has('const outer=Math.min(R*2.30', 'Broad lensing effect was lost');
 has('const fade=', 'Non-lens fades should stay controlled');
-has('ctx.save();ctx.globalAlpha=1;\n   ctx.drawImage(old.canvas', 'Cached backdrop must not dim during fade');
+has("mix.globalCompositeOperation='lighter';mix.globalAlpha=blend", 'Backdrop interpolation must sum weighted premultiplied pixels offscreen');
 has('0,496', 'LOD must support astronomical world sizes');
 has('low<496', 'LOD interpolation must also support astronomical sizes');
 has('Math.max(1e-155,camera.zoom)', 'Camera must support extremely small zoom');
@@ -57,8 +57,8 @@ assert.match(game,/if\(g\.tier===TA\.length-1\)return;\s*const t=TA\[g\.tier\]/,
  'Do not paint final black hole via ordinary player morphs');
 assert.match(game,/renderPlayer\(time\);renderParticles\(\);[\s\S]*?paintBlackHole\(p\.x,p\.y,r,time\);/,
  'Black-hole core must be composited AFTER particles and other effects');
-assert.match(game,/if\(!g\.endless&&frameFps<42/,
- 'Final-tier canvas must not be reset by adaptive resolution changes');
+assert.ok(!game.slice(game.indexOf('function frame(now){'),game.indexOf('function show(html)')).includes('applyResolution()'),
+ 'Animation loop must not resize the visible canvas');
 assert.match(game,/try\{renderBlackHoleLensing\(\);\}[\s\S]*?catch\(_\)\{blackHoleLensRetryAt=/,
  'Failed lensing must not abort drawing the event horizon');
 const beginBlack=game.indexOf('function paintBlackHole(x,y,r,time){');
@@ -137,3 +137,72 @@ traceFrame(true);
 console.log("PASS: complete atomic screen frames and lens-readback failure isolation");
 
 console.log('PASS: lens resolution, fast lens lookup, stable backdrop, 4 astronomical zoom levels, LOD, galaxy collision and movement');
+
+// Execute the real backdrop lifecycle. Missing `tier` metadata previously
+// invalidated it on EVERY frame; text-presence tests did not catch that.
+const cacheStart=game.indexOf('let macroBackdrop=null');
+const cacheEnd=game.indexOf('\nfunction streamField()',cacheStart);
+let backdropBuilds=0,canvasAllocations=0;
+const paintContext=()=>({globalAlpha:1,globalCompositeOperation:'source-over',
+ setTransform(){},clearRect(){},drawImage(){}});
+const cacheSandbox={W:1920,H:1080,g:{tier:25},TA:Array(28),camera:{x:0,y:0,zoom:.001},player:{x:0,y:0},
+ ctx:paintContext(),macroVisibleCount:0,macroEntities:[],MACRO_SIZE:3200,
+ cosmicSceneDirty:false,cosmicNextRedraw:0,macroKey:(x,y)=>`${x}:${y}`,
+ cosmicVisibleLOD:()=>({low:2}),renderMacroBackground(){backdropBuilds++},drawMacro:()=>true,
+ clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),document:{createElement(){canvasAllocations++;const ctx=paintContext();return{width:0,height:0,getContext:()=>ctx}}}};
+vm.createContext(cacheSandbox);vm.runInContext(game.slice(cacheStart,cacheEnd),cacheSandbox);
+for(let i=0;i<180;i++)vm.runInContext(`renderMacroField(${i/60})`,cacheSandbox,{timeout:100});
+assert.equal(backdropBuilds,1,'A stationary scene must build its backdrop once, not every frame');
+cacheSandbox.cosmicSceneDirty=true;vm.runInContext('renderMacroField(3)',cacheSandbox);
+assert.equal(backdropBuilds,2,'Harvesting must invalidate the backdrop');
+for(let i=0;i<10;i++){
+ cacheSandbox.cosmicSceneDirty=true;vm.runInContext(`renderMacroField(${4+i})`,cacheSandbox);
+}
+assert.equal(canvasAllocations,3,'Two backdrop buffers plus one blend buffer must be reused');
+cacheSandbox.g.tier=26;vm.runInContext('renderMacroField(15)',cacheSandbox);
+assert.equal(backdropBuilds,13,'Changing tier must refresh the backdrop once');
+console.log('PASS: 180 stationary frames reuse one backdrop; refreshed buffers recycle');
+
+// A real world index above 2^53 cannot be incremented by one. These used to
+// lock the main thread forever even though the microscopic bodies are invisible.
+const streamStart=game.indexOf('function streamField(){');
+const streamEnd=game.indexOf('\n// Render world-anchored',streamStart);
+const macroStart=game.indexOf('function streamMacroBodies(){');
+const macroEnd=game.indexOf('\nconst GALAXY_PALETTES',macroStart);
+for(const x of [1e20,-1e20,1e100,-1e100]){
+ const sim={player:{x,y:x},camera:{zoom:1e-30},g:{tier:27},CHUNK:480,MACRO_SIZE:3200,
+  entities:[{}],macroEntities:[{}],loadedChunks:new Set(['old']),macroLoaded:new Set(['old'])};
+ vm.createContext(sim);
+ vm.runInContext(game.slice(macroStart,macroEnd)+'\n'+game.slice(streamStart,streamEnd),sim);
+ vm.runInContext('streamField()',sim,{timeout:100});
+ assert.equal(sim.entities.length,0);assert.equal(sim.macroEntities.length,0);
+ assert.equal(sim.loadedChunks.size,0);assert.equal(sim.macroLoaded.size,0);
+}
+has('if(renderGpuLens(p,R,outer))return;', 'GPU path must bypass CPU pixel readback');
+has("surface.addEventListener('webglcontextlost'", 'GPU context loss must permit stable fallback');
+has('state.width!==frameCanvas.width', 'GPU texture should only be allocated when dimensions change');
+console.log('PASS: huge-coordinate streaming terminates; GPU-first lens with loss recovery');
+
+const absorptionStart=game.indexOf('function startAbsorption(e){');
+const absorptionEnd=game.indexOf('\nvisitPosition();streamField();',absorptionStart);
+for(const zoom of [1,1e-3,1e-60,1e-110]){
+ let rewards=0;
+ const e={x:210/zoom,y:0,r:100/zoom,macro:true,index:0,chunk:'test'};
+ const sim={e,camera:{zoom},player:{x:0,y:0,r:450/zoom},W:1920,H:1080,
+ BLACK_HOLE_CORE_FRACTION:.245,clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
+ absorbingMacroKeys:new Set(),absorptionKey:()=> 'test',
+ absorb(body){body.dead=true;rewards++},finishCosmicAbsorption(body){body.dead=true;rewards++}};
+ vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(absorptionStart,absorptionEnd),sim);
+ vm.runInContext('startAbsorption(e);animateAbsorption(e,.05)',sim);
+ assert.equal(rewards,0,'Touching the horizon must not award/remove a galaxy');
+ assert.ok(e.x<210/zoom&&e.x>0,'Galaxy must actually move inward');
+ assert.ok(e.absorbScale>.98,'Galaxy must not instantly collapse on first contact');
+ for(let i=0;i<150&&!e.dead;i++)vm.runInContext('animateAbsorption(e,1/60)',sim);
+ assert.equal(rewards,1,'Full absorption must finish and reward exactly once');
+ const drawnRadius=112*1.4*e.absorbScale;
+ assert.ok(Math.hypot(e.x,e.y)*zoom+drawnRadius<=110.25*.96,
+  'The complete galaxy must be inside the black disk before deletion');
+ vm.runInContext('animateAbsorption(e,1/60)',sim);assert.equal(rewards,1);
+}
+lacks('1-e.absorbing/.26', 'Contact must not fade/shrink galaxies out in place');
+console.log('PASS: galaxies travel fully inside the horizon before reward/removal at four scales');
