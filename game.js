@@ -671,7 +671,9 @@ function renderMacroField(time){
    const ow=old.canvas.width*r,oh=old.canvas.height*r;
    const ox=W*.5+(old.x-camera.x)*worldZoom-ow*.5;
    const oy=H*.5+(old.y-camera.y)*worldZoom-oh*.5;
-   ctx.save();ctx.globalAlpha=1-clamp(elapsed/.40,0,1);
+   // Keep the outgoing backdrop at full brightness while fading in the new one.
+   // Fading both caused a visible dark pulse on every buffer refresh.
+   ctx.save();ctx.globalAlpha=1;
    ctx.drawImage(old.canvas,ox,oy,ow,oh);ctx.restore();
   }else{macroBackdropOld.canvas.width=0;macroBackdropOld.canvas.height=0;macroBackdropOld=null;}
  }
@@ -1030,7 +1032,7 @@ function renderBlackHoleLensing(){
  if(g.tier!==TA.length-1)return;
  const p=project(player.x,player.y),R=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
  // A compact lens, not a giant vortex of stretched galaxies.
- const outer=Math.min(R*1.30,Math.max(W,H)*.64);
+ const outer=Math.min(R*2.30,Math.max(W,H)*.85);
  const left=Math.max(0,Math.floor(p.x-outer)),top=Math.max(0,Math.floor(p.y-outer));
  const right=Math.min(W,Math.ceil(p.x+outer)),bottom=Math.min(H,Math.ceil(p.y+outer));
  const width=right-left,height=bottom-top;
@@ -1049,16 +1051,18 @@ function renderBlackHoleLensing(){
  const a=lensInputCtx.getImageData(0,0,sw,sh).data;
  const warped=lensOutputCtx.createImageData(sw,sh),b=warped.data;
  const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION;
- const outerStart=Math.max(core+R*.30,outer-R*.34),outerLength=Math.max(1,outer-outerStart);
+ const outerStart=Math.max(core+R*.35,outer-R*.50),outerLength=Math.max(1,outer-outerStart);
  for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
   const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
   const d=Math.hypot(dx,dy),idx=(iy*sw+ix)*4;
   if(d<core*.99||d>=outer)continue;
-  // Smooth, short-range deflection: prevents the old long radial streaks.
-  const u=Math.max(0,(d-core)/(R*.34));
-  const strength=Math.exp(-u*u);
-  const bend=R*.065*strength;
-  const twist=.018*strength;
+  // A strong, broad lens with smoothly fading edges instead of rays.
+  const u=Math.max(0,(d-core)/(R*.76));
+  const strength=Math.exp(-Math.pow(u,1.65));
+  const border=clamp((outer-d)/Math.max(1,R*.50),0,1);
+  const feather=border*border*(3-2*border);
+  const bend=R*.34*strength*feather;
+  const twist=.040*strength*feather;
   const rr=(d+bend)/d;
   const cosine=Math.cos(twist),sine=Math.sin(twist);
   const sx=(p.x+(dx*cosine-dy*sine)*rr-left)*sampleX-.5;
