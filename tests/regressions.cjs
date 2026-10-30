@@ -102,7 +102,10 @@ const renderCode=game.slice(startRender,stopRender);
 function traceFrame(lensFails=false){
  const calls=[];
  const mockCtx=label=>({
-  setTransform(){calls.push(label+":transform")},save(){},restore(){},
+  stateStack:[],
+  setTransform(){calls.push(label+":transform")},
+  save(){this.stateStack.push([this.globalAlpha,this.globalCompositeOperation])},
+  restore(){const state=this.stateStack.pop();if(state){this.globalAlpha=state[0];this.globalCompositeOperation=state[1];}},
   globalAlpha:1,globalCompositeOperation:"source-over",
   drawImage(){calls.push(label+":present")}
  });
