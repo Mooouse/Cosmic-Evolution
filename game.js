@@ -46,7 +46,18 @@ const upgrades = [
  {id:'harvest',name:'Синтез материи',label:'Бонус к поглощению',glyph:'✦',base:65,growth:1.31,max:65},
  {id:'shield',name:'Стабильность',label:'Защита от опасностей',glyph:'⬡',base:80,growth:1.28,max:45}
 ];
-const SAVE_KEY = 'cosmic-evolution-save-v1';
+const TEST_MODE = new URLSearchParams(location.search).get('tester')==='1';
+const SAVE_KEY = TEST_MODE?'cosmic-evolution-tester-save-v1':'cosmic-evolution-save-v1';
+const TEST_KEY = 'cosmic-evolution-tester-v1';
+const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,density:32,showStats:true});
+let tester={...TEST_DEFAULTS};
+try {
+ const savedTester=JSON.parse(localStorage.getItem(TEST_KEY)||'null');
+ if(TEST_MODE&&savedTester&&typeof savedTester==='object')for(const k in TEST_DEFAULTS)
+  if(typeof savedTester[k]===typeof TEST_DEFAULTS[k])tester[k]=savedTester[k];
+}catch(_){}
+function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify(tester));}catch(_){}}
+
 const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,worldX:0,worldY:0,complete:false,visited:[],depleted:{},stageExplored:0,rebalanceV:2});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
@@ -68,7 +79,7 @@ function radiusAt(tier,fraction){return 13*Math.pow(1.125,tier+clamp(fraction,0,
 const initialRadius=radiusAt(g.tier,stageFraction());
 let player={x:Number.isFinite(g.worldX)?g.worldX:0,y:Number.isFinite(g.worldY)?g.worldY:0,vx:0,vy:0,r:initialRadius,targetR:initialRadius,rotation:0,shield:0,trail:[]};
 let camera={x:player.x,y:player.y,zoom:1};
-let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;
+let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();
 let keys=new Set(),pointer={x:W/2,y:H/2,active:false,down:false,type:'mouse'};
 let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
 let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
@@ -155,6 +166,8 @@ function renderUI(force=false){
  $('pulse-fill').style.transform=`scaleX(${clamp(1-pulseCd/13,0,1)})`;$('boost-fill').style.transform=`scaleX(${clamp(1-boostCd/6,0,1)})`;
  $('zoom-label').textContent=`РАЗМЕР ${player.r.toFixed(1)} · КАМЕРА ${camera.zoom.toFixed(2)}×`;
  $('btn-music').textContent=g.music?'♫':'♪̸';$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`СЕКТОР ${sx} : ${sy}  ·  ОТКРЫТО ${visitedChunks.size}`;
+ const stats=$('tester-stats');
+ if(stats)stats.textContent=`${Math.round(frameFps)} FPS · ${entities.length} объектов · ${loadedChunks.size} секторов · ${Math.floor(player.x/CHUNK)}:${Math.floor(player.y/CHUNK)}`;
  if(force)save();
 }
 // World is deterministic: the same sector always has the same matter, even after a restart.
@@ -184,15 +197,18 @@ function makeChunk(cx,cy){
  const info=chunkInfo(cx,cy),rng=chunkRandom(info.seed),mask=(g.depleted[key]||0)>>>0;
  for(let i=0;i<32;i++){
   const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK;
-  const r=rng(),v=rng();let kind=info.biome==='void'?(r<.10?'matter':r<.16?'relic':'hazard'):
+  const r=rng(),v=rng();let kind=info.biome==='void'?(r<.64?'matter':r<.78?'relic':'hazard'):
        info.biome==='relic'?(r<.24?'relic':r<.29?'hazard':'matter'):
        info.biome==='rich'?(r<.08?'relic':r<.13?'hazard':'matter'):
        info.biome==='nebula'?(r<.075?'relic':r<.11?'hazard':'matter'):
        r<.038?'relic':r<.10?'hazard':'matter';
   // Starting area is accessible without early fatal hazards.
   if(Math.hypot(px,py)<110)kind='matter';
-  if((mask&(1<<i))!==0)continue;
-  let e=spawn(px,py,kind,rng);e.chunk=key;e.index=i;
+  // Always advance RNG for every index (including harvested ones). Otherwise,
+  // depleted bodies silently shift all later positions when the sector reloads.
+  let e=spawn(px,py,kind,rng);
+  if((mask&(1<<i))!==0||i>=tester.density)continue;
+  e.chunk=key;e.index=i;
   // Regions farther from the origin contain physically larger, richer bodies.
   // Grade depends only on sector coordinates, never on player tier, so revisits stay consistent.
   const dist=Math.hypot(cx,cy),grade=clamp(Math.floor(Math.log(1+dist/3)/Math.log(1.46)),0,27);
@@ -216,11 +232,60 @@ function streamField(){
  for(const k of loadedChunks)if(!active.has(k))loadedChunks.delete(k);
  entities=entities.filter(e=>!e.dead&&active.has(e.chunk));
 }
+// Render world-anchored low-cost proxies outside the physics bubble. Unlike
+// decorative stars these exactly sample the same 32 deterministic sector bodies.
+// A harvested body never reappears, even in this low-detail distant view.
+function distantSamples(cx,cy){
+ const key=chunkKey(cx,cy);
+ let result=distantChunkCache.get(key);
+ if(result)return result;
+ const info=chunkInfo(cx,cy),rng=chunkRandom(info.seed);result=[];
+ for(let i=0;i<32;i++){
+  const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK,r=rng(),v=rng();
+  const kind=info.biome==='void'?(r<.64?'matter':r<.78?'relic':'hazard'):
+   info.biome==='relic'?(r<.24?'relic':r<.29?'hazard':'matter'):
+   info.biome==='rich'?(r<.08?'relic':r<.13?'hazard':'matter'):
+   info.biome==='nebula'?(r<.075?'relic':r<.11?'hazard':'matter'):
+   r<.038?'relic':r<.10?'hazard':'matter';
+  const stableKind=Math.hypot(px,py)<110?'matter':kind;
+  const e=spawn(px,py,stableKind,rng);
+  if(i%3===0)result.push({x:px,y:py,r:e.r,index:i,kind:stableKind});
+ }
+ if(distantChunkCache.size>1200)distantChunkCache.clear();
+ distantChunkCache.set(key,result);
+ return result;
+}
+function renderDistantBodies(){
+ // Cover the entire visible world, not only the seven-by-seven active bubble.
+ // A hard screen-space budget preserves FPS on 2K/4K monitors.
+ const zoom=Math.max(.15,camera.zoom);
+ const minX=Math.floor((camera.x-W*.5/zoom)/CHUNK)-1,maxX=Math.floor((camera.x+W*.5/zoom)/CHUNK)+1;
+ const minY=Math.floor((camera.y-H*.5/zoom)/CHUNK)-1,maxY=Math.floor((camera.y+H*.5/zoom)/CHUNK)+1;
+ const step=Math.max(1,Math.ceil(Math.sqrt(((maxX-minX+1)*(maxY-minY+1))/650)));
+ ctx.save();
+ for(let cy=minY;cy<=maxY;cy+=step)for(let cx=minX;cx<=maxX;cx+=step){
+  const key=chunkKey(cx,cy);
+  if(loadedChunks.has(key))continue;
+  const info=chunkInfo(cx,cy),mask=(g.depleted[key]||0)>>>0;
+  const color=info.biome==='nebula'?'#b6a6f9':info.biome==='rich'?'#9adff0':
+    info.biome==='relic'?'#ffe0a0':'#86a9c5';
+  ctx.fillStyle=color;
+  for(const e of distantSamples(cx,cy)){
+   if(e.index>=tester.density||(mask&(1<<e.index))!==0)continue;
+   const sx=(e.x-camera.x)*zoom+W*.5,sy=(e.y-camera.y)*zoom+H*.5;
+   if(sx<-8||sy<-8||sx>W+8||sy>H+8)continue;
+   const radius=clamp(e.r*zoom*.55,.9,3.7);
+   ctx.globalAlpha=e.kind==='hazard'?.27:e.kind==='relic'?.84:.58;
+   ctx.fillRect(sx-radius,sy-radius,radius*2,radius*2);
+  }
+ }
+ ctx.restore();
+}
 function respawn(e){markHarvested(e);e.dead=true;}
 visitPosition();streamField();
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
-function absorb(e){const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)));g.matter+=val;g.total+=val;g.stageCollects+=val;g.collects++;let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.stageRare++;g.rare++;burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(Math.random()<.24){burst(e.x,e.y,4,'#8bdcfb',.35);}
+function absorb(e){const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter+=val;g.total+=val;g.stageCollects+=val;g.collects++;let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.stageRare++;g.rare++;burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(Math.random()<.24){burst(e.x,e.y,4,'#8bdcfb',.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
  player.targetR=radiusAt(g.tier,stageFraction());
  if(Math.random()<.08)popText(e.x,e.y,'+'+val);if(g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(g.matter>=TA[g.tier].required&&missionsDone())evolve();}
@@ -260,11 +325,11 @@ function update(dt){
  let mag=Math.hypot(ax,ay);if(mag>0){ax/=mag;ay/=mag;}
  player.targetR=radiusAt(g.tier,stageFraction());
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
- const speed=(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.35)*(boostTime>0?2.5:1),lerp=1-Math.exp(-dt*9);player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
+ const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.35)*(boostTime>0?2.5:1),lerp=1-Math.exp(-dt*9);player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
  player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
- let gravRange=Math.max(97+g.upgrade.gravity*7,player.r*2.8),collectR=player.r+4;
+ let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,player.r*2.8),collectR=player.r+4;
  for(const e of entities){let dx=player.x-e.x,dy=player.y-e.y,dist2=dx*dx+dy*dy;
    const reach=gravRange+e.r+80;if(dist2>reach*reach)continue;
    const dist=Math.sqrt(dist2)||1;
@@ -285,7 +350,7 @@ function update(dt){
  texts.forEach(p=>{p.y-=dt*28;p.life-=dt;});texts=texts.filter(p=>p.life>0);
  // Tasty-Planet-style zoom: the camera follows physical size rather than abstract levels.
  // It deliberately zooms out slower than the body grows, so screen size also increases.
- const zTarget=clamp(1.45/Math.pow(1+player.r/70,.62),.25,1.25);camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*3.5));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
+ const zTarget=clamp(tester.zoom*1.45/Math.pow(1+player.r/70,.62),.18,2.5);camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*3.5));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
  uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
  if(saveTimer>12){saveTimer=0;save();}
 }
@@ -446,7 +511,7 @@ function renderEntity(e,time){
 function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=player.r*camera.zoom;ctx.save();
  for(const tr of player.trail){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,tr.r*camera.zoom*(.45+alpha*.3),0,TAU);ctx.fill();}
  // Gravity field ring and orbiting shards.
- let range=Math.max(97+g.upgrade.gravity*7,player.r*2.8)*camera.zoom;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);
+ let range=Math.max((97+g.upgrade.gravity*7)*tester.gravity,player.r*2.8)*camera.zoom;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);
  let count=Math.min(18,3+Math.floor(g.tier/2));for(let i=0;i<count;i++){let a=player.rotation*(i%2?1:-1)*(0.65+(i%4)*.08)+i*TAU/count,R=r*(1.8+(i%3)*.24),xx=Math.cos(a)*R,yy=Math.sin(a)*R*.65;ctx.fillStyle=i%3?'#96baf8':'#ffdcaa';ctx.beginPath();ctx.arc(xx,yy,i%5===0?2.6:1.5,0,TAU);ctx.fill();}ctx.restore();
  if(morph){let f=clamp(morph.time/morph.duration,0,1);ctx.save();ctx.globalAlpha=(1-f)*.94;paintPlayerForm(p.x,p.y,r*(1.12-f*.12),time,morph.from);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,f*1.65);paintPlayerForm(p.x,p.y,r*(.52+f*.48),time);ctx.restore();}else paintPlayerForm(p.x,p.y,r,time);
  // Swirling energy currents and magnetic filaments.
@@ -456,7 +521,7 @@ function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=pl
  ctx.restore();}
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
-function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
+function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);renderDistantBodies();ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
@@ -535,12 +600,92 @@ function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТ
 function restartCampaign(){
  if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
- const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();entities=[];
+ const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();entities=[];
+ if(TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
  player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);
  player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
- screenFlash=0;morph=null;running=true;visitPosition();streamField();save();renderUI(true);
+ screenFlash=0;morph=null;running=true;visitPosition();streamField();save();renderUI(true);testerRefresh();testerToggle(false);
  $('modal').classList.add('off');toast('Новая Вселенная создана · предыдущий прогресс сохранён');
 }
+function testerRefresh(){
+ const panel=$('tester-panel');if(!panel)return;
+ $('tester-tier').value=String(g.tier);
+ $('tester-credits').value=String(Math.round(g.credits));
+ const progress=panel.querySelector('[data-test="progress"]');progress.value=String(Math.round(stageFraction()*100));
+ $('test-progress-val').textContent=progress.value+'%';
+ for(const k of ['speed','gravity','loot','zoom','density']){
+  const input=panel.querySelector(`[data-test="${k}"]`),label=panel.querySelector(`[data-test-value="${k}"]`);
+  input.value=tester[k];label.textContent=k==='density'?`${tester[k]}/32`:`${tester[k]}×`;
+ }
+}
+function testerToggle(force){
+ if(!TEST_MODE)return;
+ const panel=$('tester-panel'),open=force===undefined?panel.classList.contains('hidden'):!!force;
+ panel.classList.toggle('hidden',!open);
+ panel.setAttribute('aria-hidden',String(!open));
+ $('btn-tester').setAttribute('aria-pressed',String(open));
+ if(open)testerRefresh();
+}
+function testerSetTier(tier){
+ const next=clamp(Math.round(tier),0,TA.length-1),from=g.tier;
+ if(next===from)return;
+ g.tier=next;g.complete=false;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ morph={from,time:0,duration:1.5};player.targetR=radiusAt(next,0);
+ player.r=player.targetR;screenFlash=.5;
+ burst(player.x,player.y,35,TA[next].color);
+ renderUI(true);testerRefresh();
+}
+function testerRemakeNearby(){
+ loadedChunks.clear();entities=[];distantChunkCache.clear();streamField();
+}
+function testerInit(){
+ if(!TEST_MODE){$('btn-tester').hidden=true;return;}
+ const tier=$('tester-tier');
+ TA.forEach((form,index)=>{const option=document.createElement('option');option.value=String(index);
+ option.textContent=`${index+1}. ${form.name}`;tier.append(option);});
+ $('btn-tester').onclick=()=>testerToggle();
+ $('tester-close').onclick=()=>testerToggle(false);
+ tier.onchange=()=>testerSetTier(Number(tier.value));
+ $('tester-credits').onchange=ev=>{g.credits=clamp(Number(ev.target.value)||0,0,1e12);renderUI(true);testerRefresh();};
+ document.querySelectorAll('#tester-panel [data-test]').forEach(input=>{
+  input.oninput=()=>{
+   const key=input.dataset.test,value=Number(input.value);
+   if(!Number.isFinite(value))return;
+   if(key==='progress'){g.matter=Math.round(TA[g.tier].required*value/100);
+    player.targetR=radiusAt(g.tier,stageFraction());
+    $('test-progress-val').textContent=value+'%';}
+   else if(Object.hasOwn(TEST_DEFAULTS,key)){
+    const previous=tester[key];tester[key]=key==='density'?Math.round(value):value;
+    panelValue(key,tester[key]);
+    if(key==='density'&&previous!==tester[key])testerRemakeNearby();
+    saveTester();
+   }
+   renderUI();save();
+  };
+ });
+ $('tester-missions').onclick=()=>{const m=missionReq();
+  g.stageCollects=Math.max(g.stageCollects,m.collect);g.stageRare=Math.max(g.stageRare,m.rare);
+  g.stageExplored=Math.max(g.stageExplored,m.explore);renderUI(true);toast('Задачи текущей формы выполнены');};
+ $('tester-next').onclick=()=>testerSetTier(g.tier+1);
+ $('tester-jump').onclick=()=>{player.x+=CHUNK*10;player.vx=player.vy=0;camera.x=player.x;camera.y=player.y;
+  visitPosition();testerRemakeNearby();renderUI(true);toast('Перемещение в новый сектор (тест)');};
+ $('tester-reset-mods').onclick=()=>{
+  Object.assign(tester,TEST_DEFAULTS);saveTester();testerRemakeNearby();testerRefresh();
+  toast('Тестовые множители сброшены');};
+ $('tester-new-game').onclick=restartCampaign;
+ $('tester-copy-save').onclick=()=>{
+  if(!confirm('Скопировать основное прохождение в тестерское? Текущий тестовый прогресс будет заменён.'))return;
+  try{const data=localStorage.getItem('cosmic-evolution-save-v1');if(!data){toast('Основное сохранение не найдено');return;}localStorage.setItem(SAVE_KEY,data);location.reload();}
+  catch(_){toast('Не удалось скопировать сохранение');}
+ };
+ $('btn-new-game').onclick=restartCampaign;
+}
+function panelValue(key,v){
+ const label=document.querySelector(`#tester-panel [data-test-value="${key}"]`);
+ if(label)label.textContent=key==='density'?`${v}/32`:`${v}×`;
+}
+testerInit();
+$('btn-new-game').onclick=restartCampaign;
 function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">ТЫ СТАЛ ВСЕЛЕННОЙ</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Ты завершил путь Cosmic Evolution.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поздравляем с завершением космической эволюции!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{running=true;$('modal').classList.add('off');last=performance.now();};$('btn-new-universe').onclick=restartCampaign;}
 $('btn-start').onclick=()=>{running=true;startMusic();$('modal').classList.add('off');last=performance.now();if(!g.time)toast('✦ ИССЛЕДУЙ КОСМОС · ПОГЛОЩАЙ МАТЕРИЮ');};if(g.time>10)$('btn-start').innerHTML='ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ <span>→</span>';
 $('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=showMap;$('btn-pause').onclick=()=>running?showPause():(running=true,$('modal').classList.add('off'));$('btn-settings').onclick=showSettings;
@@ -552,10 +697,13 @@ canvas.addEventListener('pointermove',e=>{pointer.x=e.clientX;pointer.y=e.client
 canvas.addEventListener('pointerdown',e=>{pointer.down=true;pointer.active=true;pointer.x=e.clientX;pointer.y=e.clientY;try{canvas.setPointerCapture(e.pointerId)}catch(_){}});
 canvas.addEventListener('pointerup',()=>{pointer.down=false;if(pointer.type!=='mouse')pointer.active=false;});
 canvas.addEventListener('pointercancel',()=>{pointer.down=false;pointer.active=false;});
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();keys.add(k);if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p'||k==='escape'){if(running)showPause();else{running=true;$('modal').classList.add('off');}}if(k==='m')showMap();}});
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();
+ if(k==='f2'&&TEST_MODE){e.preventDefault();testerToggle();return;}
+ if(e.target instanceof HTMLElement&&e.target.closest('input, select, textarea'))return;
+ if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();keys.add(k);if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p'||k==='escape'){if(running)showPause();else{running=true;$('modal').classList.add('off');}}if(k==='m')showMap();}});
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();pointer.active=false;if(running)showPause();});
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
-Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq()})});
+Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size})});
 })();

@@ -7,7 +7,7 @@
   <meta name="description" content="Cosmic Evolution — 2D космическая игра про гравитацию, рост и эволюцию от пылинки до Вселенной." />
   <title>Cosmic Evolution — From Dust to Infinity</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="styles.css?v=2.2" />
+  <link rel="stylesheet" href="styles.css?v=2.3.0" />
 </head>
 <body>
   <canvas id="universe" aria-label="Игровое поле Cosmic Evolution"></canvas>
@@ -20,7 +20,7 @@
         <div class="stat"><span class="stat-icon gold">✦</span><div><small>ЗВЁЗДНАЯ ПЫЛЬ</small><strong id="credit-value">0</strong></div></div>
         <div class="stat timer-stat"><span class="stat-icon clock">◷</span><div><small>В КОСМОСЕ</small><strong id="time-value">00:00</strong></div></div>
       </div>
-      <div class="top-actions"><button id="btn-music" class="square-button" title="Включить / выключить музыку" aria-label="Музыка">♫</button><button id="btn-map" class="square-button" title="Карта Вселенной (M)" aria-label="Карта Вселенной">◎</button><button id="btn-pause" class="square-button" title="Пауза (P)" aria-label="Пауза">Ⅱ</button><button id="btn-settings" class="square-button" title="Настройки" aria-label="Настройки">⚙</button></div>
+      <div class="top-actions"><button id="btn-new-game" class="square-button" title="Начать заново" aria-label="Новая игра">↺</button><button id="btn-tester" class="square-button tester-toggle" title="Тестерская панель (F2)" aria-label="Тестерская панель">⚒</button><button id="btn-music" class="square-button" title="Включить / выключить музыку" aria-label="Музыка">♫</button><button id="btn-map" class="square-button" title="Карта Вселенной (M)" aria-label="Карта Вселенной">◎</button><button id="btn-pause" class="square-button" title="Пауза (P)" aria-label="Пауза">Ⅱ</button><button id="btn-settings" class="square-button" title="Настройки" aria-label="Настройки">⚙</button></div>
     </header>
     <aside class="sidebar" id="sidebar">
       <div class="side-header"><span>ЛАБОРАТОРИЯ ЭВОЛЮЦИИ</span><button id="btn-sidebar" aria-label="Свернуть улучшения">‹</button></div>
@@ -36,7 +36,27 @@
     <div class="zoom-indicator"><span>◌</span><span id="zoom-label">МАСШТАБ 1×</span></div>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
   </div>
+  <section id="tester-panel" class="tester-panel hidden" aria-label="Панель тестирования" aria-hidden="true">
+    <div class="tester-header"><div><small>РАЗРАБОТКА / F2</small><strong>ТЕСТЕРСКАЯ ПАНЕЛЬ</strong></div><button id="tester-close" type="button" title="Закрыть панель">×</button></div>
+    <div id="tester-stats" class="tester-stats">FPS / объекты / координаты</div>
+    <label class="tester-line"><span>Форма эволюции</span><select id="tester-tier" aria-label="Форма эволюции"></select></label>
+    <label class="tester-line"><span>Прогресс стадии <b id="test-progress-val">0%</b></span><input data-test="progress" type="range" min="0" max="100" step="1" value="0"></label>
+    <label class="tester-line"><span>Скорость полёта <b data-test-value="speed">1×</b></span><input data-test="speed" type="range" min=".25" max="6" step=".25" value="1"></label>
+    <label class="tester-line"><span>Гравитация <b data-test-value="gravity">1×</b></span><input data-test="gravity" type="range" min=".5" max="8" step=".25" value="1"></label>
+    <label class="tester-line"><span>Сбор материи <b data-test-value="loot">1×</b></span><input data-test="loot" type="range" min=".25" max="30" step=".25" value="1"></label>
+    <label class="tester-line"><span>Масштаб камеры <b data-test-value="zoom">1×</b></span><input data-test="zoom" type="range" min=".5" max="3" step=".1" value="1"></label>
+    <label class="tester-line"><span>Плотность сектора <b data-test-value="density">32/32</b></span><input data-test="density" type="range" min="8" max="32" step="1" value="32"></label>
+    <label class="tester-line"><span>Звёздная пыль (баланс)</span><input id="tester-credits" type="number" min="0" max="1000000000000" step="1000" value="0"></label>
+    <div class="tester-actions">
+      <button id="tester-missions" type="button">✓ Выполнить задачи</button>
+      <button id="tester-next" type="button">↑ Следующая форма</button>
+      <button id="tester-jump" type="button">➤ +10 секторов</button>
+      <button id="tester-reset-mods" type="button">↻ Сбросить множители</button>
+      <button id="tester-new-game" type="button" class="danger">⟲ Новая игра</button><button id="tester-copy-save" type="button" class="tester-copy">⧉ Копировать основной прогресс</button>
+    </div>
+    <p class="tester-note">Тестовые параметры сохраняются отдельно. Изменения стадии и валюты влияют на текущее сохранение. Сектора и собранная материя остаются постоянными.</p>
+  </section>
   <div id="modal" class="modal-backdrop"><div class="modal-card intro-card"><div class="hero-art" aria-hidden="true"><div class="hero-ring r1"></div><div class="hero-ring r2"></div><div class="hero-ring r3"></div><div class="hero-core"></div><span class="hero-star s1">✦</span><span class="hero-star s2">✦</span><span class="hero-star s3">✧</span></div><div class="hero-kicker">ТВОЯ ВСЕЛЕННАЯ НАЧИНАЕТСЯ ЗДЕСЬ</div><h1>COSMIC<br/><span>EVOLUTION</span></h1><p class="modal-lead">Начни с одной частицы. Поглощай материю, развивай гравитацию и вырасти в целую Вселенную.</p><div class="intro-features"><span>✧ 28 форм эволюции</span><span>◉ Свободный космос</span><span>◈ Исследуй новые секторы</span></div><button id="btn-start" class="primary-button">НАЧАТЬ ЭВОЛЮЦИЮ <span>→</span></button><small class="intro-note">Мышь / WASD — движение · E — импульс · Shift — рывок · Оригинальная космическая музыка · Автосохранение</small></div></div>
-  <script src="game.js?v=2.2" defer></script>
+  <script src="game.js?v=2.3.0" defer></script>
 </body>
 </html>
