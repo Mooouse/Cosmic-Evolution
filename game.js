@@ -555,43 +555,51 @@ function harvestCosmicLOD(dt){
  cosmicHarvestTimer+=dt;
  if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
- const radius=blackHoleCoreWorldRadius(),view=cosmicVisibleLOD();
- // Check only cells intersecting the horizon, but do not silently skip the
- // actual layer shown by the renderer as happened on level-zero and LOD fades.
- let budget=10,changed=false;
+ const core=blackHoleCoreWorldRadius(),view=cosmicVisibleLOD();
+ const contacts=[];
+ // All visible LOD proxies are physical: accept an object when its rendered
+ // silhouette touches the black horizon, even at extreme camera zoom.
  for(const level of view.levels){
   const stride=2**level,span=MACRO_SIZE*stride;
-  const worldRadius=Math.max(0,Math.min(radius,1e290));
   const px=Math.floor(player.x/span),py=Math.floor(player.y/span);
-  const extent=Math.min(11,Math.ceil(worldRadius/span)+2);
-  for(let cy=py-extent;cy<=py+extent&&budget>0;cy++)for(let cx=px-extent;cx<=px+extent&&budget>0;cx++){
+  const extent=Math.min(11,Math.ceil(core/span)+3);
+  for(let cy=py-extent;cy<=py+extent;cy++)for(let cx=px-extent;cx<=px+extent;cx++){
    const gx=cx*stride,gy=cy*stride;
    const key=level===0?macroKey(gx,gy):`${level}:${gx}:${gy}`;
-   // Local sector entities are already handled by the frame-by-frame physics.
    if(level===0&&macroLoaded.has(key))continue;
    const bag=level===0?g.depletedMacro:g.depletedCosmic;
-   let mask=(bag[key]||0)>>>0;
+   const mask=(bag[key]||0)>>>0;
    for(const e of (level===0?macroNodes(gx,gy):macroLODNodes(gx,gy,level))){
-    if((mask&(1<<e.index))!==0||e.r>radius*.92)continue;
+    if(mask&(1<<e.index))continue;
     const dx=player.x-e.x,dy=player.y-e.y;
-    if(Math.abs(dx)>radius+e.r||Math.abs(dy)>radius+e.r)continue;
-    if(dx*dx+dy*dy>Math.max(0,radius-e.r*.15)**2)continue;
-    mask=(mask|(1<<e.index))>>>0;bag[key]=mask;
-    budget--;changed=true;
-    const value=Math.min(1e280,Math.max(100,e.value||Math.pow(1+e.r/100,1.45)*40));
-    const amount=value*(1+g.upgrade.harvest*.075)*tester.loot;
-    g.matter=Math.min(1e290,g.matter+amount);g.total=Math.min(1e290,g.total+amount);
-    g.stageCollects=Math.min(1e290,g.stageCollects+amount);
-    g.credits=Math.min(1e290,g.credits+amount*.4);g.collects++;
-    const resource=e.kind==='blackhole'||e.kind==='universe'?'exotic':(e.material||'gas');
-    g.materials[resource]=(g.materials[resource]||0)+(resource==='exotic'?3:2);
-    g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(amount)*.0008;
-    player.targetR=currentRadius();
-    if(budget<=0)break;
+    const touch=blackHoleTouchDistance(e,core);
+    if(Math.abs(dx)>touch||Math.abs(dy)>touch)continue;
+    const d2=dx*dx+dy*dy;
+    if(d2<=touch*touch)contacts.push({e,bag,key,d2});
    }
   }
  }
- if(changed)cosmicSceneDirty=true;
+ // Old row-major budget repeatedly ate distant cells while nearby galaxies
+ // appeared immune. Closest-first prevents this at supermassive scales.
+ contacts.sort((a,b)=>a.d2-b.d2);
+ let budget=12,changed=false;
+ for(const {e,bag,key} of contacts){
+  if(budget<=0)break;
+  const mask=(bag[key]||0)>>>0;
+  if(mask&(1<<e.index))continue;
+  bag[key]=(mask|(1<<e.index))>>>0;
+  budget--;changed=true;
+  const value=Math.min(1e280,Math.max(100,e.value||Math.pow(1+e.r/100,1.45)*40));
+  const amount=value*(1+g.upgrade.harvest*.075)*tester.loot;
+  g.matter=Math.min(1e290,g.matter+amount);
+  g.total=Math.min(1e290,g.total+amount);
+  g.stageCollects=Math.min(1e290,g.stageCollects+amount);
+  g.credits=Math.min(1e290,g.credits+amount*.4);g.collects++;
+  const resource=e.kind==='blackhole'||e.kind==='universe'?'exotic':(e.material||'gas');
+  g.materials[resource]=(g.materials[resource]||0)+(resource==='exotic'?3:2);
+  g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(amount)*.0008;
+ }
+ if(changed){player.targetR=currentRadius();cosmicSceneDirty=true;}
 }
 function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
  macroVisibleCount=0;if(g.tier<13)return;
