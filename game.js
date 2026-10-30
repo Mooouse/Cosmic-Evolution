@@ -1127,10 +1127,10 @@ function initGpuLens(){
  if(gpuLensUnavailable)return null;
  const surface=document.createElement('canvas');
  const gl=surface.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:false});
- if(!gl){gpuLensUnavailable=true;return null;}
+ if(!gl){gpuLensUnavailable=true;console.warn('Cosmic Evolution: WebGL unavailable, using Canvas lens');return null;}
  const shader=(type,source)=>{
   const sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);
-  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){gl.deleteShader(sh);throw new Error('Lens shader compilation failed');}
+  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){const message=gl.getShaderInfoLog(sh);gl.deleteShader(sh);throw new Error('Lens shader: '+message);}
   return sh;
  };
  const vertex=shader(gl.VERTEX_SHADER,'attribute vec2 position; varying vec2 uv; void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}');
@@ -1157,7 +1157,9 @@ function initGpuLens(){
   if(source.x<0.||source.y<0.||source.x>1.||source.y>1.){gl_FragColor=original;return;}
   float outerStart=max(core+radius*.35,outerRadius-radius*.50);
   float f=clamp((outerRadius-d)/max(1.,outerRadius-outerStart),0.,1.);
-  gl_FragColor=mix(original,texture2D(scene,vec2(source.x,1.-source.y)),f*f*(3.-2.*f));
+  float edge=min(min(source.x*viewport.x,(1.-source.x)*viewport.x),min(source.y*viewport.y,(1.-source.y)*viewport.y));
+  float edgeBlend=smoothstep(0.,max(8.,radius*.12),edge);
+  gl_FragColor=mix(original,texture2D(scene,vec2(source.x,1.-source.y)),f*f*(3.-2.*f)*edgeBlend);
  }
  `);
  const program=gl.createProgram();gl.attachShader(program,vertex);gl.attachShader(program,fragment);gl.linkProgram(program);
@@ -1195,7 +1197,7 @@ function renderGpuLens(p,R,outer){
   // Consume the WebGL drawing buffer synchronously, before the browser can
   // discard it. The opaque horizon is still painted afterwards on frameCtx.
   ctx.drawImage(surface,0,0,W,H);lensBackend='gpu';return true;
- }catch(error){gpuLensUnavailable=true;gpuLens=null;return false;}
+ }catch(error){gpuLensUnavailable=true;gpuLens=null;console.warn('Cosmic Evolution: Canvas lens fallback',error.message);return false;}
 }
 // True gravitational lensing of the existing stars/galaxies. No gas or disk.
 let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
@@ -1266,7 +1268,8 @@ function renderBlackHoleLensing(){
   b[idx]=a[p00]*w00+a[p01]*w01+a[p10]*w10+a[p11]*w11;
   b[idx+1]=a[p00+1]*w00+a[p01+1]*w01+a[p10+1]*w10+a[p11+1]*w11;
   b[idx+2]=a[p00+2]*w00+a[p01+2]*w01+a[p10+2]*w10+a[p11+2]*w11;
-  b[idx+3]=Math.round(255*opacityLut[k]);
+  const edge=clamp(Math.min(sx,sy,sw-1-sx,sh-1-sy)/Math.max(8*scale,R*.12*scale),0,1);
+  b[idx+3]=Math.round(255*opacityLut[k]*edge*edge*(3-2*edge));
  }
  lensOutputCtx.putImageData(warped,0,0);
  ctx.save();ctx.imageSmoothingEnabled=true;
