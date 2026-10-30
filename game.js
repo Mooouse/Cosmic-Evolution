@@ -1227,7 +1227,7 @@ function paintEvolutionDetails(x,y,r,time,tier){
   case 24: for(let i=0;i<3;i++)orbit(r*(.6+i*.31),r*(.22+i*.12),rot*.08+i*.8,'#b4d6ff77',Math.max(1,r*.013));break;
   case 25: for(let i=0;i<5;i++){let a=rot*.09+i*TAU/5;orbit(r*(.35+i*.15),r*(.2+i*.1),a,'#b7daff55',Math.max(.9,r*.012));}break;
   case 26: for(let i=0;i<9;i++){let a=i*2.399;moon(a,r*(.28+(i%4)*.26),r*.055,'#d8c7ff');}break;
-  case 27: /* The event-horizon render has its own animated accretion disk. */ break;
+  case 27: /* Opaque event horizon is rendered in the final compositor pass. */ break;
  }
  ctx.restore();
 }
@@ -1274,7 +1274,11 @@ function renderEntity(e,time){
   ctx.closePath();ctx.fill();ctx.restore();
  }
 }
-function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=Math.min(player.r*camera.zoom,Math.max(W,H)*.54);ctx.save();
+function renderPlayer(time){
+ // At the final tier the black hole uses a dedicated, always-opaque final
+ // compositor pass. Never blend it with evolution morphs or other particles.
+ if(g.tier===TA.length-1)return;
+ const t=TA[g.tier],p=project(player.x,player.y),r=Math.min(player.r*camera.zoom,Math.max(W,H)*.54);ctx.save();
  for(const tr of (g.endless?[]:player.trail)){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,Math.min(Math.max(W,H)*3,tr.r*camera.zoom*(.45+alpha*.3)),0,TAU);ctx.fill();}
  // Gravity field ring and orbiting shards.
  let range=Math.min(Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20))*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);if(!g.endless){ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);}
@@ -1287,7 +1291,30 @@ function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=Ma
  ctx.restore();}
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
-function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);renderDistantBodies();renderMacroField(time);ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderBlackHoleLensing();renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
+function render(time){
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ // Restore the compositing baseline every frame; otherwise a previous
+ // effect can accidentally carry semi-transparency onto the next frame.
+ ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+ sky(time);renderDistantBodies();renderMacroField(time);
+ ctx.save();
+ if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));
+ for(const e of entities)renderEntity(e,time);
+ renderBlackHoleLensing();
+ renderPlayer(time);renderParticles();
+ ctx.restore();
+ if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
+ // Compositing invariant: the event horizon is drawn after every distortion,
+ // light effect and entity. It can never fade behind the background.
+ if(g.tier===TA.length-1){
+  const p=project(player.x,player.y);
+  const r=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
+  ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  paintBlackHole(p.x,p.y,r,time);
+  ctx.restore();
+ }
+ renderTicks++;
+}
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
@@ -1298,8 +1325,11 @@ function frame(now){
   perfSample+=elapsed;perfFrames++;
   if(perfSample>=4){
    frameFps=perfFrames/perfSample;
-   if(frameFps<42&&performanceScale>.55){performanceScale=Math.max(.55,performanceScale-.2);applyResolution();}
-   else if(frameFps>58&&performanceScale<1){performanceScale=Math.min(1,performanceScale+.1);applyResolution();}
+   // Recreating the primary Canvas resets all pixels, producing a visible
+   // on/off pulse on the largest black hole. Leave its output resolution stable
+   // and let the lensing shader's own quality setting handle heavier frames.
+   if(!g.endless&&frameFps<42&&performanceScale>.55){performanceScale=Math.max(.55,performanceScale-.2);applyResolution();}
+   else if(!g.endless&&frameFps>58&&performanceScale<1){performanceScale=Math.min(1,performanceScale+.1);applyResolution();}
    perfSample=0;perfFrames=0;
   }
  }
