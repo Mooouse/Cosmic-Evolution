@@ -126,3 +126,7 @@ All game files are static. The included GitHub Actions workflow runs a syntax/sm
 - Rebuilt the main black-hole art with a clear horizon, slanted turbulent amber plasma and uneven gravitational glow. The expensive texture is generated and cached once per variant.
 - A small number of moving hot particles provides animation without large vector rings.
 - Galaxy collection, rendering optimizations, exploration and saves remain unchanged.
+
+
+### 3.7 — Lens-only black hole
+Player black hole now bends the actual stars and galaxies behind it with a clipped, low-resolution 2D refraction pass. There is no painted gas cloud, accretion disk or bright ring. Natural black holes have restrained dark silhouettes. Saves and gameplay systems remain unchanged.

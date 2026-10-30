@@ -469,8 +469,17 @@ function cosmicSprite(material,shape,style=0,palette=0){
  }
  macroSpriteCache.set(key,cv);return cv;
 }
+const lensHoleSpriteCache=new Map();
 function blackHoleSprite(type=0){
- return getAccretionTexture(type);
+ if(lensHoleSpriteCache.has(type))return lensHoleSpriteCache.get(type);
+ const cv=document.createElement('canvas');cv.width=cv.height=128;
+ const c=cv.getContext('2d');
+ const grad=c.createRadialGradient(64,64,10,64,64,62);
+ grad.addColorStop(0,'rgba(1,2,5,1)');grad.addColorStop(.35,'rgba(1,2,5,1)');
+ grad.addColorStop(.42,'rgba(18,25,33,.90)');grad.addColorStop(.5,'rgba(156,172,181,.18)');
+ grad.addColorStop(.67,'rgba(47,64,83,.09)');grad.addColorStop(1,'rgba(0,0,0,0)');
+ c.fillStyle=grad;c.fillRect(0,0,128,128);
+ lensHoleSpriteCache.set(type,cv);return cv;
 }
 
 function drawMacro(e,time,zoom,opacity=1){
@@ -1007,22 +1016,62 @@ function getAccretionTexture(type=2){
  c.globalCompositeOperation='source-over';c.globalAlpha=1;
  accretionTextures.set(type,cv);return cv;
 }
-function paintBlackHole(x,y,r,time){
- const R=clamp(r,8,Math.max(W,H)*.56),sprite=getAccretionTexture(2);
- ctx.save();ctx.translate(x,y);
- const breathing=1+.006*Math.sin(time*.48);
- ctx.drawImage(sprite,-R*1.89*breathing,-R*1.89*breathing,R*3.78*breathing,R*3.78*breathing);
- ctx.globalCompositeOperation='lighter';
- const count=clamp(Math.round(R*.15),14,54);
- for(let j=0;j<count;j++){
-  const phase=j*2.399963+time*(.19+(j%5)*.011);
-  const dist=R*(.92+.32*((j*37%71)/71));
-  const xx=Math.cos(phase)*dist*.94-Math.sin(phase)*dist*.4*.342;
-  const yy=Math.cos(phase)*dist*.342+Math.sin(phase)*dist*.4*.94;
-  const alpha=(.12+.3*(.5+.5*Math.sin(j*1.37+time*.91)))*(1-Math.abs(Math.cos(phase))*.21);
-  ctx.fillStyle='rgba(255,202,133,'+alpha.toFixed(3)+')';
-  const pr=clamp(R*.003,.65,2.7);ctx.fillRect(xx,yy,pr,pr);
+// True gravitational lensing of the existing stars/galaxies. No gas or disk.
+let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
+function renderBlackHoleLensing(){
+ if(g.tier!==TA.length-1)return;
+ const p=project(player.x,player.y),R=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
+ const outer=Math.min(R*2.5,Math.max(W,H)*.64);
+ const left=Math.max(0,Math.floor(p.x-outer)),top=Math.max(0,Math.floor(p.y-outer));
+ const right=Math.min(W,Math.ceil(p.x+outer)),bottom=Math.min(H,Math.ceil(p.y+outer));
+ const width=right-left,height=bottom-top;
+ if(width<4||height<4)return;
+ const scale=Math.min(1,300/Math.max(width,height));
+ const sw=Math.max(1,Math.round(width*scale)),sh=Math.max(1,Math.round(height*scale));
+ if(!lensInput){
+  lensInput=document.createElement('canvas');lensOutput=document.createElement('canvas');
+  lensInputCtx=lensInput.getContext('2d',{willReadFrequently:true});
+  lensOutputCtx=lensOutput.getContext('2d');
  }
+ if(lensInput.width!==sw||lensInput.height!==sh){
+  lensInput.width=lensOutput.width=sw;lensInput.height=lensOutput.height=sh;
+ }
+ lensInputCtx.drawImage(canvas,left*dpr,top*dpr,width*dpr,height*dpr,0,0,sw,sh);
+ const a=lensInputCtx.getImageData(0,0,sw,sh).data;
+ const warped=lensOutputCtx.createImageData(sw,sh),b=warped.data;
+ const sampleX=sw/width,sampleY=sh/height,core=R*.245,soft=R*.22;
+ const outerStart=outer*.72,outerLength=Math.max(1,outer-outerStart);
+ for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
+  const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
+  const d=Math.hypot(dx,dy),idx=(iy*sw+ix)*4;
+  if(d<core*.99||d>=outer)continue;
+  const bend=R*R*.34/(d+soft)*Math.exp(-d/(R*1.22));
+  const rr=d+bend;
+  const sx=(p.x+dx*rr/d-left)*sampleX-.5,sy=(p.y+dy*rr/d-top)*sampleY-.5;
+  if(sx<0||sy<0||sx>=sw-1||sy>=sh-1)continue;
+  const x=Math.floor(sx),y=Math.floor(sy),fx=sx-x,fy=sy-y;
+  const p00=(y*sw+x)*4,p01=p00+4,p10=p00+sw*4,p11=p10+4;
+  const w00=(1-fx)*(1-fy),w01=fx*(1-fy),w10=(1-fx)*fy,w11=fx*fy;
+  b[idx]=a[p00]*w00+a[p01]*w01+a[p10]*w10+a[p11]*w11;
+  b[idx+1]=a[p00+1]*w00+a[p01+1]*w01+a[p10+1]*w10+a[p11+1]*w11;
+  b[idx+2]=a[p00+2]*w00+a[p01+2]*w01+a[p10+2]*w10+a[p11+2]*w11;
+  const fade=Math.min(1,(outer-d)/outerLength);
+  b[idx+3]=Math.round(255*fade*fade*(3-2*fade));
+ }
+ lensOutputCtx.putImageData(warped,0,0);
+ ctx.save();ctx.imageSmoothingEnabled=true;
+ ctx.drawImage(lensOutput,left,top,width,height);ctx.restore();
+}
+function paintBlackHole(x,y,r,time){
+ const R=clamp(r,8,Math.max(W,H)*.54),core=R*.245;
+ ctx.save();
+ const edge=ctx.createRadialGradient(x,y,core*.82,x,y,core*1.12);
+ edge.addColorStop(0,'rgba(1,2,5,1)');
+ edge.addColorStop(.76,'rgba(1,2,5,1)');
+ edge.addColorStop(.91,'rgba(6,9,14,.95)');
+ edge.addColorStop(1,'rgba(25,31,38,0)');
+ ctx.fillStyle=edge;ctx.beginPath();ctx.arc(x,y,core*1.12,0,TAU);ctx.fill();
+ ctx.fillStyle='#010205';ctx.beginPath();ctx.arc(x,y,core*.96,0,TAU);ctx.fill();
  ctx.restore();
 }
 
@@ -1162,7 +1211,7 @@ function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=Ma
  ctx.restore();}
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
-function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);renderDistantBodies();renderMacroField(time);ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
+function render(time){ctx.setTransform(dpr,0,0,dpr,0,0);sky(time);renderDistantBodies();renderMacroField(time);ctx.save();if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));for(const e of entities)renderEntity(e,time);renderBlackHoleLensing();renderPlayer(time);renderParticles();ctx.restore();if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}renderTicks++;}
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
