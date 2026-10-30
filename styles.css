@@ -88,3 +88,18 @@
 .material-row.ready b{color:#89e5bc}
 .resource-help{display:block;color:#6d94aa;line-height:1.5;font-size:9px;margin-top:10px}
 .resource-hint{font-size:9px;letter-spacing:.2px;color:#8ccedc;margin-top:9px}
+
+/* Flight controls: clean desktop aim marker, thumb-friendly mobile joystick. */
+.flight-marker{pointer-events:none;position:absolute;left:50%;top:50%;z-index:2;width:18px;height:18px;border:1.5px solid rgba(126,233,255,.87);border-radius:50%;transform:translate(-50%,-50%) scale(.7);opacity:0;box-shadow:0 0 16px rgba(90,215,255,.4);transition:opacity .12s,transform .12s}
+.flight-marker:before,.flight-marker:after{content:'';position:absolute;background:#9deaff;opacity:.8}
+.flight-marker:before{height:1px;width:6px;left:5px;top:7px}
+.flight-marker:after{width:1px;height:6px;left:7px;top:5px}
+.flight-marker.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.flight-stick{display:none;position:absolute;left:26px;bottom:92px;width:132px;height:132px;border:2px solid rgba(124,220,242,.35);border-radius:50%;background:radial-gradient(circle,rgba(47,121,150,.12),rgba(8,28,48,.56));box-shadow:inset 0 0 32px #16465e55,0 0 28px #030d1e77;z-index:6;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:auto}
+.flight-stick.engaged{border-color:rgba(122,237,247,.76);background:radial-gradient(circle,rgba(51,155,167,.19),rgba(8,28,48,.7))}
+.stick-cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#4b839a;font-size:20px;font-weight:400}
+.stick-thumb{position:absolute;left:50%;top:50%;width:58px;height:58px;border-radius:50%;transform:translate(-50%,-50%);display:grid;place-items:center;border:1px solid #91e8fa95;background:radial-gradient(circle at 30% 20%,#34758f,#112a3c 75%);box-shadow:0 0 18px #2bd4ed33,inset 0 1px 1px #d7faff44;color:#b1eaf6;font-size:23px;will-change:transform}
+.flight-stick.engaged .stick-thumb{box-shadow:0 0 25px #2bd4ed77,inset 0 1px 1px #d7faff55}
+@media(pointer:coarse){.flight-stick{display:block}.flight-marker{display:none!important}}
+@media(pointer:coarse) and (max-width:800px){.flight-stick{left:14px;bottom:108px;width:120px;height:120px}.stick-thumb{width:55px;height:55px}.bottom-center{bottom:10px;max-width:calc(100vw - 32px)}.center-abilities{right:10px;bottom:110px}}
+@media(pointer:coarse) and (max-height:500px){.flight-stick{bottom:18px;width:104px;height:104px}.center-abilities{bottom:22px}}

@@ -68,7 +68,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,worldX:0,worldY:0,complete:false,endless:false,visited:[],depleted:{},depletedMacro:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'hold',flightFeel:'direct',worldX:0,worldY:0,complete:false,endless:false,visited:[],depleted:{},depletedMacro:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -93,7 +93,17 @@ const initialRadius=radiusAt(g.tier,stageFraction());
 let player={x:Number.isFinite(g.worldX)?g.worldX:0,y:Number.isFinite(g.worldY)?g.worldY:0,vx:0,vy:0,r:initialRadius,targetR:initialRadius,rotation:0,shield:0,trail:[]};
 let camera={x:player.x,y:player.y,zoom:1};
 let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();const MACRO_SIZE=3200,MACRO_COUNT=9;const macroCache=new Map(),macroSpriteCache=new Map(),macroLoaded=new Set();let macroEntities=[],macroVisibleCount=0;if(!g.depletedMacro||typeof g.depletedMacro!=='object')g.depletedMacro={};
-let keys=new Set(),pointer={x:W/2,y:H/2,active:false,down:false,type:'mouse'};
+// Manual flight: the cursor must NOT steer the ship until the user holds click.
+// Touch input uses the independent joystick surface, never mouse hover.
+let keys=new Set(),pointer={x:W/2,y:H/2,active:false,down:false,type:'mouse',id:null};
+const stick={active:false,id:null,x:0,y:0};
+if(!['hold','follow','keys'].includes(g.controlMode))g.controlMode='hold';
+if(!['direct','smooth'].includes(g.flightFeel))g.flightFeel='direct';
+function clearFlightInput(){pointer.active=false;pointer.down=false;pointer.id=null;stick.active=false;stick.id=null;stick.x=stick.y=0;const thumb=$('stick-thumb'),pad=$('flight-stick'),marker=$('flight-marker');if(thumb)thumb.style.transform='translate(-50%, -50%)';if(pad)pad.classList.remove('engaged');if(marker)marker.classList.remove('visible');}
+function updateFlightMarker(){const mark=$('flight-marker');if(!mark)return;mark.style.left=pointer.x+'px';mark.style.top=pointer.y+'px';mark.classList.toggle('visible',running&&pointer.type==='mouse'&&g.controlMode!=='keys'&&(pointer.down||g.controlMode==='follow')&&!atlasVisible);}
+function updateStickPosition(e){const pad=$('flight-stick'),rect=pad.getBoundingClientRect();let dx=e.clientX-(rect.left+rect.width/2),dy=e.clientY-(rect.top+rect.height/2);const maxDist=Math.min(rect.width,rect.height)*.36,len=Math.hypot(dx,dy);if(len>maxDist){dx*=maxDist/len;dy*=maxDist/len;}stick.x=dx/maxDist;stick.y=dy/maxDist;const thumb=$('stick-thumb');thumb.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;}
+function setupFlightStick(){const pad=$('flight-stick');pad.addEventListener('pointerdown',e=>{if(!running)return;e.preventDefault();e.stopPropagation();stick.active=true;stick.id=e.pointerId;pad.classList.add('engaged');pad.setPointerCapture(e.pointerId);updateStickPosition(e);});pad.addEventListener('pointermove',e=>{if(stick.active&&stick.id===e.pointerId){e.preventDefault();updateStickPosition(e);}});const release=e=>{if(stick.id!==e.pointerId)return;stick.active=false;stick.id=null;stick.x=stick.y=0;pad.classList.remove('engaged');$('stick-thumb').style.transform='translate(-50%, -50%)';};pad.addEventListener('pointerup',release);pad.addEventListener('pointercancel',release);pad.addEventListener('lostpointercapture',release);}
+setupFlightStick();
 let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
 let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
 const cssColor = (h,a) => h.startsWith('#')?`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`:`rgba(119,190,255,${a})`;
@@ -500,12 +510,23 @@ function activatePulse(){if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.s
 function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=1.15;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
 function update(dt){
  g.time+=dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
- let ax=0,ay=0;if(keys.has('w')||keys.has('arrowup'))ay-=1;if(keys.has('s')||keys.has('arrowdown'))ay+=1;if(keys.has('a')||keys.has('arrowleft'))ax-=1;if(keys.has('d')||keys.has('arrowright'))ax+=1;
- if(ax===0&&ay===0&&pointer.active){ax=(pointer.x-W/2)/Math.max(100,W*.26);ay=(pointer.y-H/2)/Math.max(100,H*.29);if(Math.hypot(ax,ay)<.11)ax=ay=0;}
- let mag=Math.hypot(ax,ay);if(mag>0){ax/=mag;ay/=mag;}
+ let ax=0,ay=0;
+ if(keys.has('w')||keys.has('arrowup'))ay-=1;if(keys.has('s')||keys.has('arrowdown'))ay+=1;
+ if(keys.has('a')||keys.has('arrowleft'))ax-=1;if(keys.has('d')||keys.has('arrowright'))ax+=1;
+ let mag=Math.hypot(ax,ay);
+ if(mag>0){ax/=Math.max(1,mag);ay/=Math.max(1,mag);}
+ else if(stick.active){ax=stick.x;ay=stick.y;}
+ else if(g.controlMode!=='keys'&&pointer.type==='mouse'&&pointer.active&&(pointer.down||g.controlMode==='follow')){
+  const dx=pointer.x-W*.5,dy=pointer.y-H*.5,dist=Math.hypot(dx,dy);
+  const strength=clamp((dist-18)/115,0,1);
+  if(dist>0){ax=dx/dist*strength;ay=dy/dist*strength;}
+ }
  player.targetR=currentRadius();
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
- const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.75)*(boostTime>0?2.5:1),lerp=1-Math.exp(-dt*9);player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
+ const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.75)*(boostTime>0?2.5:1);
+ // Direct flight stops almost immediately; "smooth" gives optional controlled inertia.
+ const response=g.flightFeel==='smooth'?(ax||ay?7:11):(ax||ay?23:34),lerp=1-Math.exp(-dt*response);
+ player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
  player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
@@ -744,9 +765,9 @@ function frame(now){
  if(atlasVisible&&atlas.dirty)drawAtlas();
 }
 requestAnimationFrame(frame);
-function show(html){atlasVisible=false;$('modal').innerHTML=`<div class="modal-card">${html}</div>`;$('modal').classList.remove('off');running=false;save();}
+function show(html){clearFlightInput();atlasVisible=false;$('modal').innerHTML=`<div class="modal-card">${html}</div>`;$('modal').classList.remove('off');running=false;save();}
 function continueButton(label='ПРОДОЛЖИТЬ'){return `<button class="primary-button" id="btn-continue">${label} <span>→</span></button>`;}
-function attachContinue(){const b=$('btn-continue');if(b)b.onclick=()=>{atlasVisible=false;running=true;startMusic();$('modal').classList.add('off');last=performance.now();};}
+function attachContinue(){const b=$('btn-continue');if(b)b.onclick=()=>{clearFlightInput();atlasVisible=false;running=true;startMusic();$('modal').classList.add('off');last=performance.now();};}
 // The atlas reads the exact same deterministic sector data as gameplay; it is not an evolution-level menu.
 function popcount32(x){x=x>>>0;x=x-((x>>>1)&0x55555555);x=(x&0x33333333)+((x>>>2)&0x33333333);return (((x+(x>>>4))&0x0F0F0F0F)*0x01010101)>>>24;}
 function atlasScale(){return 27*atlas.zoom/CHUNK;}
@@ -799,7 +820,7 @@ function showMap(){
  requestAnimationFrame(drawAtlas);
 }
 function showPause(){show(`<div class="hero-kicker">ПУТЕШЕСТВИЕ ПРИОСТАНОВЛЕНО</div><div class="overlay-title">ПАУЗА</div><p class="overlay-copy">Твоё место во Вселенной сохранено. Материя и улучшения останутся с тобой.</p><div class="stat-list"><div><strong>${fmt(g.total)}</strong><small>Всего материи</small></div><div><strong>${timeFmt(g.time)}</strong><small>Игровое время</small></div><div><strong>${g.collects}</strong><small>Поглощено объектов</small></div><div><strong>${g.rare}</strong><small>Реликвий найдено</small></div></div><div class="modal-actions">${continueButton()}<button id="pause-map" class="secondary-button">Карта</button></div>`);attachContinue();$('pause-map').onclick=showMap;}
-function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">Управление: мышь / пальцем или WASD; E — импульс, Shift / пробел — рывок, M — карта, P — пауза.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
+function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. Мышь — удерживай левую кнопку и направляй. На телефоне — левый джойстик. E / Shift — способности.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function restartCampaign(){
  if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
@@ -896,17 +917,31 @@ $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
 $('btn-sidebar').onclick=()=>{if(W<=800){$('sidebar').classList.remove('mobile-open')}else $('sidebar').classList.add('collapsed');$('btn-show-sidebar').classList.remove('hidden');};
 $('btn-show-sidebar').onclick=()=>{if(W<=800)$('sidebar').classList.add('mobile-open');else $('sidebar').classList.remove('collapsed');$('btn-show-sidebar').classList.add('hidden');};
 if(W<=800)$('btn-show-sidebar').classList.remove('hidden');
-canvas.addEventListener('pointermove',e=>{pointer.x=e.clientX;pointer.y=e.clientY;pointer.type=e.pointerType;pointer.active=e.pointerType==='mouse'||pointer.down;});
-canvas.addEventListener('pointerdown',e=>{pointer.down=true;pointer.active=true;pointer.x=e.clientX;pointer.y=e.clientY;try{canvas.setPointerCapture(e.pointerId)}catch(_){}});
-canvas.addEventListener('pointerup',()=>{pointer.down=false;if(pointer.type!=='mouse')pointer.active=false;});
-canvas.addEventListener('pointercancel',()=>{pointer.down=false;pointer.active=false;});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('pointermove',e=>{
+ if(e.pointerType!=='mouse')return;
+ if(pointer.down&&e.pointerId!==pointer.id)return;
+ pointer.x=e.clientX;pointer.y=e.clientY;pointer.type='mouse';
+ pointer.active=pointer.down||g.controlMode==='follow';updateFlightMarker();
+});
+canvas.addEventListener('pointerdown',e=>{
+ if(!running||e.button!==0)return;
+ if(e.pointerType!=='mouse')return; // Mobile uses the dedicated joystick.
+ pointer.down=true;pointer.active=true;pointer.id=e.pointerId;pointer.type='mouse';pointer.x=e.clientX;pointer.y=e.clientY;
+ try{canvas.setPointerCapture(e.pointerId);}catch(_){}updateFlightMarker();
+});
+const releaseMouse=e=>{if(e.pointerId!==pointer.id)return;pointer.down=false;pointer.id=null;pointer.active=false;updateFlightMarker();};
+canvas.addEventListener('pointerup',releaseMouse);
+canvas.addEventListener('pointercancel',releaseMouse);
+canvas.addEventListener('lostpointercapture',releaseMouse);
+canvas.addEventListener('pointerleave',()=>{if(!pointer.down){pointer.active=false;updateFlightMarker();}});
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();
  if(k==='f2'&&TEST_MODE){e.preventDefault();testerToggle();return;}
  if(e.target instanceof HTMLElement&&e.target.closest('input, select, textarea'))return;
  if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();keys.add(k);if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p'||k==='escape'){if(running)showPause();else{running=true;$('modal').classList.add('off');}}if(k==='m')showMap();}});
-addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();pointer.active=false;if(running)showPause();});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
-Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
+Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:visitedChunks.size,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
 })();
