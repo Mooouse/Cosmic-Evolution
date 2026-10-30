@@ -22,7 +22,7 @@ has('const extent=Math.min(32,', 'Cosmic horizon sector sweep regressed');
 has('let budget=Math.min(60,', 'Cosmic digestion budget regressed');
 has('function blackHoleTouchDistance(', 'Rendered horizon-contact physics missing');
 lacks('e.r>radius*.92', 'Oversized galaxy collision filter must remain removed');
-const version=page.match(/game\\.js\\?v=(\\d+)\\.(\\d+)\\.(\\d+)/);
+const version=page.match(/game\.js\?v=(\d+)\.(\d+)\.(\d+)/);
 assert.ok(version,'Game script must have a versioned cache key');
 assert.ok(Number(version[1])>3||(Number(version[1])===3&&Number(version[2])>=11),
  'Published game cache key must not regress below 3.11');
