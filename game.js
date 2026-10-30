@@ -480,7 +480,7 @@ function drawMacro(e,time,zoom,opacity=1){
  const drawR=clamp(radius*1.15,1.8,112);
  // LOD fades must never turn a whole class of galaxies black.
  const fade=e.absorbing?clamp(1-e.absorbing/.26,0,1):1;
- ctx.save();ctx.globalAlpha=clamp(.67+radius*.018,.66,.97)*clamp(.72+.28*opacity,.72,1)*fade;
+ ctx.save();ctx.globalAlpha=clamp(.67+radius*.018,.66,.97)*clamp(opacity,0,1)*fade;
  if(e.kind==='blackhole'){
   if(drawR<3){ctx.fillStyle=['#69c9ed','#cda1f9','#ffcc8e'][e.holeType||0];ctx.fillRect(x-1,y-1,2,2);}
   else {const cv=blackHoleSprite(e.holeType||0);ctx.drawImage(cv,x-drawR*2,y-drawR*2,drawR*4,drawR*4);}
@@ -524,51 +524,68 @@ function cosmicLODLevel(){
  const vertical=Math.ceil(H/(MACRO_SIZE*zoom))+3;
  return clamp(Math.log2(Math.max(1,Math.sqrt(horizontal*vertical/135))),0,47);
 }
+// Rendering and harvesting always sample exactly the same world-space LOD.
+// Prior versions only harvested a subset of the crossfaded levels and ignored
+// level-zero bodies outside the local 5x5 simulation bubble.
+function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
+ const zoom=Math.max(1e-12,camera.zoom);
+ const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
+ const right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
+ const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1;
+ const bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
+ const refCountX=Math.ceil(referenceWidth/(MACRO_SIZE*zoom))+3;
+ const refCountY=Math.ceil(referenceHeight/(MACRO_SIZE*zoom))+3;
+ const lod=clamp(Math.log2(Math.max(1,Math.sqrt(refCountX*refCountY/135))),0,47);
+ const low=Math.floor(lod),fraction=lod-low;
+ return {left,right,top,bottom,low,fraction,levels:fraction>.018&&low<47?[low,low+1]:[low]};
+}
 function harvestCosmicLOD(dt){
  if(!g.endless||g.tier!==TA.length-1)return;
  cosmicHarvestTimer+=dt;
- if(cosmicHarvestTimer<.115)return;
+ if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
- const playerRadius=Math.min(player.r,1e290);
- const lod=cosmicLODLevel(),levels=[Math.floor(lod)];
- if(lod-levels[0]>.12&&levels[0]<47)levels.push(levels[0]+1);
- let budget=8,changed=false;
- for(const level of levels){
-  if(level===0)continue; // Near objects already use real physics.
+ const radius=player.r,view=cosmicVisibleLOD();
+ // Check only cells intersecting the horizon, but do not silently skip the
+ // actual layer shown by the renderer as happened on level-zero and LOD fades.
+ let budget=10,changed=false;
+ for(const level of view.levels){
   const stride=2**level,span=MACRO_SIZE*stride;
-  const gx=Math.floor(player.x/span),gy=Math.floor(player.y/span);
-  const extent=Math.min(3,Math.ceil(playerRadius/span)+1);
-  for(let iy=-extent;iy<=extent&&budget>0;iy++)for(let ix=-extent;ix<=extent&&budget>0;ix++){
-   const ix0=gx+ix,iy0=gy+iy;
-   const baseX=ix0*stride,baseY=iy0*stride,id=level+':'+baseX+':'+baseY;
-   let mask=(g.depletedCosmic[id]||0)>>>0;
-   for(const e of macroLODNodes(baseX,baseY,level)){
-    if(mask&(1<<e.index)||e.r>playerRadius*.82)continue;
+  const worldRadius=Math.max(0,Math.min(radius,1e290));
+  const px=Math.floor(player.x/span),py=Math.floor(player.y/span);
+  const extent=Math.min(11,Math.ceil(worldRadius/span)+2);
+  for(let cy=py-extent;cy<=py+extent&&budget>0;cy++)for(let cx=px-extent;cx<=px+extent&&budget>0;cx++){
+   const gx=cx*stride,gy=cy*stride;
+   const key=level===0?macroKey(gx,gy):`${level}:${gx}:${gy}`;
+   // Local sector entities are already handled by the frame-by-frame physics.
+   if(level===0&&macroLoaded.has(key))continue;
+   const bag=level===0?g.depletedMacro:g.depletedCosmic;
+   let mask=(bag[key]||0)>>>0;
+   for(const e of (level===0?macroNodes(gx,gy):macroLODNodes(gx,gy,level))){
+    if((mask&(1<<e.index))!==0||e.r>radius*.92)continue;
     const dx=player.x-e.x,dy=player.y-e.y;
-    if(dx*dx+dy*dy>(playerRadius+e.r)*(playerRadius+e.r))continue;
-    mask|=1<<e.index;g.depletedCosmic[id]=mask;budget--;changed=true;
-    const value=Math.min(1e280,Math.max(100,Math.pow(1+e.r/100,1.45)*40));
+    if(Math.abs(dx)>radius+e.r||Math.abs(dy)>radius+e.r)continue;
+    if(dx*dx+dy*dy>(radius+e.r)**2)continue;
+    mask=(mask|(1<<e.index))>>>0;bag[key]=mask;
+    budget--;changed=true;
+    const value=Math.min(1e280,Math.max(100,e.value||Math.pow(1+e.r/100,1.45)*40));
     const amount=value*(1+g.upgrade.harvest*.075)*tester.loot;
-    g.matter=Math.min(1e290,g.matter+amount);
-    g.total=Math.min(1e290,g.total+amount);
+    g.matter=Math.min(1e290,g.matter+amount);g.total=Math.min(1e290,g.total+amount);
     g.stageCollects=Math.min(1e290,g.stageCollects+amount);
     g.credits=Math.min(1e290,g.credits+amount*.4);g.collects++;
-    g.materials[e.kind==='blackhole'||e.kind==='universe'?'exotic':'gas']+=e.kind==='blackhole'||e.kind==='universe'?3:2;
+    const resource=e.kind==='blackhole'||e.kind==='universe'?'exotic':(e.material||'gas');
+    g.materials[resource]=(g.materials[resource]||0)+(resource==='exotic'?3:2);
     g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(amount)*.0008;
     player.targetR=currentRadius();
-    if(budget===0)break;
+    if(budget<=0)break;
    }
   }
  }
  if(changed)cosmicSceneDirty=true;
 }
-function renderMacroBackground(time){
+function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
  macroVisibleCount=0;if(g.tier<13)return;
  const zoom=Math.max(1e-12,camera.zoom);
- const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1,right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
- const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1,bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
- const desiredStride=Math.sqrt(Math.max(1,(right-left+1)*(bottom-top+1))/135);
- const lod=clamp(Math.log2(Math.max(1,desiredStride)),0,47),low=Math.floor(lod),fraction=lod-low;
+ const {left,right,top,bottom,low,fraction}=cosmicVisibleLOD(referenceWidth,referenceHeight);
  ctx.save();
  function renderLevel(level,opacity){
   if(opacity<.025)return;
@@ -602,7 +619,7 @@ function renderMacroBackground(time){
 // Every galaxy retains its exact colors, outline and coordinates. Only close
 // physical bodies are drawn every frame. This avoids thousands of drawImage
 // operations per frame on giant black holes and high-DPI screens.
-let macroBackdrop=null;
+let macroBackdrop=null,macroBackdropOld=null,macroFadeStart=0;
 function renderMacroField(time){
  macroVisibleCount=0;
  if(g.tier<13)return;
@@ -615,7 +632,7 @@ function renderMacroField(time){
   y=H/2+(macroBackdrop.y-camera.y)*worldZoom-hh/2;
  }
  const refresh=(cosmicSceneDirty&&time>=cosmicNextRedraw)||!macroBackdrop||macroBackdrop.tier!==g.tier||macroBackdrop.width!==W||macroBackdrop.height!==H||
-   ratio<.958||ratio>1.044||x>0||y>0||x+ww<W||y+hh<H||
+   ratio<.91||ratio>1.12||x>0||y>0||x+ww<W||y+hh<H||
    (macroBackdrop.nearCenter!==nearCenter&&macroBackdrop.level===0);
  if(refresh){
   const realCtx=ctx,realW=W,realH=H;
@@ -626,16 +643,30 @@ function renderMacroField(time){
    ctx=canvas.getContext('2d',{alpha:true});
    W=canvas.width;H=canvas.height;
    ctx.setTransform(1,0,0,1,0,0);
-   renderMacroBackground(time);
+   renderMacroBackground(time,realW,realH);
   }finally{ctx=realCtx;W=realW;H=realH;}
-  const old=macroBackdrop;
-  // Clear the superseded canvas, releasing GPU / RAM resources.
-  if(old){old.canvas.width=0;old.canvas.height=0;}
+  // Blend new geometry over the previous world-anchored buffer. This avoids
+  // galaxies popping in/out during a change of LOD or camera magnification.
+  if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld.canvas.height=0;macroBackdropOld=null;}
+  macroBackdropOld=macroBackdrop;macroFadeStart=time;
   cosmicSceneDirty=false;cosmicNextRedraw=time+.65;macroBackdrop={canvas,x:camera.x,y:camera.y,zoom:worldZoom,width:W,height:H,
    nearCenter,level:Math.floor(clamp(Math.log2(Math.max(1,Math.sqrt((W/(MACRO_SIZE*worldZoom))*(H/(MACRO_SIZE*worldZoom))/135))),0,47))};
   x=(W-canvas.width)/2;y=(H-canvas.height)/2;ww=canvas.width;hh=canvas.height;
  }
- ctx.drawImage(macroBackdrop.canvas,x,y,ww,hh);
+ if(macroBackdropOld){
+  const elapsed=time-macroFadeStart;
+  if(elapsed<.40){
+   const old=macroBackdropOld,r=worldZoom/old.zoom;
+   const ow=old.canvas.width*r,oh=old.canvas.height*r;
+   const ox=W*.5+(old.x-camera.x)*worldZoom-ow*.5;
+   const oy=H*.5+(old.y-camera.y)*worldZoom-oh*.5;
+   ctx.save();ctx.globalAlpha=1-clamp(elapsed/.40,0,1);
+   ctx.drawImage(old.canvas,ox,oy,ow,oh);ctx.restore();
+  }else{macroBackdropOld.canvas.width=0;macroBackdropOld.canvas.height=0;macroBackdropOld=null;}
+ }
+ ctx.save();ctx.globalAlpha=macroBackdropOld?clamp((time-macroFadeStart)/.40,0,1):1;
+ if(macroBackdropOld)ctx.globalCompositeOperation="lighter";
+ ctx.drawImage(macroBackdrop.canvas,x,y,ww,hh);ctx.restore();
  const zoom=Math.max(1e-12,camera.zoom);
  for(const e of macroEntities)if(drawMacro(e,time,zoom,1))macroVisibleCount++;
 }
@@ -714,7 +745,7 @@ function renderDistantBodies(){
  }
  ctx.restore();
 }
-function respawn(e){markHarvested(e);e.dead=true;}
+function respawn(e){markHarvested(e);e.dead=true;if(e.macro)cosmicSceneDirty=true;}
 // Absorption is time-based, not an intermittent physics step. Bodies stay
 // fixed in world space until the short shrinking animation completes.
 function startAbsorption(e){if(e.dead||e.absorbing)return;e.absorbing=.001;e.absorbOriginX=e.x;e.absorbOriginY=e.y;}
@@ -842,8 +873,10 @@ function update(dt){
  // only as needed to keep its horizon visible, with no hard size ceiling.
  const horizonRadius=Math.max(player.r,player.targetR);
  const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-12,2.5):clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
- const zoomResponse=g.endless&&zTarget<camera.zoom?9:2;
- camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*zoomResponse));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
+ const zoomResponse=g.endless?2.4:2;
+ const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-12),1e-10,1e10);
+ camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
+ camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
  uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
  if(saveTimer>12){saveTimer=0;save();}
 }
@@ -901,77 +934,95 @@ function paintBody(x,y,r,kind,color,time,shadow=true){if(shadow){ctx.save();ctx.
 const accretionTextures=new Map();
 function getAccretionTexture(type=2){
  if(accretionTextures.has(type))return accretionTextures.get(type);
- const S=640,half=S/2,unit=S/4;
+ const S=768,C=S/2,U=S/3.8;
  const cv=document.createElement('canvas');cv.width=cv.height=S;
- const c=cv.getContext('2d',{willReadFrequently:true}),img=c.createImageData(S,S),data=img.data;
- const palettes=[[[95,217,253],[213,249,255],[44,87,185]],[[184,114,254],[255,212,250],[85,70,190]],[[255,125,47],[255,245,196],[81,114,206]]];
- const [warm,hot,cold]=palettes[type%3];
- const smooth=(a,b,t)=>{const u=clamp((t-a)/(b-a),0,1);return u*u*(3-2*u);};
- const hash=(x,y)=>{let h=Math.imul(x,0x1b873593)^Math.imul(y,0x85ebca6b)^Math.imul(type+1,0xc2b2ae35);h^=h>>>16;h=Math.imul(h,0x7feb352d);h^=h>>>15;return (h>>>0)/4294967295;};
- function noise(x,y){
-  const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy;
-  const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
-  const a=hash(ix,iy),b=hash(ix+1,iy),c=hash(ix,iy+1),d=hash(ix+1,iy+1);
-  return (a+(b-a)*sx)*(1-sy)+(c+(d-c)*sx)*sy;
- }
+ const cx=cv.getContext('2d',{willReadFrequently:true});
+ const image=cx.createImageData(S,S),pixels=image.data;
+ const palettes=[[[69,185,255],[202,242,255],[76,83,179]],[[165,96,247],[255,197,245],[72,84,191]],[[255,132,50],[255,244,197],[96,127,224]]];
+ const pal=palettes[type%palettes.length],seed=type*123791+5297;
+ const hash=(x,y)=>{let z=Math.imul(x+seed,0x9e3779b1)^Math.imul(y-seed,0x85ebca77);z=Math.imul(z^(z>>>16),0x7feb352d);z^=z>>>15;return(z>>>0)/4294967295};
+ const n=(x,y)=>{let a=Math.floor(x),b=Math.floor(y),fx=x-a,fy=y-b;
+  fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);
+  const v0=hash(a,b)*(1-fx)+hash(a+1,b)*fx,v1=hash(a,b+1)*(1-fx)+hash(a+1,b+1)*fx;
+  return v0*(1-fy)+v1*fy;};
+ const smooth=(a,b,v)=>{const u=clamp((v-a)/(b-a),0,1);return u*u*(3-2*u)};
+ const exp=(v)=>Math.exp(-v*v);
+ // Physically motivated painter: turbulent, inclined flow with an offset
+ // upper lensed image, thick but porous dust and extreme Doppler asymmetry.
  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
-  const sx=(x+.5-half)/unit,sy=(y+.5-half)/unit,rr=Math.hypot(sx,sy);
-  if(rr>1.97)continue;
-  const theta=Math.atan2(sy,sx),idx=(y*S+x)*4;
-  const u=sx*.94+sy*.34,v=(-sx*.34+sy*.94)/.48;
-  const angle=Math.atan2(v,u),distance=Math.hypot(u,v);
-  const roll=angle*2.4+distance*3.1;
-  const turbulence=noise((u+Math.cos(roll)*.21)*8,(v+Math.sin(roll)*.13)*8);
-  const fine=noise(u*28+Math.sin(angle*5)*.35,v*28);
-  const broad=noise(u*3.8+type,v*5.8);
-  const erratic=.06*(broad-.5)+.038*(turbulence-.5);
-  const shell=smooth(.83+erratic,1.00+erratic,distance)*(1-smooth(1.47+erratic,1.88+erratic,distance));
-  const holes=clamp((turbulence-.32)*1.8,0,1),doppler=clamp(1.03-.59*u,.32,1.65);
-  const density=clamp((.26+.66*holes+.25*fine+.25*broad)*shell*doppler,0,1.3);
-  const hotFactor=1-smooth(.97,1.53,distance);
-  const photonRadius=.785+.012*(noise(Math.cos(theta)*9,Math.sin(theta)*9)-.5);
-  const diff=(rr-photonRadius)/(.013+.005*noise(sx*16,sy*16));
-  const photon=Math.exp(-diff*diff)*(sy<0?.90:.55)*(sx<0?1.3:.82);
-  const halo=(1-smooth(.8,1.75,rr))*.11;
-  let alpha=clamp(density*.92+photon*.94+halo*.21,0,1);
-  const cool=clamp((distance-1.16)*.7,0,.62),emission=clamp(density*(.6+.55*hotFactor)+photon*1.3,0,1.7);
-  let R=(warm[0]*(1-hotFactor)+hot[0]*hotFactor)*(1-cool)+cold[0]*cool;
-  let G=(warm[1]*(1-hotFactor)+hot[1]*hotFactor)*(1-cool)+cold[1]*cool;
-  let B=(warm[2]*(1-hotFactor)+hot[2]*hotFactor)*(1-cool)+cold[2]*cool;
-  R=clamp(R*emission+hot[0]*photon*.3,0,255);
-  G=clamp(G*emission+hot[1]*photon*.3,0,255);
-  B=clamp(B*emission+hot[2]*photon*.3,0,255);
-  const horizon=1-smooth(.738,.762,rr);
-  if(horizon>0){R*=1-horizon;G*=1-horizon;B*=1-horizon;alpha=alpha*(1-horizon)+horizon;}
-  if(alpha<.012)continue;
-  data[idx]=R;data[idx+1]=G;data[idx+2]=B;data[idx+3]=Math.round(clamp(alpha,0,1)*255);
+  let px=(x-C)/U,py=(y-C)/U,r=Math.hypot(px,py),a=Math.atan2(py,px);
+  if(r>1.86)continue;
+  const qx=px*.966+py*.26,qy=(-px*.26+py*.966)/.41;
+  const ell=Math.hypot(qx,qy),theta=Math.atan2(qy,qx);
+  const twist=theta+ell*.65;
+  const broad=n(px*3.5+Math.sin(twist)*.8,py*4.1+Math.cos(twist)*.6),
+        cloud=n(px*11+Math.sin(twist)*2.5,py*9+Math.cos(twist)*1.7),
+        grains=n(px*38+Math.cos(twist)*1.1,py*36);
+  const distort=(broad-.5)*.22+(cloud-.5)*.13;
+  const band=smooth(.53+distort,.78+distort,ell)*(1-smooth(1.26+distort,1.8+distort,ell));
+  const density=Math.pow(clamp(.20+.66*cloud+.31*broad+.08*grains,0,1.3),1.2);
+  const doppler=clamp(1.0-qx*.31,.53,1.38);
+  const flux=band*density*doppler;
+  // Randomly warped gravitationally lensed image of the far side.
+  const ringShape=.585+(n(Math.cos(a)*8,Math.sin(a)*8)-.5)*.023;
+  const photon=exp((r-ringShape)/(.018+.007*cloud))*(py<0?1:.65)*(.84-.13*px);
+  const outerHalo=exp((r-.96)/.53)*.14;
+  const hot=clamp((1.44-ell)*1.0,0,1);
+  const core=smooth(.518,.566,r);
+  let alpha=clamp((flux*.94+photon*.93+outerHalo)*core,0,1);
+  // Inner photon ring is bright but irregular, never a smooth vector circle.
+  const lens=photon*.72;
+  const glow=clamp(flux*.78+lens*1.25,0,1.33);
+  const t=hot*.8+.12;
+  const cold=pal[2],warm=pal[0],white=pal[1];
+  const red=warm[0]*(1-t)+white[0]*t,green=warm[1]*(1-t)+white[1]*t,blue=warm[2]*(1-t)+white[2]*t;
+  const cool=clamp((ell-1.3)*.68,0,.5);
+  const i=(y*S+x)*4;
+  pixels[i]=clamp((red*(1-cool)+cold[0]*cool)*glow,0,255);
+  pixels[i+1]=clamp((green*(1-cool)+cold[1]*cool)*glow,0,255);
+  pixels[i+2]=clamp((blue*(1-cool)+cold[2]*cool)*glow,0,255);
+  pixels[i+3]=Math.round(alpha*255);
+  // Occlusion of the back disc by an almost-black event horizon.
+  if(r<.564){const edge=1-smooth(.522,.558,r);pixels[i]=0;pixels[i+1]=1;pixels[i+2]=5;
+   pixels[i+3]=Math.max(pixels[i+3],Math.round(edge*255));}
  }
- c.putImageData(img,0,0);
- let seed=(0x8dae136b+type*12347)>>>0;
- const random=()=>{seed+=0x6d2b79f5;let x=seed;x=Math.imul(x^(x>>>15),x|1);x^=x+Math.imul(x^(x>>>7),x|61);return ((x^(x>>>14))>>>0)/4294967296;};
- c.globalCompositeOperation='screen';
- for(let i=0;i<4200;i++){
-  const a=random()*TAU,rad=.90+Math.sqrt(random())*.89;
-  const px=Math.cos(a)*rad,py=Math.sin(a)*rad*.48;
-  const xx=px*.94-py*.34,yy=px*.34+py*.94;
-  const X=half+xx*unit,Y=half+yy*unit;
-  if(X<2||Y<2||X>=S-2||Y>=S-2||Math.hypot(xx,yy)<.77)continue;
-  const hotSide=px<0,cluster=rad<1.3;
-  c.globalAlpha=(.18+random()*.66)*(hotSide?1:.63);
-  c.fillStyle=i%7===0?'#fff8cc':cluster?'#ffc47a':type===1?'#ad92ff':'#829fc9';
-  const size=.36+random()*(cluster?1.65:1.18);
-  c.fillRect(X,Y,size,size);
+ cx.putImageData(image,0,0);
+ // Stochastic hot gas and star-like knots: each point remains fixed in the
+ // physical disk across all zoom levels. These are baked once into the sprite.
+ let rng=chunkRandom(seedHash(51+type,217+type));cx.globalCompositeOperation='screen';
+ for(let i=0;i<12000;i++){
+  const a=rng()*TAU,dist=.73+Math.pow(rng(),.74)*1.05;
+  const x0=Math.cos(a)*dist,y0=Math.sin(a)*dist*.41;
+  const xx=x0*.966-y0*.26,yy=x0*.26+y0*.966;
+  const X=C+xx*U,Y=C+yy*U;
+  if(X<1||Y<1||X>=S-1||Y>=S-1||Math.hypot(xx,yy)<.7)continue;
+  const side=clamp(1-x0*.58,.25,1.55),bright=(rng()**2)*side;
+  if(bright<.1)continue;
+  cx.globalAlpha=clamp(bright*.55,.07,.8);
+  cx.fillStyle=bright>.9?'#fff4df':i%5===0?'#fff6d2':type===1?'#e1a9fc':'#ffc78e';
+  const d=.25+bright*1.9;cx.fillRect(X,Y,d,d);
  }
- c.globalCompositeOperation='source-over';c.globalAlpha=1;
+ cx.globalCompositeOperation='source-over';cx.globalAlpha=1;
  accretionTextures.set(type,cv);return cv;
 }
 function paintBlackHole(x,y,r,time){
- const R=Math.max(8,Math.min(r,Math.max(W,H)*.6));
- const texture=getAccretionTexture(2);
+ const R=clamp(r,8,Math.max(W,H)*.56);
  ctx.save();ctx.translate(x,y);
- // A slight slow precession gives movement while keeping the disk turbulent.
- ctx.rotate(Math.sin(time*.095)*.019);
- ctx.drawImage(texture,-R*2,-R*2,R*4,R*4);
+ // The original grain is frozen; slowly moving clouds create organic motion,
+ // not a vector stripe rotating like a clock hand.
+ const sprite=getAccretionTexture(2);
+ ctx.rotate(Math.sin(time*.063)*.012);
+ ctx.drawImage(sprite,-R*1.9,-R*1.9,R*3.8,R*3.8);
+ // Soft irregular micro-sparks, cheap and subtle, along the outer disk.
+ ctx.globalCompositeOperation='screen';
+ for(let i=0;i<34;i++){
+  const t=i*2.39996,timeShift=time*(.06+(i%4)*.012),theta=t+timeShift;
+  const radius=R*(1.10+.13*Math.sin(i*16.7));
+  const xx=Math.cos(theta)*radius,yy=Math.sin(theta)*radius*.39;
+  const bright=.14+.2*(.5+.5*Math.sin(time*.6+i*6.13));
+  ctx.fillStyle=`rgba(255,204,153,${bright})`;
+  ctx.fillRect(xx,yy,Math.max(.55,R*.006),Math.max(.55,R*.006));
+ }
  ctx.restore();
 }
 
@@ -1317,7 +1368,7 @@ function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТ
 function restartCampaign(){
  if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
- const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}macroEntities=[];entities=[];
+ const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
  if(TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
  player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);lastReveal={x:Infinity,y:Infinity,r:-Infinity};
  player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
