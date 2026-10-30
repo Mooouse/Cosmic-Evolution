@@ -120,3 +120,9 @@ All game files are static. The included GitHub Actions workflow runs a syntax/sm
 
 ### Версия 3.5 — визуал и поглощение без скачков
 Единые уровни детализации для космической отрисовки и поглощения (включая дальние секторы), плавное изменение масштаба и перекрытие буферов. Новая закэшированная текстура аккреционного диска с турбулентным газом, неравномерным свечением и тёмным горизонтом событий. Сохранения совместимы.
+
+
+### 3.6 — Black-hole visual rebuild
+- Rebuilt the main black-hole art with a clear horizon, slanted turbulent amber plasma and uneven gravitational glow. The expensive texture is generated and cached once per variant.
+- A small number of moving hot particles provides animation without large vector rings.
+- Galaxy collection, rendering optimizations, exploration and saves remain unchanged.

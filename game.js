@@ -932,96 +932,96 @@ function paintBody(x,y,r,kind,color,time,shadow=true){if(shadow){ctx.save();ctx.
 // Organic accretion texture, generated once per variant. All hot-path drawing
 // is image blitting; no evenly-spaced vector arcs or costly live gradients.
 const accretionTextures=new Map();
+// v3.6: cached, layered turbulent accretion art; no vector rings.
 function getAccretionTexture(type=2){
- if(accretionTextures.has(type))return accretionTextures.get(type);
- const S=768,C=S/2,U=S/3.8;
+ type=Math.max(0,Math.min(2,type|0));
+ const cached=accretionTextures.get(type);if(cached)return cached;
+ const S=type===2?720:480,C=S*.5,U=S*.255;
  const cv=document.createElement('canvas');cv.width=cv.height=S;
- const cx=cv.getContext('2d',{willReadFrequently:true});
- const image=cx.createImageData(S,S),pixels=image.data;
- const palettes=[[[69,185,255],[202,242,255],[76,83,179]],[[165,96,247],[255,197,245],[72,84,191]],[[255,132,50],[255,244,197],[96,127,224]]];
- const pal=palettes[type%palettes.length],seed=type*123791+5297;
- const hash=(x,y)=>{let z=Math.imul(x+seed,0x9e3779b1)^Math.imul(y-seed,0x85ebca77);z=Math.imul(z^(z>>>16),0x7feb352d);z^=z>>>15;return(z>>>0)/4294967295};
- const n=(x,y)=>{let a=Math.floor(x),b=Math.floor(y),fx=x-a,fy=y-b;
+ const c=cv.getContext('2d',{willReadFrequently:true});
+ const img=c.createImageData(S,S),data=img.data;
+ const colors=[[[99,190,255],[207,237,255],[55,87,189]],[[199,114,255],[255,216,244],[89,84,200]],[[255,147,57],[255,239,185],[104,125,246]]];
+ const col=colors[type],seed=1934+type*9931;
+ const hash=(a,b)=>{let x=Math.imul(a+seed,374761393)^Math.imul(b-seed,668265263);
+  x=Math.imul(x^(x>>>13),1274126177);return((x^(x>>>16))>>>0)/4294967295;};
+ const noise=(x,y)=>{const a=Math.floor(x),b=Math.floor(y);let fx=x-a,fy=y-b;
   fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);
-  const v0=hash(a,b)*(1-fx)+hash(a+1,b)*fx,v1=hash(a,b+1)*(1-fx)+hash(a+1,b+1)*fx;
-  return v0*(1-fy)+v1*fy;};
- const smooth=(a,b,v)=>{const u=clamp((v-a)/(b-a),0,1);return u*u*(3-2*u)};
- const exp=(v)=>Math.exp(-v*v);
- // Physically motivated painter: turbulent, inclined flow with an offset
- // upper lensed image, thick but porous dust and extreme Doppler asymmetry.
+  return (hash(a,b)*(1-fx)+hash(a+1,b)*fx)*(1-fy)+
+    (hash(a,b+1)*(1-fx)+hash(a+1,b+1)*fx)*fy;};
+ const sm=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
+ const gaussian=x=>Math.exp(-x*x);
  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
-  let px=(x-C)/U,py=(y-C)/U,r=Math.hypot(px,py),a=Math.atan2(py,px);
-  if(r>1.86)continue;
-  const qx=px*.966+py*.26,qy=(-px*.26+py*.966)/.41;
-  const ell=Math.hypot(qx,qy),theta=Math.atan2(qy,qx);
-  const twist=theta+ell*.65;
-  const broad=n(px*3.5+Math.sin(twist)*.8,py*4.1+Math.cos(twist)*.6),
-        cloud=n(px*11+Math.sin(twist)*2.5,py*9+Math.cos(twist)*1.7),
-        grains=n(px*38+Math.cos(twist)*1.1,py*36);
-  const distort=(broad-.5)*.22+(cloud-.5)*.13;
-  const band=smooth(.53+distort,.78+distort,ell)*(1-smooth(1.26+distort,1.8+distort,ell));
-  const density=Math.pow(clamp(.20+.66*cloud+.31*broad+.08*grains,0,1.3),1.2);
-  const doppler=clamp(1.0-qx*.31,.53,1.38);
-  const flux=band*density*doppler;
-  // Randomly warped gravitationally lensed image of the far side.
-  const ringShape=.585+(n(Math.cos(a)*8,Math.sin(a)*8)-.5)*.023;
-  const photon=exp((r-ringShape)/(.018+.007*cloud))*(py<0?1:.65)*(.84-.13*px);
-  const outerHalo=exp((r-.96)/.53)*.14;
-  const hot=clamp((1.44-ell)*1.0,0,1);
-  const core=smooth(.518,.566,r);
-  let alpha=clamp((flux*.94+photon*.93+outerHalo)*core,0,1);
-  // Inner photon ring is bright but irregular, never a smooth vector circle.
-  const lens=photon*.72;
-  const glow=clamp(flux*.78+lens*1.25,0,1.33);
-  const t=hot*.8+.12;
-  const cold=pal[2],warm=pal[0],white=pal[1];
-  const red=warm[0]*(1-t)+white[0]*t,green=warm[1]*(1-t)+white[1]*t,blue=warm[2]*(1-t)+white[2]*t;
-  const cool=clamp((ell-1.3)*.68,0,.5);
+  const px=(x-C)/U,py=(y-C)/U;
+  const r=Math.hypot(px,py),theta=Math.atan2(py,px);
+  if(r>2.02)continue;
+  const ux=px*.94+py*.342,uy=(-px*.342+py*.94)/.405;
+  const er=Math.hypot(ux,uy),a=Math.atan2(uy,ux);
+  const s0=noise(ux*2.1+Math.cos(a)*.7,uy*2.0+Math.sin(a)*.5);
+  const s1=noise(ux*6.3+2*s0,uy*6.8-1.7*s0);
+  const s2=noise(ux*17+2*s1,uy*17-1.6*s1);
+  const s3=noise(ux*44,uy*45);
+  const warp=(s0-.5)*.32+(s1-.5)*.15;
+  const q=er+warp;
+  const disk=sm(.69,.91,q)*(1-sm(1.56,1.98,q));
+  const filament=Math.pow(sm(.18,.78,s1*.52+s2*.35+s0*.19),1.12);
+  const clumpy=.43+.44*s0+.35*s1+.15*s2+.08*s3;
+  const approaching=clamp(1.17-.49*ux+.08*uy,.48,1.6);
+  const innerHot=1-sm(1.02,1.92,er);
+  const hotKnots=Math.pow(Math.max(0,noise(a*3.8+er*4.5,er*8.6)-.56)*2.8,1.9);
+  const flux=disk*clumpy*(.68+.38*filament+.47*hotKnots)*approaching;
+  const lensRadius=.59+.029*(s0-.5)+.02*(s2-.5);
+  const lens=gaussian((r-lensRadius)/(.042+.011*s1))*(py<.13?1:.44)*(.58+.5*s1);
+  const farGlow=gaussian((r-1.03)/.54)*(.055+.065*s0);
+  const plasma=clamp(flux*.93+lens*.78+farGlow,0,1.25);
+  const edge=sm(.465,.545,r);
+  const hueMix=clamp(.10+.32*innerHot+.29*hotKnots,0,.82);
+  const cool=clamp((er-1.43)*.53+(1-s0)*.11,0,.47);
+  const intensity=clamp(.22+plasma*.77,0,1.07);
+  const alpha=clamp((plasma*.82+farGlow*.55)*edge,0,.91);
   const i=(y*S+x)*4;
-  pixels[i]=clamp((red*(1-cool)+cold[0]*cool)*glow,0,255);
-  pixels[i+1]=clamp((green*(1-cool)+cold[1]*cool)*glow,0,255);
-  pixels[i+2]=clamp((blue*(1-cool)+cold[2]*cool)*glow,0,255);
-  pixels[i+3]=Math.round(alpha*255);
-  // Occlusion of the back disc by an almost-black event horizon.
-  if(r<.564){const edge=1-smooth(.522,.558,r);pixels[i]=0;pixels[i+1]=1;pixels[i+2]=5;
-   pixels[i+3]=Math.max(pixels[i+3],Math.round(edge*255));}
+  for(let channel=0;channel<3;channel++){
+   const warm=col[0][channel]*(1-hueMix)+col[1][channel]*hueMix;
+   const v=(warm*(1-cool)+col[2][channel]*cool)*intensity;
+   data[i+channel]=Math.round(clamp(v,0,255));
+  }
+  data[i+3]=Math.round(alpha*255);
+  if(r<.527){const darkness=1-sm(.467,.528,r);
+   data[i]=2;data[i+1]=2;data[i+2]=7;
+   data[i+3]=Math.max(data[i+3],Math.round(255*darkness));}
  }
- cx.putImageData(image,0,0);
- // Stochastic hot gas and star-like knots: each point remains fixed in the
- // physical disk across all zoom levels. These are baked once into the sprite.
- let rng=chunkRandom(seedHash(51+type,217+type));cx.globalCompositeOperation='screen';
- for(let i=0;i<12000;i++){
-  const a=rng()*TAU,dist=.73+Math.pow(rng(),.74)*1.05;
-  const x0=Math.cos(a)*dist,y0=Math.sin(a)*dist*.41;
-  const xx=x0*.966-y0*.26,yy=x0*.26+y0*.966;
-  const X=C+xx*U,Y=C+yy*U;
-  if(X<1||Y<1||X>=S-1||Y>=S-1||Math.hypot(xx,yy)<.7)continue;
-  const side=clamp(1-x0*.58,.25,1.55),bright=(rng()**2)*side;
-  if(bright<.1)continue;
-  cx.globalAlpha=clamp(bright*.55,.07,.8);
-  cx.fillStyle=bright>.9?'#fff4df':i%5===0?'#fff6d2':type===1?'#e1a9fc':'#ffc78e';
-  const d=.25+bright*1.9;cx.fillRect(X,Y,d,d);
+ c.putImageData(img,0,0);
+ const rng=chunkRandom(seedHash(type*11+37,type*13+118));
+ c.globalCompositeOperation='screen';
+ for(let j=0;j<(type===2?5100:2650);j++){
+  const a=rng()*TAU,rr=.83+Math.pow(rng(),.8)*1.05;
+  const cloud=noise(Math.cos(a)*rr*6,Math.sin(a)*rr*6);
+  if(rng()>.4+cloud*.4)continue;
+  const ux=Math.cos(a)*rr,uy=Math.sin(a)*rr*.405;
+  const X=C+(ux*.94-uy*.342)*U,Y=C+(ux*.342+uy*.94)*U;
+  if(X<2||Y<2||X>S-2||Y>S-2)continue;
+  const hot=clamp((1.5-ux*.52)*(.25+rng()*.75),.1,1.8);
+  c.globalAlpha=clamp(hot*.65*(.45+cloud*.4),.07,.92);
+  c.fillStyle=rng()>.87?'#ffffff':type===2?'#ffe1a4':type===1?'#f5c0ff':'#c0eaff';
+  const d=.3+Math.pow(rng(),5)*2.1;c.fillRect(X,Y,d,d);
  }
- cx.globalCompositeOperation='source-over';cx.globalAlpha=1;
+ c.globalCompositeOperation='source-over';c.globalAlpha=1;
  accretionTextures.set(type,cv);return cv;
 }
 function paintBlackHole(x,y,r,time){
- const R=clamp(r,8,Math.max(W,H)*.56);
+ const R=clamp(r,8,Math.max(W,H)*.56),sprite=getAccretionTexture(2);
  ctx.save();ctx.translate(x,y);
- // The original grain is frozen; slowly moving clouds create organic motion,
- // not a vector stripe rotating like a clock hand.
- const sprite=getAccretionTexture(2);
- ctx.rotate(Math.sin(time*.063)*.012);
- ctx.drawImage(sprite,-R*1.9,-R*1.9,R*3.8,R*3.8);
- // Soft irregular micro-sparks, cheap and subtle, along the outer disk.
- ctx.globalCompositeOperation='screen';
- for(let i=0;i<34;i++){
-  const t=i*2.39996,timeShift=time*(.06+(i%4)*.012),theta=t+timeShift;
-  const radius=R*(1.10+.13*Math.sin(i*16.7));
-  const xx=Math.cos(theta)*radius,yy=Math.sin(theta)*radius*.39;
-  const bright=.14+.2*(.5+.5*Math.sin(time*.6+i*6.13));
-  ctx.fillStyle=`rgba(255,204,153,${bright})`;
-  ctx.fillRect(xx,yy,Math.max(.55,R*.006),Math.max(.55,R*.006));
+ const breathing=1+.006*Math.sin(time*.48);
+ ctx.drawImage(sprite,-R*1.89*breathing,-R*1.89*breathing,R*3.78*breathing,R*3.78*breathing);
+ ctx.globalCompositeOperation='lighter';
+ const count=clamp(Math.round(R*.15),14,54);
+ for(let j=0;j<count;j++){
+  const phase=j*2.399963+time*(.19+(j%5)*.011);
+  const dist=R*(.92+.32*((j*37%71)/71));
+  const xx=Math.cos(phase)*dist*.94-Math.sin(phase)*dist*.4*.342;
+  const yy=Math.cos(phase)*dist*.342+Math.sin(phase)*dist*.4*.94;
+  const alpha=(.12+.3*(.5+.5*Math.sin(j*1.37+time*.91)))*(1-Math.abs(Math.cos(phase))*.21);
+  ctx.fillStyle='rgba(255,202,133,'+alpha.toFixed(3)+')';
+  const pr=clamp(R*.003,.65,2.7);ctx.fillRect(xx,yy,pr,pr);
  }
  ctx.restore();
 }
