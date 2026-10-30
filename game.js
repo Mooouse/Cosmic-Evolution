@@ -3,7 +3,12 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const canvas = $('universe');
-let ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+// Present only complete frames. The old low-latency front buffer exposed
+// intermediate clears and readbacks from the gravitational lens.
+const screenCtx=canvas.getContext('2d',{alpha:false,desynchronized:false});
+const frameCanvas=document.createElement('canvas');
+const frameCtx=frameCanvas.getContext('2d',{alpha:false});
+let ctx=screenCtx;
 const TAU = Math.PI * 2;
 // The painted black disk, its lens and its physical absorption use one radius.
 const BLACK_HOLE_CORE_FRACTION = .245;
@@ -195,7 +200,12 @@ function applyResolution(){
  const base=Math.min(devicePixelRatio||1,W*H>=2200000?.87:1.25);
  const effective=base*(g.quality===.5?.75:1)*performanceScale;
  dpr=Math.max(.65,effective);
- canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
+ const pixelWidth=Math.max(1,Math.round(W*dpr));
+ const pixelHeight=Math.max(1,Math.round(H*dpr));
+ canvas.width=pixelWidth;canvas.height=pixelHeight;
+ frameCanvas.width=pixelWidth;frameCanvas.height=pixelHeight;
+ screenCtx.setTransform(1,0,0,1,0,0);
+ frameCtx.setTransform(dpr,0,0,dpr,0,0);
  ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 function resize(){W=innerWidth;H=innerHeight;applyResolution();makeSky();}
@@ -1087,7 +1097,8 @@ function renderBlackHoleLensing(){
  if(lensInput.width!==sw||lensInput.height!==sh){
   lensInput.width=lensOutput.width=sw;lensInput.height=lensOutput.height=sh;
  }
- lensInputCtx.drawImage(canvas,left*dpr,top*dpr,width*dpr,height*dpr,0,0,sw,sh);
+ // The lens must sample the fully drawn BACK buffer, never the visible one.
+ lensInputCtx.drawImage(frameCanvas,left*dpr,top*dpr,width*dpr,height*dpr,0,0,sw,sh);
  const a=lensInputCtx.getImageData(0,0,sw,sh).data;
  const warped=lensOutputCtx.createImageData(sw,sh),b=warped.data;
  const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION;
@@ -1293,6 +1304,9 @@ function renderPlayer(time){
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
 function render(time){
+ // The public Canvas retains the previous complete frame throughout every
+ // expensive readback, galaxy repaint, and lensing pass.
+ ctx=frameCtx;
  ctx.setTransform(dpr,0,0,dpr,0,0);
  // Restore the compositing baseline every frame; otherwise a previous
  // effect can accidentally carry semi-transparency onto the next frame.
@@ -1319,6 +1333,15 @@ function render(time){
   paintBlackHole(p.x,p.y,r,time);
   ctx.restore();
  }
+ // Atomic presentation: the screen never sees a partially completed frame.
+ // Do not reset canvas.width/height or use a desynchronized front context.
+ screenCtx.save();
+ screenCtx.setTransform(1,0,0,1,0,0);
+ screenCtx.globalAlpha=1;
+ screenCtx.globalCompositeOperation='copy';
+ screenCtx.drawImage(frameCanvas,0,0);
+ screenCtx.restore();
+ ctx=screenCtx;
  renderTicks++;
 }
 let idleLast=0;
