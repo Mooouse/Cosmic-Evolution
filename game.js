@@ -120,6 +120,25 @@ function setupFlightStick(){const pad=$('flight-stick');pad.addEventListener('po
 setupFlightStick();
 let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
 let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
+let pickupSoundAt=-1e9,pickupCount=0,pickupValue=0,pickupDisplayAt=-1e9;
+let absorptionTokens=0;
+function pickupFeedback(value,rare=false){
+ pickupCount++;pickupValue+=value;
+ const now=performance.now();
+ // Never produce dozens of layered high-frequency tones when a galaxy is eaten.
+ if(g.sound&&now-pickupSoundAt>420){
+  pickupSoundAt=now;
+  sound(g.endless?190:rare?430:310,'sine',.085,g.endless?.004:.009);
+ }
+ // One compact feedback number per cluster; no individual floating labels.
+ if(now-pickupDisplayAt>650&&player.r<CHUNK*4){
+  popText(player.x,player.y-player.r*1.3,`+${fmt(Math.round(pickupValue))}`,'#b7e9fc');
+  pickupValue=0;pickupCount=0;pickupDisplayAt=now;
+ }
+ if(player.r>=CHUNK*4){pickupValue=0;pickupCount=0;}
+}
+
+
 const cssColor = (h,a) => h.startsWith('#')?`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`:`rgba(119,190,255,${a})`;
 function sound(freq=350,type='sine',duration=.075,vol=.045){if(!g.sound)return;try{soundCtx??=new (window.AudioContext||window.webkitAudioContext)();if(soundCtx.state==='suspended')soundCtx.resume();const osc=soundCtx.createOscillator(),gain=soundCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,soundCtx.currentTime);osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.63),soundCtx.currentTime+duration);gain.gain.setValueAtTime(vol,soundCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,soundCtx.currentTime+duration);osc.connect(gain);gain.connect(soundCtx.destination);osc.start();osc.stop(soundCtx.currentTime+duration+.01);}catch(_){}}
 // Original procedurally composed cinematic space ambient — not the film soundtrack.
@@ -374,7 +393,7 @@ function streamMacroBodies(){
   for(const e of macroNodes(cx,cy))if(!(depleted&(1<<e.index)))macroEntities.push({...e});
  }
  for(const key of macroLoaded)if(!active.has(key))macroLoaded.delete(key);
- macroEntities=macroEntities.filter(e=>!e.dead&&active.has(e.chunk));
+ macroEntities=macroEntities.filter(e=>!e.dead&&(active.has(e.chunk)||e.absorbing));
 }
 function cosmicSprite(material,shape){
  const key=material+':'+shape;let cv=macroSpriteCache.get(key);if(cv)return cv;
@@ -395,34 +414,60 @@ function cosmicSprite(material,shape){
  c.fillStyle='#fffaf0';c.beginPath();c.arc(72,72,3,0,TAU);c.fill();
  if(macroSpriteCache.size>20)macroSpriteCache.clear();macroSpriteCache.set(key,cv);return cv;
 }
-function drawMacro(e,time,zoom){
+function drawMacro(e,time,zoom,opacity=1){
  const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5;
  const radius=e.r*zoom;
  if(x<-radius*1.6||x>W+radius*1.6||y<-radius*1.6||y>H+radius*1.6)return false;
  const drawR=clamp(radius*1.15,2,115),canEat=e.r<=player.r*.82;
- ctx.globalAlpha=clamp(.65+radius*.02,.55,1);
+ ctx.globalAlpha=clamp(.65+radius*.02,.55,1)*opacity*(e.absorbing?1-e.absorbing/.26:1);
  if(e.index>=7||drawR<5){ctx.fillStyle=MATERIALS[e.material]?.color||'#9cb5ff';ctx.beginPath();ctx.arc(x,y,Math.max(1.5,drawR*.55),0,TAU);ctx.fill();}
  else {const cv=cosmicSprite(e.material,e.shape);ctx.drawImage(cv,x-drawR*1.5,y-drawR*1.5,drawR*3,drawR*3);
   if(e.macro&&macroLoaded.has(e.chunk)&&drawR>12){ctx.strokeStyle=canEat?'rgba(115,230,205,.20)':'rgba(245,151,171,.19)';ctx.lineWidth=1;
    ctx.beginPath();ctx.arc(x,y,radius,0,TAU);ctx.stroke();}}
  return true;
 }
+// Stable world-space LOD: ALL sampling anchors to the global origin (0,0).
+// Older screen-relative steps made distant galaxies jump whenever a boundary
+// or camera zoom changed. Fade across two fixed power-of-two resolutions.
 function renderMacroField(time){
  macroVisibleCount=0;
  if(g.tier<13)return;
- const zoom=Math.max(.025,camera.zoom),left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
- const right=Math.floor((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
+ const zoom=Math.max(1e-12,camera.zoom);
+ const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
+ const right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
  const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1;
- const bottom=Math.floor((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
- const total=(right-left+1)*(bottom-top+1);
- // At exceptionally wide zoom, use stable grid sampling; no unbounded drawing.
- const step=Math.max(1,Math.ceil(Math.sqrt(total/210)));
+ const bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
+ const widthCells=Math.max(1,right-left+1),heightCells=Math.max(1,bottom-top+1);
+ const desiredStride=Math.sqrt(widthCells*heightCells/155);
+ const lod=Math.max(0,Math.log2(Math.max(1,desiredStride)));
+ const low=Math.min(50,Math.floor(lod)),frac=Math.min(1,lod-low);
  ctx.save();
- for(let cy=top;cy<=bottom;cy+=step)for(let cx=left;cx<=right;cx+=step){
-  const key=macroKey(cx,cy);if(macroLoaded.has(key))continue;
-  const depleted=(g.depletedMacro[key]||0)>>>0;
-  for(const e of macroNodes(cx,cy))if(!(depleted&(1<<e.index)) && (W*H<2200000||e.index>=7||e.index!==5&&e.index!==6)){if(drawMacro(e,time,zoom))macroVisibleCount++;}
+ function renderLevel(level,alpha){
+  if(alpha<.025)return;
+  const stride=2**level;
+  const startX=Math.floor(left/stride)*stride,startY=Math.floor(top/stride)*stride;
+  // Even at absurdly deep zoom, stay within a bounded number of draw calls.
+  let draws=0;
+  for(let cy=startY;cy<=bottom;cy+=stride){
+   for(let cx=startX;cx<=right;cx+=stride){
+    if(++draws>850)break;
+    const key=macroKey(cx,cy);
+    if(level===0&&macroLoaded.has(key))continue;
+    // Higher LOD: a deterministic representative from the WORLD grid, never
+    // the current viewport corner; crossfade rather than pop at the threshold.
+    const mask=(g.depletedMacro[key]||0)>>>0;
+    for(const e of macroNodes(cx,cy)){
+     if(mask&(1<<e.index))continue;
+     if(level>0&&e.index>=3)continue;
+     if(W*H>=2200000&&e.index===5||W*H>=2200000&&e.index===6)continue;
+     if(drawMacro(e,time,zoom,alpha))macroVisibleCount++;
+    }
+   }
+   if(draws>850)break;
+  }
  }
+ renderLevel(low,1-frac);
+ if(frac>.015&&low<50)renderLevel(low+1,frac);
  for(const e of macroEntities)if(drawMacro(e,time,zoom))macroVisibleCount++;
  ctx.restore();
 }
@@ -469,7 +514,7 @@ function renderDistantBodies(){
  const step=Math.max(1,Math.ceil(Math.sqrt(total/380)));
  const full=total<120?32:total<550?10:4;
  ctx.save();
- for(let cy=minY;cy<=maxY;cy+=step)for(let cx=minX;cx<=maxX;cx+=step){
+ for(let cy=Math.floor(minY/step)*step;cy<=maxY;cy+=step)for(let cx=Math.floor(minX/step)*step;cx<=maxX;cx+=step){
   const key=chunkKey(cx,cy),info=chunkInfo(cx,cy),seed=seedHash(cx,cy);
   const x=(cx+.5-camera.x/CHUNK)*CHUNK*zoom+W*.5;
   const y=(cy+.5-camera.y/CHUNK)*CHUNK*zoom+H*.5;
@@ -502,6 +547,16 @@ function renderDistantBodies(){
  ctx.restore();
 }
 function respawn(e){markHarvested(e);e.dead=true;}
+// Absorption is time-based, not an intermittent physics step. Bodies stay
+// fixed in world space until the short shrinking animation completes.
+function startAbsorption(e){if(e.dead||e.absorbing)return;e.absorbing=.001;e.absorbOriginX=e.x;e.absorbOriginY=e.y;}
+function animateAbsorption(e,dt){
+ if(!e.absorbing||e.dead)return false;
+ e.absorbing=Math.min(.26,e.absorbing+dt);
+ if(e.absorbing>=.26){absorb(e);return true;}
+ return true;
+}
+
 visitPosition();streamField();
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
@@ -509,10 +564,10 @@ function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.val
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
  g.materials[mat]=(g.materials[mat]||0)+gain;
  if((mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
- let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;if(player.r<CHUNK*4)burst(e.x,e.y,22,'#f9d797',.9);popText(e.x,e.y,'+'+val+' ✦','#ffe4a2');sound(700,'sine',.18,.02);}else if(player.r<CHUNK*4&&Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
+ let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;if(player.r<CHUNK*4)burst(e.x,e.y,22,'#f9d797',.9);pickupFeedback(val,true);}else if(player.r<CHUNK*4&&Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
  player.targetR=currentRadius();
- if(player.r<CHUNK*4&&Math.random()<.08)popText(e.x,e.y,'+'+val);if(player.r<CHUNK*4&&g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
+ if(e.kind!=='relic')pickupFeedback(val,false);if(player.r<CHUNK*4&&g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
 // Bodies larger than you stay in the universe; avoid them until you outgrow them.
 function collideWithGiant(e,dx,dy,dist){
  if(g.tier===TA.length-1||player.shield>0)return;
@@ -566,24 +621,46 @@ function update(dt){
  player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
- let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,player.r*2.8),collectR=player.r+4;
- const nearbyObjects=entities.concat(macroEntities);
+ let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20)),collectR=Math.min(player.r,MACRO_SIZE*20)+4;
  const giantMode=g.endless&&player.r>CHUNK*5;
- const budget=giantMode?Math.min(nearbyObjects.length,190):nearbyObjects.length;
- const offset=giantMode&&nearbyObjects.length?Math.floor(g.time*240)%nearbyObjects.length:0;
- for(let j=0;j<budget;j++){
-   const e=nearbyObjects[(offset+j)%nearbyObjects.length];if(!running||e.dead)continue;
-   let dx=player.x-e.x,dy=player.y-e.y,dist2=dx*dx+dy*dy;
-   const reach=gravRange+e.r+80;if(dist2>reach*reach)continue;
-   const dist=Math.sqrt(dist2)||1;
-   if((e.kind!=='hazard'||g.tier===TA.length-1)&&(e.r<=player.r*.82||g.tier===TA.length-1&&e.kind==='hazard')&&dist<gravRange*(e.material==='gas'?1.4:1)){const pull=(gravRange-dist)/gravRange;e.vx+=dx/dist*(150+pull*520)*dt;e.vy+=dy/dist*(150+pull*520)*dt;}
-   e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
-   if(Math.hypot(player.x-e.x,player.y-e.y)<collectR+e.r){
-     if(e.kind==='hazard')impact(e);
-     else if(e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
-     else absorb(e);
-   }
-   // Objects outside the viewport are unloaded by streamField, never marked as consumed.
+ // Fixed collection rate, independent of render FPS or the number of bodies
+ // touched by the enormous horizon. This prevents a thousand simultaneous
+ // harvests and the audible/visual 'batch' stutter every streaming tick.
+ absorptionTokens=giantMode?Math.min(12,absorptionTokens+dt*clamp(60+Math.log10(Math.max(1,player.r/CHUNK))*12,60,130)):0;
+ const captureRadius=giantMode?Math.min(player.r,MACRO_SIZE*16):player.r;
+ const nearReach=giantMode?captureRadius+MACRO_SIZE:gravRange;
+ const nearReachSq=nearReach*nearReach;
+ const nearbyObjects=entities.concat(macroEntities);
+ // Full deterministic update each frame. Previously only a rotating subset was
+ // simulated; objects jumped when their turn in the queue arrived.
+ for(const e of nearbyObjects){
+  if(e.dead)continue;
+  if(animateAbsorption(e,dt))continue;
+  let dx=player.x-e.x,dy=player.y-e.y;
+  // Broad phase: no sqrt, movement or sound for distant objects.
+  const dist2=dx*dx+dy*dy;
+  const reach=nearReach+e.r+20;if(dist2>reach*reach)continue;
+  const dist=Math.sqrt(dist2)||1;
+  if(giantMode){
+   // Macro deposits are fixed astronomical bodies, not projectiles. Do not
+   // pull them across sectors and then restore them on reload.
+   if(dist<=captureRadius+e.r&&e.r<=player.r*.82&&absorptionTokens>=1){startAbsorption(e);absorptionTokens--;}
+   continue;
+  }
+  if((e.kind!=='hazard'||g.tier===TA.length-1)&&
+    (e.r<=player.r*.82||(g.tier===TA.length-1&&e.kind==='hazard'))&&
+    dist<gravRange*(e.material==='gas'?1.4:1)){
+   const pull=(gravRange-dist)/gravRange;
+   e.vx+=dx/dist*(150+pull*520)*dt;
+   e.vy+=dy/dist*(150+pull*520)*dt;
+  }
+  e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);
+  e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
+  if(Math.hypot(player.x-e.x,player.y-e.y)<collectR+e.r){
+   if(e.kind==='hazard')impact(e);
+   else if(e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
+   else absorb(e);
+  }
  }
  entities=entities.filter(e=>!e.dead);macroEntities=macroEntities.filter(e=>!e.dead);if(streamTimer>.32){streamTimer=0;streamField();}
  // No random refill events: only unexplored, persistent sectors supply new matter.
@@ -596,7 +673,7 @@ function update(dt){
  // Early stages keep the familiar camera. The endless black hole zooms out
  // only as needed to keep its horizon visible, with no hard size ceiling.
  const horizonRadius=Math.max(player.r,player.targetR);
- const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-30,2.5):clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
+ const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-12,2.5):clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
  const zoomResponse=g.endless&&zTarget<camera.zoom?9:2;
  camera.zoom+=(zTarget-camera.zoom)*(1-Math.exp(-dt*zoomResponse));camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
  uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
@@ -773,7 +850,7 @@ function paintEvolutionDetails(x,y,r,time,tier){
 // detailed shapes close to the player. The object itself is never deleted by LOD.
 function renderEntity(e,time){
  const px=(e.x-camera.x)*camera.zoom+W/2,py=(e.y-camera.y)*camera.zoom+H/2;
- const r=e.r*camera.zoom;
+ const r=e.r*camera.zoom*(e.absorbing?Math.max(.05,1-e.absorbing/.26):1);
  if(px<-r-12||px>W+r+12||py<-r-12||py>H+r+12)return;
  const near=(e.x-player.x)**2+(e.y-player.y)**2<560*560;
  if(g.tier>=18&&camera.zoom<.13&&r<2.25)return;
@@ -812,10 +889,10 @@ function renderEntity(e,time){
   ctx.closePath();ctx.fill();ctx.restore();
  }
 }
-function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=Math.min(player.r*camera.zoom,Math.max(W,H)*2);ctx.save();
+function renderPlayer(time){const t=TA[g.tier],p=project(player.x,player.y),r=Math.min(player.r*camera.zoom,Math.max(W,H)*.54);ctx.save();
  for(const tr of player.trail){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,Math.min(Math.max(W,H)*3,tr.r*camera.zoom*(.45+alpha*.3)),0,TAU);ctx.fill();}
  // Gravity field ring and orbiting shards.
- let range=Math.min(Math.max((97+g.upgrade.gravity*7)*tester.gravity,player.r*2.8)*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);
+ let range=Math.min(Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20))*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);
  let count=Math.min(18,3+Math.floor(g.tier/2));for(let i=0;i<count;i++){let a=player.rotation*(i%2?1:-1)*(0.65+(i%4)*.08)+i*TAU/count,R=r*(1.8+(i%3)*.24),xx=Math.cos(a)*R,yy=Math.sin(a)*R*.65;ctx.fillStyle=i%3?'#96baf8':'#ffdcaa';ctx.beginPath();ctx.arc(xx,yy,i%5===0?2.6:1.5,0,TAU);ctx.fill();}ctx.restore();
  if(morph){let f=clamp(morph.time/morph.duration,0,1);ctx.save();ctx.globalAlpha=(1-f)*.94;paintPlayerForm(p.x,p.y,r*(1.12-f*.12),time,morph.from);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,f*1.65);paintPlayerForm(p.x,p.y,r*(.52+f*.48),time);ctx.restore();}else paintPlayerForm(p.x,p.y,r,time);
  // Swirling energy currents and magnetic filaments.
@@ -926,13 +1003,40 @@ function drawAtlas(){
   c.strokeStyle='rgba(131,246,239,.7)';c.lineWidth=1.25;
   if(br>Math.max(w,h)*3)c.strokeRect(.6,.6,w-1.2,h-1.2);else {c.beginPath();c.arc(mx,my,Math.max(3,br),0,TAU);c.stroke();}
  }
+ // Readable local sector grid, independent of atlas zoom. The previous
+ // atlas became sub-pixel at 0.008x, hiding every adjacent discovered cell.
+ const insetCell=15,insetN=11,insetSize=insetCell*insetN;
+ const bx=w-insetSize-16,by=h-insetSize-31;
+ c.fillStyle='rgba(4,17,31,.94)';c.fillRect(bx-9,by-22,insetSize+18,insetSize+33);
+ c.strokeStyle='rgba(130,210,242,.5)';c.strokeRect(bx-9,by-22,insetSize+18,insetSize+33);
+ c.fillStyle='#b1e9ff';c.font='bold 10px Inter,sans-serif';c.fillText('СОСЕДНИЕ СЕКТОРА',bx,by-7);
+ const centerCellX=Math.floor(player.x/CHUNK),centerCellY=Math.floor(player.y/CHUNK);
+ function exploredCell(cx,cy){
+  const key=chunkKey(cx,cy);if(visitedChunks.has(key))return true;
+  // A cell touched by the giant horizon is discovered, even without an
+  // individual saved key. Test nearest point of its square vs each disc.
+  for(const d of g.discoveryDiscs){const nx=clamp(d[0],cx,cx+1),ny=clamp(d[1],cy,cy+1);
+   if((nx-d[0])**2+(ny-d[1])**2<=d[2]*d[2])return true;}
+  return false;
+ }
+ let adjacentKnown=0;
+ for(let iy=0;iy<insetN;iy++)for(let ix=0;ix<insetN;ix++){
+  const cx=centerCellX+ix-5,cy=centerCellY+iy-5;
+  const known=exploredCell(cx,cy);if(known)adjacentKnown++;
+  const x=bx+ix*insetCell,y=by+iy*insetCell;
+  c.fillStyle=known?'rgba(82,208,236,.85)':'rgba(31,54,74,.9)';
+  c.fillRect(x+.6,y+.6,insetCell-1.2,insetCell-1.2);
+  if(ix===5&&iy===5){c.fillStyle='#fff3b0';c.fillRect(x+5,y+5,5,5);}
+ }
+ c.fillStyle='#8db5c4';c.font='9px Inter,sans-serif';
+ c.fillText(`${adjacentKnown}/121 · масштаб независимый`,bx,by+insetSize+12);
  // The origin is spatial, never a second place to respawn.
  const ox=w/2-atlas.x/CHUNK*size,oy=h/2-atlas.y/CHUNK*size;
  if(ox>=-25&&oy>=-25&&ox<w+25&&oy<h+25){c.strokeStyle='#84adc3';c.lineWidth=1.2;c.beginPath();c.arc(ox,oy,6,0,TAU);c.stroke();c.fillStyle='#a0c5d9';c.font='10px Inter, sans-serif';c.fillText('НАЧАЛО',ox+11,oy-8);}
  if(mx>-18&&mx<w+18&&my>-18&&my<h+18){c.save();c.translate(mx,my);c.shadowColor='#76eaff';c.shadowBlur=15;c.fillStyle='#b7f5ff';c.beginPath();c.moveTo(0,-10);c.lineTo(8,8);c.lineTo(0,4);c.lineTo(-8,8);c.closePath();c.fill();c.restore();}
  c.strokeStyle='rgba(147,200,234,.17)';c.beginPath();c.moveTo(w/2-13,h/2);c.lineTo(w/2+13,h/2);c.moveTo(w/2,h/2-13);c.lineTo(w/2,h/2+13);c.stroke();
  $('atlas-coords').textContent=`X ${Math.floor(atlas.x/CHUNK)} · Y ${Math.floor(atlas.y/CHUNK)} / масштаб ${atlas.zoom<.1?atlas.zoom.toFixed(3):atlas.zoom.toFixed(2)}×`;
- $('atlas-count').textContent=`Исследовано ≈ ${fmt(exploredCount())} секторов · ${sampleStep>1?'Обзор '+sampleStep+'×'+sampleStep+' · ':''}областей чёрной дыры: ${g.discoveryDiscs.length}`;
+ $('atlas-count').textContent=`Исследовано ≈ ${fmt(exploredCount())} секторов · ${sampleStep>1?'Обзор '+sampleStep+'×'+sampleStep+' · ':''}областей чёрной дыры: ${g.discoveryDiscs.length} · рядом ${adjacentKnown}/121`;
  atlas.dirty=false;
 }
 function showMap(){
@@ -1078,5 +1182,5 @@ addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
-Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:exploredCount(),visitedExactSectors:visitedChunks.size,visitedDiscs:g.discoveryDiscs.length,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,baseRadius:radiusAt(g.tier,0),endlessRadiusMultiplier:g.tier===TA.length-1?currentRadius()/radiusAt(g.tier,0):1,atlasZoom:atlas.zoom,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
+Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:exploredCount(),visitedExactSectors:visitedChunks.size,visitedDiscs:g.discoveryDiscs.length,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,nearbyCollected:g.collects,activeSoundSources:pickupCount,macroPositions:macroEntities.slice(0,5).map(e=>[e.chunk,e.index,e.x,e.y]),visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,baseRadius:radiusAt(g.tier,0),endlessRadiusMultiplier:g.tier===TA.length-1?currentRadius()/radiusAt(g.tier,0):1,atlasZoom:atlas.zoom,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
 })();
