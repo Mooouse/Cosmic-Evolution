@@ -105,3 +105,7 @@ All game files are static. The included GitHub Actions workflow runs a syntax/sm
 - Повторное наложение исследованных областей не делает карту ярче и не создаёт концентрических кругов.
 - Радиус чёрной дыры больше не рисуется поверх карты огромным контуром. Сетка 11×11 соседних секторов остаётся видна при любом масштабе.
 - Совместимость старых сохранений сохранена.
+
+
+## 3.2 — Cosmic visual overhaul
+Eight galaxy silhouettes and nine palettes; chaotic deterministic positions; three types of natural black holes marked on the atlas; no red damaging stars; multi-layer 2D accretion disk for the player's final black hole. Previous saves and depletion masks remain compatible.

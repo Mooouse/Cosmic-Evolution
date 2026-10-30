@@ -246,7 +246,7 @@ function renderUI(force=false){
 // World is deterministic: the same sector always has the same matter, even after a restart.
 // 32 fixed objects per sector allow a single 32-bit bitmask to remember everything harvested.
 function spawn(x,y,forced,rng=Math.random){
- const kind=forced||(rng()<.06?'hazard':rng()<.045?'relic':'matter');
+ const kind=forced||(rng()<.045?'relic':'matter');
  const angle=rng()*TAU,speed=0; // Uncollected bodies never drift or move randomly between visits.
  return {x,y,vx:0,vy:0,kind,r:kind==='hazard'?20+rng()*12:kind==='relic'?9+rng()*4:3+rng()*6,
  spin:rng()*TAU,twinkle:rng()*TAU,value:kind==='relic'?17+rng()*15:.75+rng()*2.15,
@@ -272,9 +272,9 @@ function materialFor(biome,dist,rng){
 }
 function sectorType(info,r){
  const h=info.biome;
- return h==='relic'?(r<.14?'relic':r<.19?'hazard':'matter'):
- h==='anomaly'?(r<.10?'relic':r<.17?'hazard':'matter'):
- r<.055?'relic':r<.115?'hazard':'matter';
+ return h==='relic'?(r<.14?'relic':'matter'):
+ h==='anomaly'?(r<.10?'relic':'matter'):
+ r<.055?'relic':'matter';
 }
 
 // Exact sector reveals at ordinary sizes and compact permanent disc footprints for
@@ -366,7 +366,7 @@ function macroNodes(cx,cy){
  const rng=chunkRandom(seedHash(cx*31+731,cy*37-419)^0x9f4e8b21),biome=chunkInfo(cx*6,cy*6).biome;
  saved=[];
  for(let i=0;i<MACRO_COUNT;i++){
-  const x=(cx+.09+rng()*.82)*MACRO_SIZE,y=(cy+.09+rng()*.82)*MACRO_SIZE;
+  let x=(cx+.09+rng()*.82)*MACRO_SIZE,y=(cy+.09+rng()*.82)*MACRO_SIZE;
   const macroDistance=Math.hypot(cx,cy);
   const worldScale=1+Math.min(2.8,Math.pow(macroDistance/6,.62)*.6);
   const r=(i<4?65+Math.pow(rng(),.7)*370:18+rng()*118)*worldScale;
@@ -376,8 +376,14 @@ function macroNodes(cx,cy){
    biome==='relic'?(roll<.55?'plasma':'exotic'):
    biome==='rich'?(roll<.6?'crystal':'ore'):
    roll<.22?'gas':roll<.42?'crystal':'ore';
-  saved.push({x,y,r,index:i,chunk:key,macro:true,material,kind:'matter',grade:18,
-   value:Math.round(12+Math.pow(r/25,1.6)*7),vx:0,vy:0,spin:rng()*TAU,twinkle:rng()*TAU,
+  const h=seedHash(cx*47+i*103,cy*83-i*197),scatter=seedHash(cx*37+i*211,cy*59-i*137);
+  x+=((scatter&65535)/65535-.5)*MACRO_SIZE*1.35;
+  y+=((scatter>>>16)/65535-.5)*MACRO_SIZE*1.35;
+  const hole=i===0&&h%9===0,type=h%17===0?2:h%5===0?1:0;
+  saved.push({x,y,r:hole?r*[.85,1.2,1.7][type]:r,index:i,chunk:key,macro:true,
+   material:hole?'exotic':material,kind:hole?'blackhole':'matter',holeType:type,
+   style:(h>>>8)%8,palette:(h>>>17)%9,grade:18,
+   value:Math.round(12+Math.pow(r/25,1.6)*(hole?16:7)),vx:0,vy:0,spin:rng()*TAU,twinkle:rng()*TAU,
    primed:false,dead:false,shape:Math.floor(rng()*3),hue:230});
  }
  if(macroCache.size>850)macroCache.clear();macroCache.set(key,saved);return saved;
@@ -395,79 +401,95 @@ function streamMacroBodies(){
  for(const key of macroLoaded)if(!active.has(key))macroLoaded.delete(key);
  macroEntities=macroEntities.filter(e=>!e.dead&&(active.has(e.chunk)||e.absorbing));
 }
-function cosmicSprite(material,shape){
- const key=material+':'+shape;let cv=macroSpriteCache.get(key);if(cv)return cv;
- cv=document.createElement('canvas');cv.width=cv.height=144;let c=cv.getContext('2d');
- let rng=chunkRandom(seedHash(shape+13,material.length*163)),color=MATERIALS[material]?.color||'#b8aaff';
- const halo=c.createRadialGradient(72,72,0,72,72,70);
- halo.addColorStop(0,'rgba(245,252,255,.7)');halo.addColorStop(.14,color);halo.addColorStop(.44,color+'66');halo.addColorStop(1,'rgba(0,0,0,0)');
- c.globalAlpha=.72;c.fillStyle=halo;c.fillRect(0,0,144,144);c.globalAlpha=1;
- c.save();c.translate(72,72);c.rotate(shape*.4);
- // Real spiral filaments: tiny independent lights, not opaque oval blobs.
- for(let arm=0;arm<3;arm++)for(let i=0;i<65;i++){
-  let t=i/65,a=t*4.1+arm*TAU/3,spread=t*57;
-  let x=Math.cos(a)*spread+(rng()-.5)*8,y=Math.sin(a)*spread*.66+(rng()-.5)*7;
-  c.fillStyle=rng()<.28?'#fff5d5':color;
-  c.globalAlpha=.3+rng()*.7;c.beginPath();c.arc(x,y,.55+rng()*1.55,0,TAU);c.fill();
+const GALAXY_PALETTES=[
+ ['#69caff','#b4eaff','#fff5df'],['#9d81ff','#e1a8ff','#fff1e8'],
+ ['#ffae6d','#ffe19c','#f8f2e3'],['#5ce1ca','#a4b6fa','#f6fff9'],
+ ['#fa89b8','#efb6ef','#fff0bf'],['#dbe9fa','#afbbd7','#ffffff'],
+ ['#a8d48a','#ddf4b6','#fffcdf'],['#719dfa','#8cdee9','#eadcf9'],
+ ['#ffc2a6','#d5a5ff','#e1faff']];
+function cosmicSprite(material,shape,style=0,palette=0){
+ const key=material+':'+shape+':'+style+':'+palette;
+ let cv=macroSpriteCache.get(key);if(cv)return cv;
+ const colors=GALAXY_PALETTES[palette%9],rng=chunkRandom(seedHash(shape*101+style,material.length*163+palette*37));
+ cv=document.createElement('canvas');cv.width=cv.height=160;let c=cv.getContext('2d');
+ const halo=c.createRadialGradient(80,80,0,80,80,78);
+ halo.addColorStop(0,colors[2]+'dd');halo.addColorStop(.15,colors[0]+'bc');halo.addColorStop(.49,colors[1]+'30');halo.addColorStop(1,'#00000000');
+ c.globalAlpha=.8;c.fillStyle=halo;c.fillRect(0,0,160,160);c.globalAlpha=1;c.save();c.translate(80,80);c.rotate(shape*.38+style*.47);
+ for(let i=0;i<(style===6?130:210);i++){
+  let t=rng(),arm=i%(style===1?2:3),a=rng()*TAU,x,y;
+  if([0,1,2,7].includes(style)){
+   let angle=(style===1?4.6:3.6)*t+arm*TAU/(style===1?2:3),r=6+t*60+(rng()-.5)*15;
+   x=Math.cos(angle)*r+(style===7&&i%3===0?19:0);
+   y=Math.sin(angle)*r*(style===2?.52:.8)+(style===7&&i%3===0?-11:0);
+  }else if(style===4){let r=43+(rng()-.5)*15;x=Math.cos(a)*r;y=Math.sin(a)*r*.8;}
+  else if(style===5){x=(rng()-.5)*125;y=(rng()-.5)*34;}
+  else {let r=Math.sqrt(rng())*(style===6?30:68);x=Math.cos(a)*r;y=Math.sin(a)*r*(style===3?.53:1);}
+  c.globalAlpha=.21+rng()*.73;c.fillStyle=colors[i%3];
+  c.beginPath();c.arc(x,y,.5+rng()*1.7,0,TAU);c.fill();
  }
- c.restore();c.globalAlpha=1;
- c.fillStyle='#fffaf0';c.beginPath();c.arc(72,72,3,0,TAU);c.fill();
- if(macroSpriteCache.size>20)macroSpriteCache.clear();macroSpriteCache.set(key,cv);return cv;
+ const core=c.createRadialGradient(0,0,0,0,0,22);
+ core.addColorStop(0,'#fffefa');core.addColorStop(.30,colors[2]+'ed');core.addColorStop(1,colors[0]+'00');
+ c.globalAlpha=.9;c.fillStyle=core;c.beginPath();c.arc(0,0,22,0,TAU);c.fill();c.restore();c.globalAlpha=1;
+ if(macroSpriteCache.size>250)macroSpriteCache.clear();macroSpriteCache.set(key,cv);return cv;
+}
+function blackholeSprite(type=0){
+ const key='blackhole:'+type;let cv=macroSpriteCache.get(key);if(cv)return cv;
+ cv=document.createElement('canvas');cv.width=cv.height=160;let c=cv.getContext('2d');
+ const col=[['#5dd1fb','#bdf9ff'],['#bd98ff','#f2caff'],['#ffc075','#ffe8ba']][type];
+ const halo=c.createRadialGradient(80,80,8,80,80,78);
+ halo.addColorStop(0,'#01030a');halo.addColorStop(.39,'#01030a');
+ halo.addColorStop(.48,col[1]);halo.addColorStop(.57,col[0]+'a0');halo.addColorStop(1,'#00000000');
+ c.fillStyle=halo;c.fillRect(0,0,160,160);
+ c.save();c.translate(80,80);c.rotate(-.24);c.scale(1,.53);
+ for(let j=0;j<24;j++){c.globalAlpha=.24+.53*Math.sin(j*.63)**2;c.strokeStyle=col[j%3===0?1:0];c.lineWidth=4;c.beginPath();c.arc(0,0,49+j%5*1.6,j*TAU/24,j*TAU/24+.62);c.stroke();}
+ c.restore();c.globalAlpha=1;c.fillStyle='#01030a';c.beginPath();c.arc(80,80,33+type*2,0,TAU);c.fill();
+ macroSpriteCache.set(key,cv);return cv;
 }
 function drawMacro(e,time,zoom,opacity=1){
- const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5;
- const radius=e.r*zoom;
- if(x<-radius*1.6||x>W+radius*1.6||y<-radius*1.6||y>H+radius*1.6)return false;
- const drawR=clamp(radius*1.15,2,115),canEat=e.r<=player.r*.82;
- ctx.globalAlpha=clamp(.65+radius*.02,.55,1)*opacity*(e.absorbing?1-e.absorbing/.26:1);
- if(e.index>=7||drawR<5){ctx.fillStyle=MATERIALS[e.material]?.color||'#9cb5ff';ctx.beginPath();ctx.arc(x,y,Math.max(1.5,drawR*.55),0,TAU);ctx.fill();}
- else {const cv=cosmicSprite(e.material,e.shape);ctx.drawImage(cv,x-drawR*1.5,y-drawR*1.5,drawR*3,drawR*3);
-  if(e.macro&&macroLoaded.has(e.chunk)&&drawR>12){ctx.strokeStyle=canEat?'rgba(115,230,205,.20)':'rgba(245,151,171,.19)';ctx.lineWidth=1;
-   ctx.beginPath();ctx.arc(x,y,radius,0,TAU);ctx.stroke();}}
- return true;
+ const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5,rad=e.r*zoom;
+ if(x<-rad*1.6-8||x>W+rad*1.6+8||y<-rad*1.6-8||y>H+rad*1.6+8)return false;
+ const drawR=clamp(rad*1.15,1.8,112);
+ ctx.save();ctx.globalAlpha=clamp(.68+rad*.016,.68,.98)*(.72+.28*opacity)*(e.absorbing?clamp(1-e.absorbing/.26,0,1):1);
+ if(drawR<3){ctx.fillStyle=e.kind==='blackhole'?'#ffddac':GALAXY_PALETTES[e.palette||0][0];ctx.fillRect(x-1.1,y-1.1,2.2,2.2);}
+ else {const cv=e.kind==='blackhole'?blackholeSprite(e.holeType||0):cosmicSprite(e.material,e.shape,e.style||0,e.palette||0);
+  ctx.drawImage(cv,x-drawR*1.4,y-drawR*1.4,drawR*2.8,drawR*2.8);}
+ ctx.restore();return true;
 }
 // Stable world-space LOD: ALL sampling anchors to the global origin (0,0).
 // Older screen-relative steps made distant galaxies jump whenever a boundary
 // or camera zoom changed. Fade across two fixed power-of-two resolutions.
 function renderMacroField(time){
- macroVisibleCount=0;
- if(g.tier<13)return;
+ macroVisibleCount=0;if(g.tier<13)return;
  const zoom=Math.max(1e-12,camera.zoom);
- const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
- const right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
- const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1;
- const bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
- const widthCells=Math.max(1,right-left+1),heightCells=Math.max(1,bottom-top+1);
- const desiredStride=Math.sqrt(widthCells*heightCells/155);
- const lod=Math.max(0,Math.log2(Math.max(1,desiredStride)));
- const low=Math.min(50,Math.floor(lod)),frac=Math.min(1,lod-low);
+ const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1,right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
+ const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1,bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
+ const desired=Math.sqrt(Math.max(1,(right-left+1)*(bottom-top+1))/135);
+ const lod=clamp(Math.log2(Math.max(1,desired)),0,47),low=Math.floor(lod),f=lod-low;
  ctx.save();
- function renderLevel(level,alpha){
-  if(alpha<.025)return;
-  const stride=2**level;
-  const startX=Math.floor(left/stride)*stride,startY=Math.floor(top/stride)*stride;
-  // Even at absurdly deep zoom, stay within a bounded number of draw calls.
-  let draws=0;
-  for(let cy=startY;cy<=bottom;cy+=stride){
-   for(let cx=startX;cx<=right;cx+=stride){
-    if(++draws>850)break;
-    const key=macroKey(cx,cy);
-    if(level===0&&macroLoaded.has(key))continue;
-    // Higher LOD: a deterministic representative from the WORLD grid, never
-    // the current viewport corner; crossfade rather than pop at the threshold.
-    const mask=(g.depletedMacro[key]||0)>>>0;
-    for(const e of macroNodes(cx,cy)){
-     if(mask&(1<<e.index))continue;
-     if(level>0&&e.index>=3)continue;
-     if(W*H>=2200000&&e.index===5||W*H>=2200000&&e.index===6)continue;
-     if(drawMacro(e,time,zoom,alpha))macroVisibleCount++;
+ function level(L,opacity){
+  if(opacity<.025)return;
+  const stride=2**L,sx=Math.floor(left/stride)*stride,sy=Math.floor(top/stride)*stride;
+  const columns=Math.min(32,Math.ceil((right-sx)/stride)+1),rows=Math.min(24,Math.ceil((bottom-sy)/stride)+1);
+  for(let yy=0;yy<rows;yy++)for(let xx=0;xx<columns;xx++){
+   const cx=sx+xx*stride,cy=sy+yy*stride;
+   if(L===0){
+    const key=macroKey(cx,cy),mask=(g.depletedMacro[key]||0)>>>0;
+    if(macroLoaded.has(key))continue;
+    for(const e of macroNodes(cx,cy))if(!(mask&(1<<e.index))&&drawMacro(e,time,zoom,opacity))macroVisibleCount++;
+   }else{
+    const seed=seedHash(cx*37+L*103,cy*71-L*47),rng=chunkRandom(seed),span=MACRO_SIZE*stride;
+    const ax=(cx+rng()*stride)*MACRO_SIZE,ay=(cy+rng()*stride)*MACRO_SIZE;
+    for(let j=0,n=2+seed%4;j<n;j++){
+     const a=rng()*TAU,d=j===0?0:(.10+.32*rng())*span,h=seedHash(cx+j*113,cy-j*191);
+     const body={x:ax+Math.cos(a)*d,y:ay+Math.sin(a)*d,r:clamp(span*(.09+rng()*.16),30,span*.34),
+      shape:(h>>>4)%3,style:(h>>>7)%8,palette:(h>>>19)%9,holeType:(h>>>13)%3,
+      material:'gas',kind:j===0&&h%17===0?'blackhole':'matter'};
+     if(drawMacro(body,time,zoom,opacity))macroVisibleCount++;
     }
    }
-   if(draws>850)break;
   }
  }
- renderLevel(low,1-frac);
- if(frac>.015&&low<50)renderLevel(low+1,frac);
+ level(low,1-f);if(f>.018&&low<47)level(low+1,f);
  for(const e of macroEntities)if(drawMacro(e,time,zoom))macroVisibleCount++;
  ctx.restore();
 }
@@ -597,7 +619,7 @@ function evolve(){
  toast(`✦ НОВАЯ ФОРМА: ${TA[g.tier].name.toUpperCase()}`,'golden');sound(440,'triangle',.6,.055);
  renderUI(true);
 }
-function activatePulse(){if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;const range=270+g.upgrade.gravity*7;shockwaves.push({x:player.x,y:player.y,r:10,max:1.2,life:1.2,color:'#84dfff',range});for(let e of entities){let dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy);if(d<range){if(e.material==='plasma'||e.material==='exotic'){e.primed=true;burst(e.x,e.y,8,MATERIALS[e.material].color,.6);}if(e.kind==='hazard'){burst(e.x,e.y,18,'#ffb6a5');e.kind='relic';e.material='plasma';e.r=11;e.value=30+g.tier*2;}else{e.vx+=(player.x-e.x)/(d||1)*Math.max(110,650-d*1.5);e.vy+=(player.y-e.y)/(d||1)*Math.max(110,650-d*1.5);}}}shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();}
+function activatePulse(){if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;const range=270+g.upgrade.gravity*7;shockwaves.push({x:player.x,y:player.y,r:10,max:1.2,life:1.2,color:'#84dfff',range});for(let e of entities){let dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy);if(d<range){if(e.material==='plasma'||e.material==='exotic'){e.primed=true;burst(e.x,e.y,8,MATERIALS[e.material].color,.6);}if(e.kind==='hazard'){e.kind='matter';e.material='crystal';}else{e.vx+=(player.x-e.x)/(d||1)*Math.max(110,650-d*1.5);e.vy+=(player.y-e.y)/(d||1)*Math.max(110,650-d*1.5);}}}shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();}
 function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=1.15;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
 function update(dt){
  g.time+=dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
@@ -657,7 +679,7 @@ function update(dt){
   e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);
   e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
   if(Math.hypot(player.x-e.x,player.y-e.y)<collectR+e.r){
-   if(e.kind==='hazard')impact(e);
+   if(e.kind==='hazard'){e.kind='matter';e.material='crystal';absorb(e);}
    else if(e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
    else absorb(e);
   }
@@ -729,41 +751,32 @@ function paintBody(x,y,r,kind,color,time,shadow=true){if(shadow){ctx.save();ctx.
  if(kind==='dust'){glowDot(x,y,r*.7,color,2);glowDot(x-r*.13,y-r*.2,r*.2,'#ffffff',1.3);}else if(kind==='rock')paintRock(x,y,r,color,time*.1);else if(kind==='planet'||kind==='gas')paintPlanet(x,y,r,color,kind==='gas');else if(kind==='star')paintStar(x,y,r,color);else if(kind==='nebula'){paintGalaxy(x,y,r,color,time);glowDot(x,y,r*.28,color,1);}else if(kind==='galaxy')paintGalaxy(x,y,r,color,time);else if(kind==='cluster'||kind==='web'||kind==='universe'){paintGalaxy(x,y,r*1.1,color,time);ctx.save();for(let i=0;i<11;i++){let a=i*TAU/11+time*.06,R=r*(.75+.2*(i%3));glowDot(x+Math.cos(a)*R,y+Math.sin(a)*R*.68,r*.045,i%3?'#a3d7ff':'#ffddab',.5);}ctx.restore();}else glowDot(x,y,r,color);}
 // A different silhouette and surface treatment for all 28 evolution stages.
 function paintBlackHole(x,y,r,time){
- const scale=Math.max(8,r),phase=time*.23;
+ const R=Math.max(8,Math.min(r,Math.max(W,H)*.6)),phase=time*.19;
  ctx.save();ctx.translate(x,y);
- // Faint gravitational lensing outside the dark event horizon.
- const halo=ctx.createRadialGradient(0,0,scale*.62,0,0,scale*1.93);
- halo.addColorStop(0,'rgba(0,0,0,0)');halo.addColorStop(.47,'rgba(77,115,220,.13)');
- halo.addColorStop(.70,'rgba(250,139,65,.17)');halo.addColorStop(1,'rgba(0,0,0,0)');
- ctx.fillStyle=halo;ctx.beginPath();ctx.arc(0,0,scale*1.93,0,TAU);ctx.fill();
- ctx.save();ctx.rotate(phase*.38);
- // Tilted accretion disk. Fixed number of strokes for predictable FPS.
- ctx.scale(1,.62);
- for(let i=0;i<5;i++){
-  const rad=scale*(.97+i*.118);
-  ctx.lineWidth=scale*(i===0?.17:.09);
-  ctx.strokeStyle=['#ffe7a6','#ffbb58','#fb7c52','#b56ff0','#6365c1'][i];
-  ctx.globalAlpha=.92-i*.14;
-  ctx.beginPath();ctx.arc(0,0,rad,phase*(i%2?-.9:.7),phase*(i%2?-.9:.7)+Math.PI*1.82);ctx.stroke();
- }
- ctx.globalAlpha=1;ctx.restore();
- // Thin photon orbit. The black core occludes the far side of the disk.
- ctx.fillStyle='#020307';ctx.beginPath();ctx.arc(0,0,scale*.86,0,TAU);ctx.fill();
- ctx.strokeStyle='#ffdb92';ctx.lineWidth=Math.max(1.2,scale*.055);
- ctx.globalAlpha=.94;ctx.beginPath();ctx.arc(0,0,scale*.89,-2.5,.7);ctx.stroke();
- ctx.strokeStyle='#94b7ff';ctx.lineWidth=Math.max(1,scale*.025);
- ctx.globalAlpha=.7;ctx.beginPath();ctx.arc(0,0,scale*.95,.55,2.8);ctx.stroke();ctx.globalAlpha=1;
- // Approaching streams swirl into the central event horizon.
- ctx.rotate(-phase*.65);
- for(let arm=0;arm<3;arm++){
-  ctx.beginPath();for(let j=0;j<=18;j++){
-   const t=j/18,rr=scale*(1.05+t*.65),a=arm*TAU/3+t*1.8;
-   const xx=Math.cos(a)*rr,yy=Math.sin(a)*rr;
-   if(j===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);
-  }
-  ctx.strokeStyle=arm%2?'rgba(249,162,112,.24)':'rgba(164,170,255,.28)';
-  ctx.lineWidth=Math.max(1,scale*.028);ctx.stroke();
- }
+ const halo=ctx.createRadialGradient(0,0,R*.62,0,0,R*2.18);
+ halo.addColorStop(0,'#00000000');halo.addColorStop(.29,'#7966f61b');
+ halo.addColorStop(.48,'#809ad944');halo.addColorStop(.66,'#f7a65c38');halo.addColorStop(1,'#00000000');
+ ctx.fillStyle=halo;ctx.beginPath();ctx.arc(0,0,R*2.18,0,TAU);ctx.fill();
+ ctx.save();ctx.rotate(-.24+Math.sin(phase*.35)*.08);ctx.scale(1,.52);
+ for(let j=9;j>=0;j--){ctx.strokeStyle=['#ffbf6e','#ffe9b0','#f17e6b','#ab82ee','#80c6ff'][j%5];
+  ctx.globalAlpha=.37+.5*(1-j/11);ctx.lineWidth=R*(.10+.013*(j%3));
+  ctx.beginPath();ctx.arc(0,0,R*(.88+j*.084),Math.PI+phase*.22,TAU+phase*.22);ctx.stroke();}
+ ctx.restore();ctx.globalAlpha=1;
+ ctx.strokeStyle='#b6c9ff';ctx.globalAlpha=.49;ctx.lineWidth=Math.max(1,R*.029);
+ ctx.beginPath();ctx.ellipse(0,-R*.12,R*1.05,R*.69,-.04,Math.PI,TAU);ctx.stroke();ctx.globalAlpha=1;
+ ctx.fillStyle='#010208';ctx.beginPath();ctx.arc(0,0,R*.84,0,TAU);ctx.fill();
+ const photon=ctx.createRadialGradient(0,0,R*.64,0,0,R*.94);
+ photon.addColorStop(0,'#00000000');photon.addColorStop(.7,'#00000000');
+ photon.addColorStop(.88,'#ffe5aee6');photon.addColorStop(1,'#9378df00');
+ ctx.fillStyle=photon;ctx.beginPath();ctx.arc(0,0,R*.94,0,TAU);ctx.fill();
+ ctx.save();ctx.rotate(-.24+Math.sin(phase*.35)*.08);ctx.scale(1,.52);
+ for(let j=0;j<7;j++){ctx.strokeStyle=['#fff4c4','#ffd38b','#ff9965','#c68de9','#80b9fa'][j%5];
+  ctx.globalAlpha=.96-j*.09;ctx.lineWidth=R*(j===0?.15:.07);
+  ctx.beginPath();ctx.arc(0,0,R*(.99+j*.095),phase*.12,Math.PI+phase*.12);ctx.stroke();}
+ ctx.restore();ctx.globalAlpha=1;
+ for(let j=0;j<12;j++){const a=j*2.399+phase*.29,rr=R*(1.3+j%5*.09);
+  ctx.fillStyle=j%3===0?'#ffe1a899':'#97b8fa88';ctx.beginPath();
+  ctx.arc(Math.cos(a)*rr,Math.sin(a)*rr*.6,Math.max(.8,R*.014),0,TAU);ctx.fill();}
  ctx.restore();
 }
 function paintPlayerForm(x,y,r,time,tier=g.tier){
@@ -1039,6 +1052,7 @@ function drawAtlas(){
  }
  c.fillStyle='#8db5c4';c.font='9px Inter,sans-serif';
  c.fillText(`${adjacentKnown}/121 · масштаб независимый`,bx,by+insetSize+12);
+ drawAtlasBlackHoles(c,w,h,size);
  // The origin is spatial, never a second place to respawn.
  const ox=w/2-atlas.x/CHUNK*size,oy=h/2-atlas.y/CHUNK*size;
  if(ox>=-25&&oy>=-25&&ox<w+25&&oy<h+25){c.strokeStyle='#84adc3';c.lineWidth=1.2;c.beginPath();c.arc(ox,oy,6,0,TAU);c.stroke();c.fillStyle='#a0c5d9';c.font='10px Inter, sans-serif';c.fillText('НАЧАЛО',ox+11,oy-8);}
@@ -1054,7 +1068,7 @@ function showMap(){
  <p class="atlas-description">Каждый сектор существует на постоянных координатах. Поглощённая материя не восстанавливается. Исследуй новые области и отдаляй карту до масштаба скоплений галактик.</p>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Интерактивная процедурная карта галактики — перетаскивайте, чтобы перемещать карту"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить">−</button><button id="atlas-center" class="atlas-control center" title="Показать моё местоположение">⌖</button></div></div>
- <div class="atlas-legend"><span><i class="atlas-mark you"></i>ТЫ</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span><i class="atlas-mark rich"></i>КРИСТАЛЛЫ</span><span><i class="atlas-mark relic"></i>ПЛАЗМА</span><span style="color:#91d8f9">❄ ЛЁД</span><span style="color:#b49afe">◌ ГАЗ</span><span style="color:#d68af2">✧ ЭКЗОМАТЕРИЯ</span><span><i class="atlas-mark empty"></i>ОПУСТОШЕНО</span></div>
+ <div class="atlas-legend"><span><i class="atlas-mark you"></i>ТЫ</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span><i class="atlas-mark rich"></i>КРИСТАЛЛЫ</span><span><i class="atlas-mark relic"></i>ПЛАЗМА</span><span style="color:#91d8f9">❄ ЛЁД</span><span style="color:#b49afe">◌ ГАЗ</span><span style="color:#d68af2">✧ ЭКЗОМАТЕРИЯ</span><span><i class="atlas-mark empty"></i>ОПУСТОШЕНО</span><span style="color:#b9bbff">◉ ЧЁРНЫЕ ДЫРЫ</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · Колёсико или +/− меняют масштаб вплоть до 0,008× · Дальние сектора отображаются группами</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;atlas.dirty=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';
@@ -1192,4 +1206,29 @@ addEventListener('pagehide',save);document.addEventListener('visibilitychange',(
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
 Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:exploredCount(),visitedExactSectors:visitedChunks.size,visitedDiscs:g.discoveryDiscs.length,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,nearbyCollected:g.collects,activeSoundSources:pickupCount,macroPositions:macroEntities.slice(0,5).map(e=>[e.chunk,e.index,e.x,e.y]),visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroDepleted:Object.keys(g.depletedMacro).length,complete:g.complete,endless:g.endless,baseRadius:radiusAt(g.tier,0),endlessRadiusMultiplier:g.tier===TA.length-1?currentRadius()/radiusAt(g.tier,0):1,atlasZoom:atlas.zoom,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
+
+function drawAtlasBlackHoles(c,w,h,size){
+ if(g.tier<13)return;
+ const scale=size/CHUNK,x0=Math.floor((atlas.x-w*.5/scale)/MACRO_SIZE)-1,x1=Math.ceil((atlas.x+w*.5/scale)/MACRO_SIZE)+1;
+ const y0=Math.floor((atlas.y-h*.5/scale)/MACRO_SIZE)-1,y1=Math.ceil((atlas.y+h*.5/scale)/MACRO_SIZE)+1;
+ const stride=2**Math.max(0,Math.ceil(Math.log2(Math.sqrt(Math.max(1,(x1-x0+1)*(y1-y0+1))/660))));
+ const fx=Math.floor(x0/stride)*stride,fy=Math.floor(y0/stride)*stride;
+ c.save();let drawn=0;
+ for(let cy=fy;cy<=y1&&drawn<145;cy+=stride)for(let cx=fx;cx<=x1&&drawn<145;cx+=stride){
+  const hsh=seedHash(cx*47,cy*83);
+  if(stride===1&&hsh%9!==0||stride>1&&hsh%4!==0)continue;
+  if(stride===1&&((g.depletedMacro[macroKey(cx,cy)]||0)&1))continue;
+  const rng=chunkRandom(seedHash(cx*31+731,cy*37-419)^0x9f4e8b21);
+  const sx=rng(),sy=rng(),scatter=seedHash(cx*37,cy*59);
+  const wx=(cx+(stride===1?.09+sx*.82:sx*stride))*MACRO_SIZE+(stride===1?((scatter&65535)/65535-.5)*MACRO_SIZE*1.35:0);
+  const wy=(cy+(stride===1?.09+sy*.82:sy*stride))*MACRO_SIZE+(stride===1?((scatter>>>16)/65535-.5)*MACRO_SIZE*1.35:0);
+  const x=w*.5+(wx-atlas.x)*scale,y=h*.5+(wy-atlas.y)*scale;
+  if(x<7||y<7||x>w-7||y>h-7)continue;
+  const type=hsh%17===0?2:hsh%5===0?1:0;
+  c.fillStyle='#01030d';c.strokeStyle=['#82d9f3','#c9abfa','#ffd29c'][type];c.lineWidth=1.4;
+  c.beginPath();c.arc(x,y,stride===1?4.1:3.1,0,TAU);c.fill();c.stroke();drawn++;
+ }
+ c.restore();
+}
+
 })();
