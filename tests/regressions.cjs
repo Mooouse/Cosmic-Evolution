@@ -88,4 +88,49 @@ assert.ok(paintedA.some(x=>x[0]==='fill'&&x[1]==='#010205'&&x[2]===1),
  'Black-hole core must remain completely opaque');
 console.log('PASS: opaque event horizon stays stable over time and remains visible if lens fails');
 
+
+// Whole-screen flicker regression: the front canvas must receive one
+// COMPLETE frame, after background, lensing, particles and final black hole.
+has("desynchronized:false", "Front canvas must not expose partially painted frames");
+has("const frameCanvas=document.createElement('canvas')", "Separate full-frame drawing surface missing");
+has("lensInputCtx.drawImage(frameCanvas", "Lensing must read the back buffer, not the visible screen");
+lacks("lensInputCtx.drawImage(canvas,", "Reading an actively presented canvas can flicker");
+const startRender=game.indexOf("function render(time){");
+const stopRender=game.indexOf("\nlet idleLast=0;",startRender);
+assert.ok(startRender>0&&stopRender>startRender,"Cannot find atomic renderer");
+const renderCode=game.slice(startRender,stopRender);
+function traceFrame(lensFails=false){
+ const calls=[];
+ const mockCtx=label=>({
+  setTransform(){calls.push(label+":transform")},save(){},restore(){},
+  globalAlpha:1,globalCompositeOperation:"source-over",
+  drawImage(){calls.push(label+":present")}
+ });
+ const screenCtx=mockCtx("front"),frameCtx=mockCtx("back");
+ const universe={
+  ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},
+  dpr:1,W:1920,H:1080,g:{tier:27},TA:Array(28),
+  sky(){calls.push("sky")},renderDistantBodies(){calls.push("distant")},
+  renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
+  renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
+  renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
+  paintBlackHole(){calls.push("blackhole")},project(){return{x:960,y:540}},
+  player:{x:0,y:0,r:200},camera:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
+  screenFlash:0,shake:0,entities:[{}],blackHoleLensRetryAt:0,renderTicks:0,
+  rand:()=>0
+ };
+ vm.createContext(universe);
+ vm.runInContext(renderCode,universe,{timeout:1000});
+ vm.runInContext("render(1)",universe,{timeout:1000});
+ assert.equal(universe.ctx,screenCtx,"Renderer must restore front context between frames");
+ assert.equal(calls.filter(x=>x==="front:present").length,1,"Exactly one frame presentation permitted");
+ assert.ok(calls.indexOf("front:present")>calls.indexOf("blackhole"),"Screen must not present before black hole painted");
+ assert.ok(calls.indexOf("front:present")>calls.indexOf("particles"),"Screen must not present before particle pass");
+ assert.equal(screenCtx.globalCompositeOperation,"source-over","Front context state must be restored");
+ return calls;
+}
+traceFrame(false);
+traceFrame(true);
+console.log("PASS: complete atomic screen frames and lens-readback failure isolation");
+
 console.log('PASS: lens resolution, fast lens lookup, stable backdrop, 4 astronomical zoom levels, LOD, galaxy collision and movement');
