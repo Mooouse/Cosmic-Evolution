@@ -109,7 +109,7 @@ const initialRadius=currentRadius();
 let player={x:Number.isFinite(g.worldX)?g.worldX:0,y:Number.isFinite(g.worldY)?g.worldY:0,vx:0,vy:0,r:initialRadius,targetR:initialRadius,rotation:0,shield:0,trail:[]};
 // Loading a saved giant black hole must start at its correct camera scale.
 // Animating from 1x to microscopic zoom would rebuild hundreds of LOD levels.
-const savedZoom=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+initialRadius/100))/Math.max(1,initialRadius),1e-12,2.5):1;
+const savedZoom=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+initialRadius/100))/Math.max(1,initialRadius),1e-155,2.5):1;
 let camera={x:player.x,y:player.y,zoom:savedZoom};
 let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();const MACRO_SIZE=3200,MACRO_COUNT=9;const macroCache=new Map(),macroSpriteCache=new Map(),macroLoaded=new Set();let macroEntities=[];let macroVisibleCount=0;if(!g.depletedMacro||typeof g.depletedMacro!=='object')g.depletedMacro={};
 // Manual flight: the cursor must NOT steer the ship until the user holds click.
@@ -147,7 +147,7 @@ function pickupFeedback(value,rare=false){
 const cssColor = (h,a) => h.startsWith('#')?`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`:`rgba(119,190,255,${a})`;
 function sound(freq=350,type='sine',duration=.075,vol=.045){if(!g.sound)return;try{soundCtx??=new (window.AudioContext||window.webkitAudioContext)();if(soundCtx.state==='suspended')soundCtx.resume();const osc=soundCtx.createOscillator(),gain=soundCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,soundCtx.currentTime);osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.63),soundCtx.currentTime+duration);gain.gain.setValueAtTime(vol,soundCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,soundCtx.currentTime+duration);osc.connect(gain);gain.connect(soundCtx.destination);osc.start();osc.stop(soundCtx.currentTime+duration+.01);}catch(_){}}
 // Original procedurally composed cinematic space ambient — not the film soundtrack.
-const musicChords=[[45,52,57,60,64],[41,48,53,57,60],[38,45,50,53,57],[43,50,55,59,62],[40,47,52,55,59],[36,43,48,52,55]];
+const musicChords=[[45,52,57,60,64],[41,48,53,57,60],[38,45,50,53,57],[43,50,55,59,62],[40,496,52,55,59],[36,43,48,52,55]];
 const hz=midi=>440*Math.pow(2,(midi-69)/12);
 function initAudio(){
  try{
@@ -530,25 +530,25 @@ function macroLODNodes(gx,gy,level){
 // Cosmic LOD objects are interactable, even when their sprites come from the
 // cached far-field. Harvested identities persist; no giant per-frame physics.
 function cosmicLODLevel(){
- const zoom=Math.max(1e-12,camera.zoom);
+ const zoom=Math.max(1e-155,camera.zoom);
  const horizontal=Math.ceil(W/(MACRO_SIZE*zoom))+3;
  const vertical=Math.ceil(H/(MACRO_SIZE*zoom))+3;
- return clamp(Math.log2(Math.max(1,Math.sqrt(horizontal*vertical/135))),0,47);
+ return clamp(Math.log2(Math.max(1,Math.sqrt(horizontal*vertical/135))),0,496);
 }
 // Rendering and harvesting always sample exactly the same world-space LOD.
 // Prior versions only harvested a subset of the crossfaded levels and ignored
 // level-zero bodies outside the local 5x5 simulation bubble.
 function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
- const zoom=Math.max(1e-12,camera.zoom);
+ const zoom=Math.max(1e-155,camera.zoom);
  const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
  const right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
  const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1;
  const bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
  const refCountX=Math.ceil(referenceWidth/(MACRO_SIZE*zoom))+3;
  const refCountY=Math.ceil(referenceHeight/(MACRO_SIZE*zoom))+3;
- const lod=clamp(Math.log2(Math.max(1,Math.sqrt(refCountX*refCountY/135))),0,47);
+ const lod=clamp(Math.log2(Math.max(1,Math.sqrt(refCountX*refCountY/135))),0,496);
  const low=Math.floor(lod),fraction=lod-low;
- return {left,right,top,bottom,low,fraction,levels:fraction>.018&&low<47?[low,low+1]:[low]};
+ return {left,right,top,bottom,low,fraction,levels:fraction>.018&&low<496?[low,low+1]:[low]};
 }
 function harvestCosmicLOD(dt){
  if(!g.endless||g.tier!==TA.length-1)return;
@@ -562,7 +562,7 @@ function harvestCosmicLOD(dt){
  for(const level of view.levels){
   const stride=2**level,span=MACRO_SIZE*stride;
   const px=Math.floor(player.x/span),py=Math.floor(player.y/span);
-  const extent=Math.min(11,Math.ceil(core/span)+3);
+  const extent=Math.min(32,Math.ceil(core/span)+3);
   for(let cy=py-extent;cy<=py+extent;cy++)for(let cx=px-extent;cx<=px+extent;cx++){
    const gx=cx*stride,gy=cy*stride;
    const key=level===0?macroKey(gx,gy):`${level}:${gx}:${gy}`;
@@ -582,7 +582,7 @@ function harvestCosmicLOD(dt){
  // Old row-major budget repeatedly ate distant cells while nearby galaxies
  // appeared immune. Closest-first prevents this at supermassive scales.
  contacts.sort((a,b)=>a.d2-b.d2);
- let budget=12,changed=false;
+ let budget=Math.min(60,Math.max(18,Math.round(18+Math.log2(1+core/MACRO_SIZE)*1.8))),changed=false;
  for(const {e,bag,key} of contacts){
   if(budget<=0)break;
   const mask=(bag[key]||0)>>>0;
@@ -603,7 +603,7 @@ function harvestCosmicLOD(dt){
 }
 function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
  macroVisibleCount=0;if(g.tier<13)return;
- const zoom=Math.max(1e-12,camera.zoom);
+ const zoom=Math.max(1e-155,camera.zoom);
  const {left,right,top,bottom,low,fraction}=cosmicVisibleLOD(referenceWidth,referenceHeight);
  ctx.save();
  function renderLevel(level,opacity){
@@ -631,7 +631,7 @@ function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
   }
  }
  renderLevel(low,1-fraction);
- if(fraction>.018&&low<47)renderLevel(low+1,fraction);
+ if(fraction>.018&&low<496)renderLevel(low+1,fraction);
  ctx.restore();
 }
 // Freeze the distant scene into a large, reusable world-aligned Canvas buffer.
@@ -642,7 +642,7 @@ let macroBackdrop=null,macroBackdropOld=null,macroFadeStart=0;
 function renderMacroField(time){
  macroVisibleCount=0;
  if(g.tier<13)return;
- const worldZoom=Math.max(1e-12,camera.zoom),nearCenter=macroKey(Math.floor(player.x/MACRO_SIZE),Math.floor(player.y/MACRO_SIZE));
+ const worldZoom=Math.max(1e-155,camera.zoom),nearCenter=macroKey(Math.floor(player.x/MACRO_SIZE),Math.floor(player.y/MACRO_SIZE));
  const ratio=macroBackdrop?worldZoom/macroBackdrop.zoom:1;
  let x=0,y=0,ww=0,hh=0;
  if(macroBackdrop){
@@ -669,7 +669,7 @@ function renderMacroField(time){
   if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld.canvas.height=0;macroBackdropOld=null;}
   macroBackdropOld=macroBackdrop;macroFadeStart=time;
   cosmicSceneDirty=false;cosmicNextRedraw=time+.65;macroBackdrop={canvas,x:camera.x,y:camera.y,zoom:worldZoom,width:W,height:H,
-   nearCenter,level:Math.floor(clamp(Math.log2(Math.max(1,Math.sqrt((W/(MACRO_SIZE*worldZoom))*(H/(MACRO_SIZE*worldZoom))/135))),0,47))};
+   nearCenter,level:Math.floor(clamp(Math.log2(Math.max(1,Math.sqrt((W/(MACRO_SIZE*worldZoom))*(H/(MACRO_SIZE*worldZoom))/135))),0,496))};
   x=(W-canvas.width)/2;y=(H-canvas.height)/2;ww=canvas.width;hh=canvas.height;
  }
  if(macroBackdropOld){
@@ -688,7 +688,7 @@ function renderMacroField(time){
  ctx.save();ctx.globalAlpha=macroBackdropOld?clamp((time-macroFadeStart)/.40,0,1):1;
  // Standard alpha blending avoids over-bright flashes on cache refresh.
  ctx.drawImage(macroBackdrop.canvas,x,y,ww,hh);ctx.restore();
- const zoom=Math.max(1e-12,camera.zoom);
+ const zoom=Math.max(1e-155,camera.zoom);
  for(const e of macroEntities)if(drawMacro(e,time,zoom,1))macroVisibleCount++;
 }
 function streamField(){
@@ -834,7 +834,14 @@ function update(dt){
  }
  player.targetR=currentRadius();
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
- const speed=tester.speed*(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.38)*(boostTime>0?2.5:1);
+ const ordinarySpeed=(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.38);
+ // In the endless universe, movement must be based on *screen pixels*, not a
+ // fixed count of world units. Previously the player became effectively
+ // stationary once the camera zoom fell below 1e-12.
+ const cosmicSpeed=g.endless&&player.r>CHUNK*5
+  ? Math.min(1e290,Math.max(ordinarySpeed,140/Math.max(camera.zoom,1e-155)))
+  : ordinarySpeed;
+ const speed=tester.speed*cosmicSpeed*(boostTime>0?2.5:1);
  // Direct flight stops almost immediately; "smooth" gives optional controlled inertia.
  const response=g.flightFeel==='smooth'?(ax||ay?7:11):(ax||ay?23:34),lerp=1-Math.exp(-dt*response);
  player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
@@ -894,9 +901,9 @@ function update(dt){
  // Early stages keep the familiar camera. The endless black hole zooms out
  // only as needed to keep its horizon visible, with no hard size ceiling.
  const horizonRadius=Math.max(player.r,player.targetR);
- const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-12,2.5):clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
+ const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-155,2.5):clamp(tester.zoom*1.28/Math.pow(1+player.r/105,1.30),.12,2.5);
  const zoomResponse=g.endless?2.4:2;
- const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-12),1e-10,1e10);
+ const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-155),1e-10,1e10);
  camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
  camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
  uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
@@ -904,7 +911,7 @@ function update(dt){
 }
 function project(x,y){return {x:(x-camera.x)*camera.zoom+W/2,y:(y-camera.y)*camera.zoom+H/2};}
 function blackHoleCoreWorldRadius(){
- const zoom=Math.max(1e-12,camera.zoom);
+ const zoom=Math.max(1e-155,camera.zoom);
  // Account for the visual size cap: nothing should disappear outside the black disk.
  const paintedRadius=clamp(player.r*zoom,8,Math.max(W,H)*.54);
  return paintedRadius*BLACK_HOLE_CORE_FRACTION/zoom;
@@ -913,7 +920,7 @@ function blackHoleCoreWorldRadius(){
 // galaxy sprites. At extreme magnification ordinary world radii disagree
 // with painted artwork, which previously made those galaxies untouchable.
 function blackHoleTouchDistance(e,core=blackHoleCoreWorldRadius()){
- const zoom=Math.max(1e-12,camera.zoom);
+ const zoom=Math.max(1e-155,camera.zoom);
  const paintedPixels=(e.macro||e.cosmic)
   ? clamp(e.r*zoom*1.15,1.8,112)
   : Math.max(.3,e.r*zoom);
@@ -1056,7 +1063,11 @@ function renderBlackHoleLensing(){
  const right=Math.min(W,Math.ceil(p.x+outer)),bottom=Math.min(H,Math.ceil(p.y+outer));
  const width=right-left,height=bottom-top;
  if(width<4||height<4)return;
- const scale=Math.min(1,300/Math.max(width,height));
+ // Render near native screen resolution. The former 300px lens texture
+ // was enlarged 3-8x on desktop and produced large blocky galaxies.
+ // Dynamic quality scaling retains FPS on weaker hardware.
+ const qualityTarget=Math.round(clamp(1120*Math.max(.6,performanceScale),700,1250));
+ const scale=Math.min(1,qualityTarget/Math.max(width,height));
  const sw=Math.max(1,Math.round(width*scale)),sh=Math.max(1,Math.round(height*scale));
  if(!lensInput){
   lensInput=document.createElement('canvas');lensOutput=document.createElement('canvas');
