@@ -575,7 +575,7 @@ function harvestCosmicLOD(dt){
     if((mask&(1<<e.index))!==0||e.r>radius*.92)continue;
     const dx=player.x-e.x,dy=player.y-e.y;
     if(Math.abs(dx)>radius+e.r||Math.abs(dy)>radius+e.r)continue;
-    if(dx*dx+dy*dy>(radius+e.r)**2)continue;
+    if(dx*dx+dy*dy>Math.max(0,radius-e.r*.15)**2)continue;
     mask=(mask|(1<<e.index))>>>0;bag[key]=mask;
     budget--;changed=true;
     const value=Math.min(1e280,Math.max(100,e.value||Math.pow(1+e.r/100,1.45)*40));
@@ -676,7 +676,7 @@ function renderMacroField(time){
   }else{macroBackdropOld.canvas.width=0;macroBackdropOld.canvas.height=0;macroBackdropOld=null;}
  }
  ctx.save();ctx.globalAlpha=macroBackdropOld?clamp((time-macroFadeStart)/.40,0,1):1;
- if(macroBackdropOld)ctx.globalCompositeOperation="lighter";
+ // Standard alpha blending avoids over-bright flashes on cache refresh.
  ctx.drawImage(macroBackdrop.canvas,x,y,ww,hh);ctx.restore();
  const zoom=Math.max(1e-12,camera.zoom);
  for(const e of macroEntities)if(drawMacro(e,time,zoom,1))macroVisibleCount++;
@@ -854,7 +854,7 @@ function update(dt){
   if(giantMode){
    // Macro deposits are fixed astronomical bodies, not projectiles. Do not
    // pull them across sectors and then restore them on reload.
-   if(dist<=captureRadius+e.r&&e.r<=player.r*.92&&absorptionTokens>=1){startAbsorption(e);absorptionTokens--;}
+   if(dist<=Math.max(0,captureRadius-e.r*.15)&&e.r<=captureRadius*.92&&absorptionTokens>=1){startAbsorption(e);absorptionTokens--;}
    continue;
   }
   if((e.kind!=='hazard'||g.tier===TA.length-1)&&
@@ -1029,7 +1029,8 @@ let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
 function renderBlackHoleLensing(){
  if(g.tier!==TA.length-1)return;
  const p=project(player.x,player.y),R=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
- const outer=Math.min(R*2.5,Math.max(W,H)*.64);
+ // A compact lens, not a giant vortex of stretched galaxies.
+ const outer=Math.min(R*1.30,Math.max(W,H)*.64);
  const left=Math.max(0,Math.floor(p.x-outer)),top=Math.max(0,Math.floor(p.y-outer));
  const right=Math.min(W,Math.ceil(p.x+outer)),bottom=Math.min(H,Math.ceil(p.y+outer));
  const width=right-left,height=bottom-top;
@@ -1047,15 +1048,21 @@ function renderBlackHoleLensing(){
  lensInputCtx.drawImage(canvas,left*dpr,top*dpr,width*dpr,height*dpr,0,0,sw,sh);
  const a=lensInputCtx.getImageData(0,0,sw,sh).data;
  const warped=lensOutputCtx.createImageData(sw,sh),b=warped.data;
- const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION,soft=R*.22;
- const outerStart=outer*.72,outerLength=Math.max(1,outer-outerStart);
+ const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION;
+ const outerStart=Math.max(core+R*.30,outer-R*.34),outerLength=Math.max(1,outer-outerStart);
  for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
   const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
   const d=Math.hypot(dx,dy),idx=(iy*sw+ix)*4;
   if(d<core*.99||d>=outer)continue;
-  const bend=R*R*.34/(d+soft)*Math.exp(-d/(R*1.22));
-  const rr=d+bend;
-  const sx=(p.x+dx*rr/d-left)*sampleX-.5,sy=(p.y+dy*rr/d-top)*sampleY-.5;
+  // Smooth, short-range deflection: prevents the old long radial streaks.
+  const u=Math.max(0,(d-core)/(R*.34));
+  const strength=Math.exp(-u*u);
+  const bend=R*.065*strength;
+  const twist=.018*strength;
+  const rr=(d+bend)/d;
+  const cosine=Math.cos(twist),sine=Math.sin(twist);
+  const sx=(p.x+(dx*cosine-dy*sine)*rr-left)*sampleX-.5;
+  const sy=(p.y+(dx*sine+dy*cosine)*rr-top)*sampleY-.5;
   if(sx<0||sy<0||sx>=sw-1||sy>=sh-1)continue;
   const x=Math.floor(sx),y=Math.floor(sy),fx=sx-x,fy=sy-y;
   const p00=(y*sw+x)*4,p01=p00+4,p10=p00+sw*4,p11=p10+4;
@@ -1063,7 +1070,7 @@ function renderBlackHoleLensing(){
   b[idx]=a[p00]*w00+a[p01]*w01+a[p10]*w10+a[p11]*w11;
   b[idx+1]=a[p00+1]*w00+a[p01+1]*w01+a[p10+1]*w10+a[p11+1]*w11;
   b[idx+2]=a[p00+2]*w00+a[p01+2]*w01+a[p10+2]*w10+a[p11+2]*w11;
-  const fade=Math.min(1,(outer-d)/outerLength);
+  const fade=Math.min(1,Math.max(0,(outer-d)/outerLength));
   b[idx+3]=Math.round(255*fade*fade*(3-2*fade));
  }
  lensOutputCtx.putImageData(warped,0,0);
