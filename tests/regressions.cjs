@@ -71,7 +71,7 @@ function traceBlackHole(time){
   beginPath(){},arc(x,y,r){recorded.push(['arc',x,y,r])},
   fill(){recorded.push(['fill',this.fillStyle,this.globalAlpha])}
  };
- const sandbox={ctx,W:1920,H:1080,TAU:Math.PI*2,
+ const sandbox={ctx,W:1920,H:1080,TAU:Math.PI*2,BLACK_HOLE_CORE_FRACTION:.245,
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
  vm.createContext(sandbox);
  vm.runInContext(paintSnippet,sandbox,{timeout:1000});
