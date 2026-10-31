@@ -40,11 +40,11 @@
 @media(max-width:560px){.stat:nth-child(1),.timer-stat{display:none}.brand-logo{width:30px;height:30px}.top-actions{gap:3px}.brand strong{font-size:10px}.world-label{top:76px;letter-spacing:1.5px}.sidebar{z-index:8}}
 
 /* Infinite procedural atlas: coordinates and depletion derive from actual saved gameplay world. */
-.modal-card.atlas-card{width:min(960px,calc(100vw - 28px));max-width:none;padding:23px 28px;max-height:calc(100vh - 34px);overflow-y:auto;display:block}
+.modal-card.atlas-card{width:min(1220px,calc(100vw - 28px));max-width:none;padding:23px 28px;max-height:calc(100vh - 34px);overflow-y:auto;display:block}
 .atlas-top{display:flex;justify-content:space-between;align-items:center;gap:16px}.atlas-top .overlay-title{margin:5px 0 8px;font-size:clamp(22px,3vw,35px);letter-spacing:1.4px;text-align:left}
 .atlas-north{font-size:13px;color:#b7eafa;letter-spacing:3px}.atlas-description{text-align:left;color:#90acbc;font-size:12px;line-height:1.65;max-width:730px;margin:0 0 15px}
 .atlas-stats{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;border-top:1px solid #254256;padding:11px 0;color:#a6c4d9;font-size:11px;font-weight:600}
-.atlas-wrap{position:relative;height:clamp(220px,47vh,530px);border:1px solid #3a6678;background:#07101d;overflow:hidden;border-radius:5px;box-shadow:inset 0 0 65px #03080fc7}
+.atlas-wrap{position:relative;height:clamp(240px,54vh,640px);border:1px solid #3a6678;background:#07101d;overflow:hidden;border-radius:5px;box-shadow:inset 0 0 65px #03080fc7}
 #atlas-canvas{display:block;width:100%;height:100%;cursor:grab}#atlas-canvas:active{cursor:grabbing}
 .atlas-controls{position:absolute;right:13px;top:13px;display:grid;gap:6px}.atlas-control{width:37px;height:36px;background:#0b2030dc;border:1px solid #54798d;border-radius:4px;color:#d3f3ff;font-size:21px}.atlas-control:hover{background:#23475a;border-color:#99deef}.atlas-control.center{font-size:24px}
 .atlas-legend{display:flex;align-items:center;flex-wrap:wrap;gap:13px;margin:13px 0;color:#a4b9c9;font-size:9px;letter-spacing:.6px;font-weight:700}.atlas-legend span{display:inline-flex;gap:6px;align-items:center}
@@ -103,3 +103,5 @@
 @media(pointer:coarse){.flight-stick{display:block}.flight-marker{display:none!important}}
 @media(pointer:coarse) and (max-width:800px){.flight-stick{left:14px;bottom:108px;width:120px;height:120px}.stick-thumb{width:55px;height:55px}.bottom-center{bottom:10px;max-width:calc(100vw - 32px)}.center-abilities{right:10px;bottom:110px}}
 @media(pointer:coarse) and (max-height:500px){.flight-stick{bottom:18px;width:104px;height:104px}.center-abilities{bottom:22px}}
+
+.atlas-measures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:10px 0 16px}.atlas-measures>div{padding:12px 14px;border:1px solid #284554;background:#0a1723;border-radius:6px}.atlas-measures small{display:block;font-size:9px;letter-spacing:1px;color:#86a9bb;margin-bottom:8px}.atlas-measures strong{font-size:clamp(13px,1.7vw,20px);font-weight:600;color:#d4f3ff;overflow-wrap:anywhere}.gravity-key{color:#b8a2ff}@media(max-width:650px){.atlas-measures{gap:5px;margin:5px 0 10px}.atlas-measures>div{padding:9px 7px}.atlas-measures small{font-size:8px;line-height:1.4;letter-spacing:.3px}.atlas-measures strong{font-size:12px}.atlas-legend{line-height:1.5}.atlas-wrap{height:44vh}}

@@ -206,3 +206,77 @@ for(const zoom of [1,1e-3,1e-60,1e-110]){
 }
 lacks('1-e.absorbing/.26', 'Contact must not fade/shrink galaxies out in place');
 console.log('PASS: galaxies travel fully inside the horizon before reward/removal at four scales');
+
+// Gravity must act before contact and have identical screen-space motion at
+// ordinary and astronomical scales, including the former x9 cutoff.
+const gravityCode=game.slice(game.indexOf('function blackHoleGravityRadius(){'),game.indexOf('\nfunction harvestCosmicLOD'));
+let firstMotion;
+for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
+ const e={x:400/zoom,y:0,r:80/zoom,cosmic:true,index:0,level:2,gx:0,gy:0};
+ const sim={e,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
+  BLACK_HOLE_CORE_FRACTION:.245,g:{upgrade:{gravity:0}},tester:{gravity:1},
+  clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'fixture',
+  startAbsorption(){throw Error('Gravity test body is still outside the event horizon')}};
+ vm.createContext(sim);vm.runInContext(snippet+'\n'+gravityCode,sim);
+ const radius=vm.runInContext('blackHoleGravityRadius()',sim);
+ vm.runInContext('for(let i=0;i<15;i++)applyBlackHoleGravity(e,1/60)',sim);
+ const movement=400-e.x*zoom;
+ assert.ok(movement>1,'Galaxies outside contact must move toward the black hole');
+ if(firstMotion===undefined)firstMotion=movement;else assert.ok(Math.abs(movement-firstMotion)<1e-7,'Gravity speed must not vanish as zoom shrinks');
+ sim.g.upgrade.gravity=40;
+ assert.ok(vm.runInContext('blackHoleGravityRadius()',sim)>radius,'Gravity upgrades must affect cosmic bodies');
+}
+console.log('PASS: pre-contact gravity and upgrades work at five zoom scales');
+
+const dustStart=game.indexOf('function cosmicDustView(){');
+const dustEnd=game.indexOf('\nfunction renderDistantBodies()',dustStart);
+for(const [W,H,zoom] of [[1920,1080,.08],[3840,2160,.025],[390,844,.08]]){
+ const points=[];
+ const sim={W,H,CHUNK:480,camera:{zoom,x:11000,y:-7000},g:{depleted:{}},
+  ctx:{save(){},restore(){},fillRect(x,y){points.push([x,y])}},
+  clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),seedHash:()=>0,
+  chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
+  MATERIALS:{ore:{color:'#abc'}},absorbingMacroKeys:new Set(),absorptionKey:e=>e.chunk,
+  distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:8,index:0,chunk:`${cx},${cy}`,material:'ore'}]};
+ vm.createContext(sim);vm.runInContext(game.slice(dustStart,dustEnd),sim);
+ const view=vm.runInContext('cosmicDustView()',sim);
+ assert.ok(view.columns*view.rows<600,'Dust sampling must stay bounded on 4K');
+ vm.runInContext('renderCosmicDust()',sim);
+ for(const [sx,sy] of [[0,0],[1,0],[0,1],[1,1]]){
+  assert.ok(points.some(([x,y])=>(sx?x>W*.7:x<W*.3)&&(sy?y>H*.7:y<H*.3)),
+   'Dust must cover every viewport corner, outside the physics square');
+ }
+}
+console.log('PASS: dust covers all four corners on desktop, 4K and mobile');
+
+const mapHelpers=game.slice(game.indexOf('function atlasScale(){'),game.indexOf('\nfunction atlasFitPlayer(){'));
+for(const zoom of [1,.08,1e-30,1e-110]){
+ const sim={W:1920,H:1080,CHUNK:480,camera:{zoom},atlas:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+ vm.createContext(sim);vm.runInContext(mapHelpers,sim);
+ vm.runInContext('atlas.zoom=atlasFitZoom(1100,550)',sim);
+ const scale=vm.runInContext('atlasScale()',sim);
+ assert.ok(1920/zoom*scale<1100&&1080/zoom*scale<550,'Map must fit actual camera footprint at every size');
+ assert.ok(450/zoom*.245*scale>10,'Black hole must remain visible when opening the map');
+ const length=vm.runInContext('atlasNiceDistance(150/atlasScale()/CHUNK)*CHUNK*atlasScale()',sim);
+ assert.ok(length>40&&length<=150.000001,'Scale bar must be readable across world exponents');
+}
+console.log('PASS: map fits real viewport and horizon; readable scale at four exponents');
+
+// Far dust enters physics too, and a repeated sampling tick cannot spawn a
+// second copy of the same sector slot.
+{
+ const active=new Set(),entities=[];
+ const sim={W:1920,H:1080,CHUNK:480,camera:{zoom:.08,x:0,y:0},player:{x:0,y:0},
+  g:{endless:true,depleted:{}},loadedChunks:new Set(),absorbingMacroKeys:active,entities,
+  seedHash:()=>0,chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
+  blackHoleGravityRadius:()=>1e8,absorptionKey:e=>`${e.chunk}:${e.index}`,
+  distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:8,index:0,chunk:`${cx},${cy}`,material:'ore',value:10}]};
+ vm.createContext(sim);vm.runInContext(game.slice(dustStart,dustEnd),sim);
+ for(let i=0;i<10;i++)vm.runInContext('promoteCosmicDust()',sim);
+ assert.ok(entities.length>64,'Particles outside the local streaming square must be promoted');
+ const count=entities.length;
+ vm.runInContext('promoteCosmicDust()',sim);
+ assert.equal(entities.length,count,'Repeated sampling must not duplicate active dust');
+ assert.equal(new Set(entities.map(e=>`${e.chunk}:${e.index}`)).size,count);
+}
+console.log('PASS: distant dust becomes physical without duplicate sector slots');

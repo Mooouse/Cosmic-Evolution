@@ -208,7 +208,7 @@ function applyResolution(){
  frameCtx.setTransform(dpr,0,0,dpr,0,0);
  ctx.setTransform(dpr,0,0,dpr,0,0);
 }
-function resize(){W=innerWidth;H=innerHeight;applyResolution();makeSky();}
+function resize(){W=innerWidth;H=innerHeight;applyResolution();makeSky();if(atlasVisible)atlas.dirty=true;}
 
 addEventListener('resize',resize);resize();
 function toast(message,kind=''){let el=document.createElement('div');el.className=`toast ${kind}`;el.textContent=message;$('toast-root').append(el);setTimeout(()=>el.remove(),3100);}
@@ -355,7 +355,7 @@ function makeChunk(cx,cy){
   // depleted bodies silently shift all later positions when the sector reloads.
   let e=spawn(px,py,kind,rng);
   const dist=Math.hypot(cx,cy);e.material=materialFor(info.biome,dist,rng);
-  if((mask&(1<<i))!==0||i>=sectorQuota(info,cx,cy))continue;
+  if((mask&(1<<i))!==0||i>=sectorQuota(info,cx,cy)||absorbingMacroKeys.has(`0:${key}:${i}`))continue;
   e.chunk=key;e.index=i;
   // Regions farther from the origin contain physically larger, richer bodies.
   // Grade depends only on sector coordinates, never on player tier, so revisits stay consistent.
@@ -410,7 +410,7 @@ function macroNodes(cx,cy){
  macroCache.set(key,saved);return saved;
 }
 function streamMacroBodies(){
- if(g.tier<13||MACRO_SIZE*camera.zoom<2||!Number.isSafeInteger(Math.floor(player.x/MACRO_SIZE))||!Number.isSafeInteger(Math.floor(player.y/MACRO_SIZE))){macroEntities=macroEntities.filter(e=>e.absorbing&&!e.dead);macroLoaded.clear();return;}
+ if(g.tier<13||MACRO_SIZE*camera.zoom<2||!Number.isSafeInteger(Math.floor(player.x/MACRO_SIZE))||!Number.isSafeInteger(Math.floor(player.y/MACRO_SIZE))){macroEntities=macroEntities.filter(e=>(e.absorbing||e.gravityBound)&&!e.dead);macroLoaded.clear();return;}
  const cx0=Math.floor(player.x/MACRO_SIZE),cy0=Math.floor(player.y/MACRO_SIZE),active=new Set();
  for(let iy=-2;iy<=2;iy++)for(let ix=-2;ix<=2;ix++){
   const cx=cx0+ix,cy=cy0+iy;
@@ -421,7 +421,7 @@ function streamMacroBodies(){
   for(const e of macroNodes(cx,cy))if(!(depleted&(1<<e.index))&&!absorbingMacroKeys.has(absorptionKey(e)))macroEntities.push({...e});
  }
  for(const key of macroLoaded)if(!active.has(key))macroLoaded.delete(key);
- macroEntities=macroEntities.filter(e=>!e.dead&&(active.has(e.chunk)||e.absorbing));
+ macroEntities=macroEntities.filter(e=>!e.dead&&(active.has(e.chunk)||e.absorbing||e.gravityBound));
 }
 const GALAXY_PALETTES=[
  ['#6ac9fa','#b5e6ff','#fff0bd'],['#9c80ff','#e1aeff','#fff3e5'],
@@ -554,31 +554,62 @@ function cosmicLODLevel(){
 // Rendering and harvesting always sample exactly the same world-space LOD.
 // Prior versions only harvested a subset of the crossfaded levels and ignored
 // level-zero bodies outside the local 5x5 simulation bubble.
-function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
- const zoom=Math.max(1e-155,camera.zoom);
- const left=Math.floor((camera.x-W*.5/zoom)/MACRO_SIZE)-1;
- const right=Math.ceil((camera.x+W*.5/zoom)/MACRO_SIZE)+1;
- const top=Math.floor((camera.y-H*.5/zoom)/MACRO_SIZE)-1;
- const bottom=Math.ceil((camera.y+H*.5/zoom)/MACRO_SIZE)+1;
+function cosmicViewAt(x,y,width,height,zoom,referenceWidth=width,referenceHeight=height){
+ zoom=Math.max(1e-155,zoom);
+ const left=Math.floor((x-width*.5/zoom)/MACRO_SIZE)-1;
+ const right=Math.ceil((x+width*.5/zoom)/MACRO_SIZE)+1;
+ const top=Math.floor((y-height*.5/zoom)/MACRO_SIZE)-1;
+ const bottom=Math.ceil((y+height*.5/zoom)/MACRO_SIZE)+1;
  const refCountX=Math.ceil(referenceWidth/(MACRO_SIZE*zoom))+3;
  const refCountY=Math.ceil(referenceHeight/(MACRO_SIZE*zoom))+3;
- const lod=clamp(Math.log2(Math.max(1,Math.sqrt(refCountX*refCountY/135))),0,496);
+ const lod=clamp((Math.log2(refCountX)+Math.log2(refCountY)-Math.log2(135))*.5,0,496);
  const low=Math.floor(lod),fraction=lod-low;
  return {left,right,top,bottom,low,fraction,levels:fraction>.018&&low<496?[low,low+1]:[low]};
 }
+function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
+ return cosmicViewAt(camera.x,camera.y,W,H,camera.zoom,referenceWidth,referenceHeight);
+}
+function blackHoleGravityRadius(){
+ const zoom=Math.max(1e-155,camera.zoom),core=blackHoleCoreWorldRadius();
+ return core+Math.max(180,core*zoom*2.2)*(1+g.upgrade.gravity*.012)*tester.gravity/zoom;
+}
+function applyBlackHoleGravity(e,dt){
+ const zoom=Math.max(1e-155,camera.zoom);
+ const dx=(player.x-e.x)*zoom,dy=(player.y-e.y)*zoom,d=Math.hypot(dx,dy);
+ const core=blackHoleCoreWorldRadius(),range=blackHoleGravityRadius()*zoom;
+ const touch=blackHoleTouchDistance(e,core)*zoom;
+ if(!e.gravityBound&&d>range+touch-core*zoom)return false;
+ if(!e.gravityBound){
+  e.gravityBound=true;
+  if(e.chunk!==undefined||e.cosmic)absorbingMacroKeys.add(absorptionKey(e));
+ }
+ const strength=clamp(1-d/Math.max(1,range),0,1);
+ // Screen-space speed is invariant across every LOD and world exponent.
+ // Bound bodies keep catching up during flight instead of filling the pool
+ // with abandoned stationary objects behind the player.
+ const flight=Math.hypot(player.vx,player.vy)*zoom;
+ const speed=28+235*strength*strength+core*zoom*.22+flight*1.12;
+ const response=1-Math.exp(-dt*4);
+ e.vx=((e.vx||0)*zoom+(dx/Math.max(d,.001)*speed-(e.vx||0)*zoom)*response)/zoom;
+ e.vy=((e.vy||0)*zoom+(dy/Math.max(d,.001)*speed-(e.vy||0)*zoom)*response)/zoom;
+ e.x+=e.vx*dt;e.y+=e.vy*dt;
+ if(Math.hypot(player.x-e.x,player.y-e.y)*zoom<=touch)startAbsorption(e);
+ return true;
+}
+
 function harvestCosmicLOD(dt){
  if(!g.endless||g.tier!==TA.length-1)return;
  cosmicHarvestTimer+=dt;
  if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
- const core=blackHoleCoreWorldRadius(),view=cosmicVisibleLOD();
+ const core=blackHoleCoreWorldRadius(),gravity=blackHoleGravityRadius(),view=cosmicVisibleLOD();
  const contacts=[];
- // All visible LOD proxies are physical: accept an object when its rendered
- // silhouette touches the black horizon, even at extreme camera zoom.
+ // Promote visible LOD proxies when they enter the gravitational field,
+ // before their rendered silhouette reaches the event horizon.
  for(const level of view.levels){
   const stride=2**level,span=MACRO_SIZE*stride;
   const px=Math.floor(player.x/span),py=Math.floor(player.y/span);
-  const extent=Math.min(32,Math.ceil(core/span)+3);
+  const extent=Math.min(32,Math.ceil(gravity/span)+3);
   for(let iy=-extent;iy<=extent;iy++)for(let ix=-extent;ix<=extent;ix++){
    const cx=px+ix,cy=py+iy;
    const gx=cx*stride,gy=cy*stride;
@@ -589,7 +620,7 @@ function harvestCosmicLOD(dt){
    for(const e of (level===0?macroNodes(gx,gy):macroLODNodes(gx,gy,level))){
     if((mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
     const dx=player.x-e.x,dy=player.y-e.y;
-    const touch=blackHoleTouchDistance(e,core);
+    const touch=gravity+blackHoleTouchDistance(e,core)-core;
     if(Math.abs(dx)>touch||Math.abs(dy)>touch)continue;
     const d2=dx*dx+dy*dy;
     if(d2<=touch*touch)contacts.push({e,bag,key,d2,opacity:level===view.low?1-view.fraction:view.fraction});
@@ -601,12 +632,13 @@ function harvestCosmicLOD(dt){
  contacts.sort((a,b)=>a.d2-b.d2);
  let budget=Math.min(60,Math.max(18,Math.round(18+Math.log2(1+core/MACRO_SIZE)*1.8)));
  for(const {e,bag,key,opacity} of contacts){
-  if(budget<=0||cosmicAbsorptions.length>=64)break;
+  if(budget<=0||cosmicAbsorptions.length>=160)break;
   if((bag[key]||0)&(1<<e.index)||absorbingMacroKeys.has(absorptionKey(e)))continue;
   if(opacity<.025)continue;
-  // Keep the saved depletion mask unchanged until the whole body is inside.
+  // Attraction does not deplete a sector; wait until the whole body is inside.
   const body={...e,cosmic:true,captureBag:bag,captureKey:key,captureOpacity:opacity};
-  startAbsorption(body);cosmicAbsorptions.push(body);budget--;
+  body.gravityBound=true;body.vx=body.vy=0;
+  absorbingMacroKeys.add(absorptionKey(body));cosmicAbsorptions.push(body);budget--;
  }
 }
 function finishCosmicAbsorption(e){
@@ -729,7 +761,7 @@ function streamField(){
  // Below one sector per two pixels, only the visible cosmic LOD is useful.
  // Never increment astronomical world indices: x + 1 can equal x.
  if(CHUNK*camera.zoom<2||!Number.isSafeInteger(Math.floor(player.x/CHUNK))||!Number.isSafeInteger(Math.floor(player.y/CHUNK))){
-  entities=entities.filter(e=>e.absorbing&&!e.dead);loadedChunks.clear();streamMacroBodies();return;
+  entities=entities.filter(e=>(e.absorbing||e.gravityBound)&&!e.dead);loadedChunks.clear();streamMacroBodies();return;
  }
  // Physics and individual sprites exist only around the player. The far field uses stars/nebulae.
  // This prevents 4K zoom-outs from loading thousands of gradient/shadow draw calls.
@@ -742,7 +774,7 @@ function streamField(){
   const k=chunkKey(cx,cy);active.add(k);makeChunk(cx,cy);
  }
  for(const k of loadedChunks)if(!active.has(k))loadedChunks.delete(k);
- entities=entities.filter(e=>!e.dead&&(active.has(e.chunk)||e.absorbing));
+ entities=entities.filter(e=>!e.dead&&(active.has(e.chunk)||e.absorbing||e.gravityBound));
  streamMacroBodies();
 }
 // Render world-anchored low-cost proxies outside the physics bubble. Unlike
@@ -757,13 +789,71 @@ function distantSamples(cx,cy){
   const r=rng();let kind=sectorType(info,r);
   if(Math.hypot(px,py)<110)kind='matter';
   const e=spawn(px,py,kind,rng),material=materialFor(info.biome,Math.hypot(cx,cy),rng);
-  result.push({x:px,y:py,index:i,kind,material,r:e.r});
+  const grade=clamp(Math.floor(Math.log(1+Math.hypot(cx,cy)/3)/Math.log(1.46)),0,27);
+  const radius=e.r*Math.pow(1.125,grade)*(i%17===0?1.45:1);
+  const value=e.value*(1+Math.pow(Math.max(1,radius/5),1.55)*.42)*(info.biome==='rich'?2.1:1);
+  result.push({...e,x:px,y:py,index:i,chunk:key,kind,material,r:radius,value,grade});
  }
  if(distantChunkCache.size>1250)distantChunkCache.clear();
  distantChunkCache.set(key,result);return result;
 }
+// One world-anchored dust layer across the whole viewport. Its coverage never
+// depends on the square physics streaming bubble. Sampling is bounded in 4K.
+function cosmicDustView(){
+ const zoom=Math.max(1e-155,camera.zoom),cell=CHUNK*zoom;
+ if(cell<2)return null;
+ const nx=W/cell+4,ny=H/cell+4;
+ const step=2**Math.max(0,Math.ceil(Math.log2(Math.sqrt(nx*ny/240))));
+ const left=Math.floor((camera.x-W*.5/zoom)/CHUNK/step)*step-step;
+ const top=Math.floor((camera.y-H*.5/zoom)/CHUNK/step)*step-step;
+ return {zoom,cell,step,left,top,columns:Math.ceil(W/cell/step)+4,rows:Math.ceil(H/cell/step)+4};
+}
+function promoteCosmicDust(){
+ if(!g.endless||camera.zoom>=.13)return;
+ const view=cosmicDustView();if(!view)return;
+ const {zoom,step,left,top,columns,rows}=view,range=blackHoleGravityRadius()*zoom;
+ let budget=64;
+ for(let iy=0;iy<rows&&budget>0;iy++)for(let ix=0;ix<columns&&budget>0;ix++){
+  const gx=left+ix*step,gy=top+iy*step,seed=seedHash(gx/step,gy/step);
+  const cx=gx+(seed%step),cy=gy+((seed>>>12)%step),key=chunkKey(cx,cy);
+  if(loadedChunks.has(key))continue;
+  const quota=sectorQuota(chunkInfo(cx,cy),cx,cy),mask=(g.depleted[key]||0)>>>0;
+  for(const e of distantSamples(cx,cy)){
+   if(budget<=0)break;
+   if(e.index>=quota||(mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
+   if(Math.hypot(e.x-player.x,e.y-player.y)*zoom>range+e.r*zoom)continue;
+   const body={...e,vx:0,vy:0,gravityBound:true};
+   absorbingMacroKeys.add(absorptionKey(body));entities.push(body);budget--;
+  }
+ }
+}
+
+function renderCosmicDust(){
+ const view=cosmicDustView();if(!view)return;
+ const {zoom,cell,step,left,top,columns,rows}=view;
+ const opacity=clamp((cell-2)/14,0,1)*.72;
+ ctx.save();ctx.globalAlpha=opacity;
+ for(let iy=0;iy<rows;iy++)for(let ix=0;ix<columns;ix++){
+  const gx=left+ix*step,gy=top+iy*step;
+  // Select a stable actual sector within each group, not a decorative refill.
+  const seed=seedHash(gx/step,gy/step);
+  const cx=gx+(seed%step),cy=gy+((seed>>>12)%step),key=chunkKey(cx,cy);
+  const info=chunkInfo(cx,cy),quota=sectorQuota(info,cx,cy),mask=(g.depleted[key]||0)>>>0;
+  for(const e of distantSamples(cx,cy)){
+   if(e.index>=quota||(mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
+   const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5;
+   if(x<0||y<0||x>W||y>H)continue;
+   const r=clamp(e.r*zoom*.65,.65,2.8);
+   ctx.fillStyle=MATERIALS[e.material]?.color||'#9bbddd';
+   ctx.fillRect(x-r,y-r,r*2,r*2);
+  }
+ }
+ ctx.restore();
+}
+
 function renderDistantBodies(){
  // At giant scales the real macro deposits replace microscopic dust.
+ if(g.endless&&camera.zoom<.13){renderCosmicDust();return;}
  if(g.tier>=18&&camera.zoom<.13)return;
  const zoom=Math.max(.014,camera.zoom),dx=W*.5/zoom,dy=H*.5/zoom;
  const minX=Math.floor((camera.x-dx)/CHUNK)-1,maxX=Math.floor((camera.x+dx)/CHUNK)+1;
@@ -813,7 +903,7 @@ function startAbsorption(e){
  if(e.dead||e.absorbing)return;
  e.absorbing=.000001;e.absorbScale=1;e.absorbOriginX=e.x;e.absorbOriginY=e.y;
  e.absorbDuration=clamp(.85+Math.hypot(e.x-player.x,e.y-player.y)*camera.zoom/420,.85,1.6);
- if(e.macro||e.cosmic)absorbingMacroKeys.add(absorptionKey(e));
+ if(e.chunk!==undefined||e.cosmic)absorbingMacroKeys.add(absorptionKey(e));
 }
 function animateAbsorption(e,dt){
  if(!e.absorbing||e.dead)return false;
@@ -827,7 +917,7 @@ function animateAbsorption(e,dt){
  const fullyInside=Math.hypot(e.x-player.x,e.y-player.y)*zoom+fullRadius<=core*.96;
  if(fullyInside){
   if(e.captureBag)finishCosmicAbsorption(e);else absorb(e);
-  if(e.macro||e.cosmic)absorbingMacroKeys.delete(absorptionKey(e));
+  if(e.chunk!==undefined||e.cosmic)absorbingMacroKeys.delete(absorptionKey(e));
  }
  return true;
 }
@@ -918,18 +1008,13 @@ function update(dt){
  for(const e of nearbyObjects){
   if(e.dead)continue;
   if(animateAbsorption(e,dt))continue;
+  if(g.endless){applyBlackHoleGravity(e,dt);continue;}
   let dx=player.x-e.x,dy=player.y-e.y;
   // Broad phase: no sqrt, movement or sound for distant objects.
   const dist2=dx*dx+dy*dy;
   const reach=giantMode?Math.max(nearReach+e.r+20,blackHoleTouchDistance(e,captureRadius)):nearReach+e.r+20;
    if(dist2>reach*reach)continue;
   const dist=Math.sqrt(dist2)||1;
-  if(giantMode){
-   // Macro deposits are fixed astronomical bodies, not projectiles. Do not
-   // pull them across sectors and then restore them on reload.
-   if(dist<=blackHoleTouchDistance(e,captureRadius)&&absorptionTokens>=1){startAbsorption(e);absorptionTokens--;}
-   continue;
-  }
   if((e.kind!=='hazard'||g.tier===TA.length-1)&&
     (e.r<=player.r*.82||(g.tier===TA.length-1&&e.kind==='hazard'))&&
     dist<gravRange*(e.material==='gas'?1.4:1)){
@@ -947,8 +1032,8 @@ function update(dt){
   }
  }
  entities=entities.filter(e=>!e.dead);macroEntities=macroEntities.filter(e=>!e.dead);
- for(let i=cosmicAbsorptions.length-1;i>=0;i--){animateAbsorption(cosmicAbsorptions[i],dt);if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);}
- harvestCosmicLOD(dt);if(streamTimer>.32){streamTimer=0;streamField();}
+ for(let i=cosmicAbsorptions.length-1;i>=0;i--){if(!animateAbsorption(cosmicAbsorptions[i],dt))applyBlackHoleGravity(cosmicAbsorptions[i],dt);if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);}
+ harvestCosmicLOD(dt);if(streamTimer>.32){streamTimer=0;streamField();promoteCosmicDust();}
  // No random refill events: only unexplored, persistent sectors supply new matter.
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*2);p.vy*=Math.exp(-dt*2);p.life-=dt;}
  particles=particles.filter(p=>p.life>0);
@@ -1382,7 +1467,8 @@ function renderEntity(e,time){
  const r=e.r*camera.zoom*(e.absorbScale??1);
  if(px<-r-12||px>W+r+12||py<-r-12||py>H+r+12)return;
  const near=(e.x-player.x)**2+(e.y-player.y)**2<560*560;
- if(g.tier>=18&&camera.zoom<.13&&r<2.25)return;
+ if(g.endless&&camera.zoom<.13&&!e.gravityBound&&!e.absorbing)return;
+ if(!g.endless&&g.tier>=18&&camera.zoom<.13&&r<2.25)return;
  if(r<1.6){ctx.fillStyle=e.kind==='hazard'?'#ed6d88':e.kind==='relic'?'#ffd790':MATERIALS[e.material]?.color||'#8bc9ed';ctx.fillRect(px,py,1.8,1.8);return;}
  if(e.kind==='matter'){
   const mat=e.material;
@@ -1504,181 +1590,148 @@ function attachContinue(){const b=$('btn-continue');if(b)b.onclick=()=>{clearFli
 // The atlas reads the exact same deterministic sector data as gameplay; it is not an evolution-level menu.
 function popcount32(x){x=x>>>0;x=x-((x>>>1)&0x55555555);x=(x&0x33333333)+((x>>>2)&0x33333333);return (((x+(x>>>4))&0x0F0F0F0F)*0x01010101)>>>24;}
 function atlasScale(){return 27*atlas.zoom/CHUNK;}
+function atlasNumber(value){
+ const n=Math.abs(value);
+ if(n>=1e7||n>0&&n<.001)return value.toExponential(2).replace('e+',' × 10^').replace('e-',' × 10^-');
+ return value.toLocaleString('ru-RU',{maximumFractionDigits:n<1?3:n<100?1:0});
+}
+function atlasNiceDistance(value){
+ const power=10**Math.floor(Math.log10(Math.max(1e-155,value))),fraction=value/power;
+ return (fraction>=5?5:fraction>=2?2:1)*power;
+}
+function atlasFitZoom(w,h){
+ return clamp(Math.min(w/W,h/H)*.72*camera.zoom*CHUNK/27,1e-155,12);
+}
+function atlasFitPlayer(){
+ const bounds=$('atlas-canvas').getBoundingClientRect();
+ atlas.x=player.x;atlas.y=player.y;atlas.zoom=atlasFitZoom(bounds.width,bounds.height);atlas.dirty=true;
+}
+function changeAtlasZoom(factor,anchorX,anchorY){
+ const bounds=$('atlas-canvas').getBoundingClientRect(),before=atlasScale();
+ atlas.zoom=clamp(atlas.zoom*factor,1e-155,12);
+ const after=atlasScale();
+ if(anchorX!==undefined){
+  atlas.x+=(anchorX-bounds.width/2)*(1/before-1/after);
+  atlas.y+=(anchorY-bounds.height/2)*(1/before-1/after);
+ }
+ atlas.dirty=true;
+}
 function drawAtlas(){
- const canvas=$('atlas-canvas');if(!canvas)return;
- const bounds=canvas.getBoundingClientRect();if(bounds.width<10)return;
+ const surface=$('atlas-canvas');if(!surface)return;
+ const bounds=surface.getBoundingClientRect();if(bounds.width<10)return;
  const w=Math.round(bounds.width),h=Math.round(bounds.height),pixelRatio=Math.min(devicePixelRatio||1,1.5);
- if(canvas.width!==Math.floor(w*pixelRatio)||canvas.height!==Math.floor(h*pixelRatio)){canvas.width=Math.floor(w*pixelRatio);canvas.height=Math.floor(h*pixelRatio);}
- const c=canvas.getContext('2d');c.setTransform(pixelRatio,0,0,pixelRatio,0,0);
- c.fillStyle='#06101e';c.fillRect(0,0,w,h);
- const size=27*atlas.zoom,px=atlas.x/CHUNK,py=atlas.y/CHUNK;
- const left=Math.floor(px-w/(2*size))-1,right=Math.ceil(px+w/(2*size))+1,top=Math.floor(py-h/(2*size))-1,bottom=Math.ceil(py+h/(2*size))+1;
- const tiles=(right-left+1)*(bottom-top+1),sampleStep=Math.max(1,Math.ceil(Math.sqrt(tiles/2600)));
- const tileSize=size*sampleStep;
- const colors={normal:'#7d9eb5',rich:'#a9e4bc',nebula:'#c59eff',void:'#9bd9ef',relic:'#f3d58e',anomaly:'#d691ef'};
- // Deterministic underlying biome colors are intentionally faint until explored.
- const startX=Math.floor(left/sampleStep)*sampleStep,startY=Math.floor(top/sampleStep)*sampleStep;
- let exhausted=0;
- for(let cy=startY;cy<=bottom;cy+=sampleStep)for(let cx=startX;cx<=right;cx+=sampleStep){
-  const x=w/2+(cx-px)*size,y=h/2+(cy-py)*size;
-  const info=chunkInfo(cx,cy);
-  c.fillStyle=sampleStep===1?'rgba(12,31,49,.70)':'rgba(21,44,65,.55)';c.fillRect(x,y,tileSize+.5,tileSize+.5);
-  if(tileSize>=5){c.strokeStyle='rgba(89,120,154,.12)';c.lineWidth=.7;c.strokeRect(x+.5,y+.5,tileSize,tileSize);}
-  if(sampleStep===1){
-   const key=chunkKey(cx,cy);if(!visitedChunks.has(key))continue;
-   const quota=sectorQuota(info,cx,cy),mask=(g.depleted[key]||0)>>>0;
-   const removed=popcount32(mask&(quota===32?0xffffffff:((1<<quota)-1)>>>0));
-   const remaining=quota-removed;if(!remaining)exhausted++;
-   c.fillStyle=remaining===0?'rgba(82,104,126,.75)':colors[info.biome]+'bb';
-   c.fillRect(x+.6,y+.6,Math.max(1,tileSize-1.2),Math.max(1,tileSize-1.2));
-  }
+ if(surface.width!==Math.floor(w*pixelRatio)||surface.height!==Math.floor(h*pixelRatio)){surface.width=Math.floor(w*pixelRatio);surface.height=Math.floor(h*pixelRatio);}
+ const c=surface.getContext('2d'),scale=atlasScale();
+ const projectMap=(x,y)=>({x:w/2+(x-atlas.x)*scale,y:h/2+(y-atlas.y)*scale});
+ c.setTransform(pixelRatio,0,0,pixelRatio,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';
+ c.fillStyle='#050b17';c.fillRect(0,0,w,h);
+ // Exploration footprints stay in their real world coordinates at every scale.
+ c.fillStyle='rgba(40,124,153,.18)';
+ for(const d of g.discoveryDiscs){
+  const q=projectMap(d[0]*CHUNK,d[1]*CHUNK),r=d[2]*CHUNK*scale;
+  if(q.x+r<0||q.x-r>w||q.y+r<0||q.y-r>h)continue;
+  if(r>Math.hypot(w,h)+Math.hypot(q.x-w/2,q.y-h/2)){c.fillRect(0,0,w,h);continue;}
+  c.beginPath();c.arc(q.x,q.y,r,0,TAU);c.fill();
  }
- // When the atlas zooms out, sampling biome cells misses the player's visited
- // tiles. Aggregate VISITED coordinates into the same raster bins and draw them
- // on top, independent of which representative tile was sampled above.
- if(sampleStep>1){
-  const bins=new Map();
-  for(const key of visitedChunks){
-   const comma=key.indexOf(',');if(comma<0)continue;
-   const cx=Number(key.slice(0,comma)),cy=Number(key.slice(comma+1));
-   if(cx<left-sampleStep||cx>right+sampleStep||cy<top-sampleStep||cy>bottom+sampleStep)continue;
-   const bx=Math.floor(cx/sampleStep),by=Math.floor(cy/sampleStep),bkey=bx+','+by;
-   bins.set(bkey,(bins.get(bkey)||0)+1);
-  }
-  for(const [key,count] of bins){
-   const comma=key.indexOf(','),cx=Number(key.slice(0,comma))*sampleStep,cy=Number(key.slice(comma+1))*sampleStep;
-   const x=w/2+(cx-px)*size,y=h/2+(cy-py)*size;
-   const strength=clamp(.55+Math.log2(1+count)*.075,.6,1);
-   c.globalAlpha=strength;c.fillStyle='#67cdec';
-   c.fillRect(x,y,Math.max(2,tileSize),Math.max(2,tileSize));c.globalAlpha=1;
-  }
+ const sectorPx=CHUNK*scale;
+ c.fillStyle='rgba(70,174,194,.35)';
+ for(const key of visitedChunks){
+  const comma=key.indexOf(','),cx=Number(key.slice(0,comma)),cy=Number(key.slice(comma+1));
+  const p=projectMap(cx*CHUNK,cy*CHUNK);
+  if(p.x+sectorPx<0||p.y+sectorPx<0||p.x>w||p.y>h)continue;
+  c.fillRect(p.x,p.y,Math.max(1,sectorPx),Math.max(1,sectorPx));
  }
- // The exploration discs are stored geometry, not map artwork. Rasterize
- // their UNION onto aligned sector blocks; never draw overlapping circles.
- const group=Math.pow(2,Math.max(0,Math.ceil(Math.log2(7/size))));
- const groupPx=size*group;
- const baseX=Math.floor(left/group)*group,baseY=Math.floor(top/group)*group;
- const columns=Math.min(220,Math.ceil((right-baseX)/group)+1);
- const rows=Math.min(170,Math.ceil((bottom-baseY)/group)+1);
- const explored=new Uint8Array(columns*rows);
- const discs=Array.isArray(g.discoveryDiscs)?g.discoveryDiscs:[];
- for(const d of discs){
-  if(!Array.isArray(d)||d.length!==3)continue;
-  const [cx,cy,r]=d;if(![cx,cy,r].every(Number.isFinite)||r<0)continue;
-  const minX=Math.max(0,Math.floor((cx-r-baseX)/group)-1),maxX=Math.min(columns-1,Math.floor((cx+r-baseX)/group)+1);
-  const minY=Math.max(0,Math.floor((cy-r-baseY)/group)-1),maxY=Math.min(rows-1,Math.floor((cy+r-baseY)/group)+1);
-  const r2=r*r;
-  for(let gy=minY;gy<=maxY;gy++){
-   const y0=baseY+gy*group,y1=y0+group,dy=cy<y0?y0-cy:cy>y1?cy-y1:0;
-   if(dy*dy>r2)continue;
-   for(let gx=minX;gx<=maxX;gx++){
-    const x0=baseX+gx*group,x1=x0+group,dx=cx<x0?x0-cx:cx>x1?cx-x1:0;
-    if(dx*dx+dy*dy<=r2)explored[gy*columns+gx]=1;
-   }
-  }
+ // Adaptive grid uses fixed world units and bounded local loop counters.
+ const gridWorld=atlasNiceDistance(105/scale/CHUNK)*CHUNK,gridPx=gridWorld*scale;
+ const gridX=Math.floor((atlas.x-w/2/scale)/gridWorld),gridY=Math.floor((atlas.y-h/2/scale)/gridWorld);
+ c.strokeStyle='rgba(114,172,204,.13)';c.lineWidth=1;c.beginPath();
+ for(let i=0;i<Math.ceil(w/gridPx)+2;i++){const x=w/2+((gridX+i)*gridWorld-atlas.x)*scale;c.moveTo(x,0);c.lineTo(x,h);}
+ for(let i=0;i<Math.ceil(h/gridPx)+2;i++){const y=h/2+((gridY+i)*gridWorld-atlas.y)*scale;c.moveTo(0,y);c.lineTo(w,y);}
+ c.stroke();
+ function plotBody(e,opacity=1){
+  const p=projectMap(e.x,e.y);if(p.x<-20||p.y<-20||p.x>w+20||p.y>h+20)return;
+  const r=clamp(e.r*scale*.35,1.5,18)*(e.absorbScale??1);
+  c.globalAlpha=clamp(opacity,0,1)*.8;
+  c.fillStyle=e.kind==='blackhole'?'#03070f':GALAXY_PALETTES[(e.palette||0)%9][0];
+  c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.fill();
+  if(e.kind==='blackhole'){c.strokeStyle='#d8b5ff';c.lineWidth=1;c.stroke();}
  }
- c.save();c.fillStyle='#42afcc';c.globalAlpha=group>8?.53:.41;
- for(let gy=0;gy<rows;gy++)for(let gx=0;gx<columns;gx++){
-  if(!explored[gy*columns+gx])continue;
-  const x=w/2+(baseX+gx*group-px)*size,y=h/2+(baseY+gy*group-py)*size;
-  if(x>=w||y>=h||x+groupPx<=0||y+groupPx<=0)continue;
-  c.fillRect(x+.25,y+.25,Math.max(.5,groupPx-.5),Math.max(.5,groupPx-.5));
- }
- c.restore();
- // Keep the player's marker small even when its physical horizon covers
- // millions of sectors. Local scale is shown in the separate 11x11 grid.
- const mx=w/2+(player.x-atlas.x)*size/CHUNK,my=h/2+(player.y-atlas.y)*size/CHUNK;
- // Readable local sector grid, independent of atlas zoom. The previous
- // atlas became sub-pixel at 0.008x, hiding every adjacent discovered cell.
- const insetCell=15,insetN=11,insetSize=insetCell*insetN;
- const bx=w-insetSize-16,by=h-insetSize-31;
- c.fillStyle='rgba(4,17,31,.94)';c.fillRect(bx-9,by-22,insetSize+18,insetSize+33);
- c.strokeStyle='rgba(130,210,242,.5)';c.strokeRect(bx-9,by-22,insetSize+18,insetSize+33);
- c.fillStyle='#b1e9ff';c.font='bold 10px Inter,sans-serif';c.fillText('СОСЕДНИЕ СЕКТОРА',bx,by-7);
- const centerCellX=Math.floor(player.x/CHUNK),centerCellY=Math.floor(player.y/CHUNK);
- function exploredCell(cx,cy){
-  const key=chunkKey(cx,cy);if(visitedChunks.has(key))return true;
-  // A cell touched by the giant horizon is discovered, even without an
-  // individual saved key. Test nearest point of its square vs each disc.
-  for(const d of g.discoveryDiscs){const nx=clamp(d[0],cx,cx+1),ny=clamp(d[1],cy,cy+1);
-   if((nx-d[0])**2+(ny-d[1])**2<=d[2]*d[2])return true;}
-  return false;
- }
- let adjacentKnown=0;
- for(let iy=0;iy<insetN;iy++)for(let ix=0;ix<insetN;ix++){
-  const cx=centerCellX+ix-5,cy=centerCellY+iy-5;
-  const known=exploredCell(cx,cy);if(known)adjacentKnown++;
-  const x=bx+ix*insetCell,y=by+iy*insetCell;
-  c.fillStyle=known?'rgba(82,208,236,.85)':'rgba(31,54,74,.9)';
-  c.fillRect(x+.6,y+.6,insetCell-1.2,insetCell-1.2);
-  if(ix===5&&iy===5){c.fillStyle='#fff3b0';c.fillRect(x+5,y+5,5,5);}
- }
- c.fillStyle='#8db5c4';c.font='9px Inter,sans-serif';
- c.fillText(`${adjacentKnown}/121 · масштаб независимый`,bx,by+insetSize+12);
- // Natural black holes are meaningful world locations; mark actual persisted
- // stellar/intermediate/supermassive bodies when zoom permits. Far zoom uses
- // a bounded deterministic cluster marker instead of scanning millions of cells.
  if(g.tier>=13){
-  const leftMacro=Math.floor((atlas.x-w*.5/(size/CHUNK))/MACRO_SIZE)-1;
-  const rightMacro=Math.ceil((atlas.x+w*.5/(size/CHUNK))/MACRO_SIZE)+1;
-  const topMacro=Math.floor((atlas.y-h*.5/(size/CHUNK))/MACRO_SIZE)-1;
-  const bottomMacro=Math.ceil((atlas.y+h*.5/(size/CHUNK))/MACRO_SIZE)+1;
-  const visibleMacro=Math.max(1,(rightMacro-leftMacro+1)*(bottomMacro-topMacro+1));
-  const stride=Math.max(1,2**Math.ceil(Math.log2(Math.max(1,Math.sqrt(visibleMacro/680)))));
-  const firstX=Math.floor(leftMacro/stride)*stride,firstY=Math.floor(topMacro/stride)*stride;
-  c.save();let drawn=0;
-  for(let cy=firstY;cy<=bottomMacro&&drawn<150;cy+=stride)
-   for(let cx=firstX;cx<=rightMacro&&drawn<150;cx+=stride){
-    // At distant zoom each icon represents an actual seeded region, not
-    // a made-up point at the grid intersection.
-    const hash=seedHash(cx*47,cy*83);
-    if(stride===1&&hash%9!==0)continue;
-    if(stride>1&&hash%4!==0)continue;
-    const rng=chunkRandom(seedHash(cx*31+731,cy*37-419)^0x9f4e8b21);
-    const dx=(cx+(stride===1?.09+rng()*.82:rng()*stride))*MACRO_SIZE;
-    const dy=(cy+(stride===1?.09+rng()*.82:rng()*stride))*MACRO_SIZE;
-    const scatter=seedHash(cx*37,cy*59);
-    const bxWorld=dx+(stride===1?((scatter&0xffff)/65535-.5)*MACRO_SIZE*1.35:0);
-    const byWorld=dy+(stride===1?(((scatter>>>16)&0xffff)/65535-.5)*MACRO_SIZE*1.35:0);
-    if(stride===1&&((g.depletedMacro[macroKey(cx,cy)]||0)&1))continue;
-    const px=w/2+(bxWorld-atlas.x)*size/CHUNK,py=h/2+(byWorld-atlas.y)*size/CHUNK;
-    if(px<8||px>w-8||py<8||py>h-8)continue;
-    const ht=hash%17===0?2:hash%5===0?1:0;
-    const colors=['#79e5f6','#cda6ff','#ffcc8a'];
-    c.fillStyle='#02060f';c.strokeStyle=colors[ht];c.lineWidth=1.5;
-    c.beginPath();c.arc(px,py,stride===1?4.1:3.0,0,TAU);c.fill();c.stroke();
-    drawn++;
+  const view=cosmicViewAt(atlas.x,atlas.y,w,h,scale);
+  for(const level of view.levels){
+   const opacity=level===view.low?1-view.fraction:view.fraction;if(opacity<.025)continue;
+   const stride=2**level,firstX=Math.floor(view.left/stride)*stride,firstY=Math.floor(view.top/stride)*stride;
+   const columns=Math.min(36,Math.ceil((view.right-firstX)/stride)+1),rows=Math.min(28,Math.ceil((view.bottom-firstY)/stride)+1);
+   for(let iy=0;iy<rows;iy++)for(let ix=0;ix<columns;ix++){
+    const gx=firstX+ix*stride,gy=firstY+iy*stride,key=level===0?macroKey(gx,gy):`${level}:${gx}:${gy}`;
+    const mask=((level===0?g.depletedMacro:g.depletedCosmic)[key]||0)>>>0;
+    for(const e of (level===0?macroNodes(gx,gy):macroLODNodes(gx,gy,level))){
+     if((mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
+     plotBody(e,opacity);
+    }
    }
-  c.restore();
+  }
+  for(const e of macroEntities)if(e.gravityBound||e.absorbing)plotBody(e);
+  for(const e of cosmicAbsorptions)if(!e.dead)plotBody(e,e.captureOpacity);
  }
- // The origin is spatial, never a second place to respawn.
- const ox=w/2-atlas.x/CHUNK*size,oy=h/2-atlas.y/CHUNK*size;
- if(ox>=-25&&oy>=-25&&ox<w+25&&oy<h+25){c.strokeStyle='#84adc3';c.lineWidth=1.2;c.beginPath();c.arc(ox,oy,6,0,TAU);c.stroke();c.fillStyle='#a0c5d9';c.font='10px Inter, sans-serif';c.fillText('НАЧАЛО',ox+11,oy-8);}
- if(mx>-18&&mx<w+18&&my>-18&&my<h+18){c.save();c.translate(mx,my);c.shadowColor='#76eaff';c.shadowBlur=15;c.fillStyle='#b7f5ff';c.beginPath();c.moveTo(0,-10);c.lineTo(8,8);c.lineTo(0,4);c.lineTo(-8,8);c.closePath();c.fill();c.restore();}
- c.strokeStyle='rgba(147,200,234,.17)';c.beginPath();c.moveTo(w/2-13,h/2);c.lineTo(w/2+13,h/2);c.moveTo(w/2,h/2-13);c.lineTo(w/2,h/2+13);c.stroke();
- $('atlas-coords').textContent=`X ${Math.floor(atlas.x/CHUNK)} · Y ${Math.floor(atlas.y/CHUNK)} / масштаб ${atlas.zoom<.1?atlas.zoom.toFixed(3):atlas.zoom.toFixed(2)}×`;
- $('atlas-count').textContent=`Исследовано ≈ ${fmt(exploredCount())} секторов · ${sampleStep>1?'Обзор '+sampleStep+'×'+sampleStep+' · ':''}областей чёрной дыры: ${g.discoveryDiscs.length} · рядом ${adjacentKnown}/121`;
+ c.globalAlpha=1;
+ const playerPoint=projectMap(player.x,player.y);
+ // Both the event horizon and gravity field are drawn at their TRUE map size.
+ const bodyRadius=(g.endless?blackHoleCoreWorldRadius():player.r)*scale;
+ const gravityRadius=(g.endless?blackHoleGravityRadius():(97+g.upgrade.gravity*7)*tester.gravity)*scale;
+ if(gravityRadius<Math.max(w,h)*20){
+  c.strokeStyle='rgba(173,145,255,.65)';c.lineWidth=1;c.setLineDash([5,6]);
+  c.beginPath();c.arc(playerPoint.x,playerPoint.y,gravityRadius,0,TAU);c.stroke();c.setLineDash([]);
+ }
+ if(bodyRadius<Math.max(w,h)*20){
+  c.fillStyle=g.endless?'#010205':'#9ce9ff';c.strokeStyle='#9ce9ff';c.lineWidth=1.5;
+  c.beginPath();c.arc(playerPoint.x,playerPoint.y,bodyRadius,0,TAU);c.fill();c.stroke();
+ }
+ // The rectangular frame is the actual camera footprint, not a fixed inset.
+ const viewCenter=projectMap(camera.x,camera.y),viewW=W/camera.zoom*scale,viewH=H/camera.zoom*scale;
+ c.strokeStyle='rgba(132,224,242,.8)';c.lineWidth=1;c.strokeRect(viewCenter.x-viewW/2,viewCenter.y-viewH/2,viewW,viewH);
+ if(playerPoint.x>=0&&playerPoint.y>=0&&playerPoint.x<=w&&playerPoint.y<=h){
+  c.fillStyle='#f1f8ff';c.beginPath();c.arc(playerPoint.x,playerPoint.y,2.5,0,TAU);c.fill();
+  c.font='600 10px Inter,sans-serif';c.fillText('ТЫ',playerPoint.x+Math.max(9,bodyRadius+7),playerPoint.y-5);
+ }
+ const origin=projectMap(0,0);
+ if(origin.x>15&&origin.y>15&&origin.x<w-70&&origin.y<h-20){
+  c.strokeStyle='#9caebf';c.beginPath();c.arc(origin.x,origin.y,4,0,TAU);c.stroke();
+  c.fillStyle='#91a5b9';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
+ }
+ // Always-readable scale bar, in real sectors (not invented light-years).
+ const barSectors=atlasNiceDistance(Math.min(150,w*.28)/sectorPx),barPx=barSectors*sectorPx;
+ c.fillStyle='rgba(4,11,23,.94)';c.fillRect(12,h-59,Math.max(172,barPx+32),47);
+ c.strokeStyle='#d0eaf5';c.lineWidth=2;c.beginPath();c.moveTo(24,h-24);c.lineTo(24+barPx,h-24);
+ c.moveTo(24,h-29);c.lineTo(24,h-19);c.moveTo(24+barPx,h-29);c.lineTo(24+barPx,h-19);c.stroke();
+ c.fillStyle='#c6e3f0';c.font='600 11px Inter,sans-serif';c.fillText(`${atlasNumber(barSectors)} сект.`,24,h-38);
+ $('atlas-diameter').textContent=atlasNumber((g.endless?blackHoleCoreWorldRadius():player.r)*2/CHUNK)+' сект.';
+ $('atlas-viewport').textContent=atlasNumber(W/camera.zoom/CHUNK)+' сект.';
+ $('atlas-span').textContent=atlasNumber(w/scale/CHUNK)+' сект.';
+ $('atlas-coords').textContent=`X ${atlasNumber(atlas.x/CHUNK)} · Y ${atlasNumber(atlas.y/CHUNK)}`;
+ $('atlas-count').textContent=`Исследовано ≈ ${atlasNumber(exploredCount())} секторов`;
  atlas.dirty=false;
 }
 function showMap(){
  atlas={x:player.x,y:player.y,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
- show(`<div class="atlas-top"><div><div class="eyebrow">ГАЛАКТИЧЕСКАЯ НАВИГАЦИЯ</div><div class="overlay-title">БЕСКОНЕЧНАЯ КАРТА</div></div><span class="atlas-north">N ↑</span></div>
- <p class="atlas-description">Каждый сектор существует на постоянных координатах. Поглощённая материя не восстанавливается. Исследуй новые области и отдаляй карту до масштаба скоплений галактик.</p>
+ show(`<div class="atlas-top"><div><div class="eyebrow">ГАЛАКТИЧЕСКАЯ НАВИГАЦИЯ</div><div class="overlay-title">МАСШТАБ ВСЕЛЕННОЙ</div></div><span class="atlas-north">N ↑</span></div>
+ <div class="atlas-measures"><div><small>${g.endless?'ДИАМЕТР ГОРИЗОНТА':'ТВОЙ ДИАМЕТР'}</small><strong id="atlas-diameter"></strong></div><div><small>ШИРИНА ИГРОВОГО ЭКРАНА</small><strong id="atlas-viewport"></strong></div><div><small>ШИРИНА КАРТЫ</small><strong id="atlas-span"></strong></div></div>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
- <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Интерактивная процедурная карта галактики — перетаскивайте, чтобы перемещать карту"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить">−</button><button id="atlas-center" class="atlas-control center" title="Показать моё местоположение">⌖</button></div></div>
- <div class="atlas-legend"><span><i class="atlas-mark you"></i>ТЫ</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span><i class="atlas-mark rich"></i>КРИСТАЛЛЫ</span><span><i class="atlas-mark relic"></i>ПЛАЗМА</span><span style="color:#91d8f9">❄ ЛЁД</span><span style="color:#b49afe">◌ ГАЗ</span><span style="color:#d68af2">✧ ЭКЗОМАТЕРИЯ</span><span><i class="atlas-mark empty"></i>ОПУСТОШЕНО</span><span style="color:#a9e2ff">◉ ЧЁРНЫЕ ДЫРЫ</span></div>
- <div class="atlas-footer"><small>Перетаскивай карту · Колёсико или +/− меняют масштаб вплоть до 0,008× · Дальние сектора отображаются группами</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
- $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;atlas.dirty=true;attachContinue();
- const cv=$('atlas-canvas');cv.style.touchAction='none';
+ <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">−</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">⌖</button></div></div>
+ <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span></div>
+ <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Все расстояния — в секторах мира.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
+ $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
+ const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
  cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
- cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;const f=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/f;atlas.y-=(ev.clientY-atlas.lastY)/f;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
+ cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
  cv.addEventListener('pointerup',()=>atlas.drag=false);cv.addEventListener('pointercancel',()=>atlas.drag=false);
- cv.addEventListener('wheel',ev=>{ev.preventDefault();atlas.zoom=clamp(atlas.zoom*(ev.deltaY>0?.82:1.22),.008,4.2);atlas.dirty=true;},{passive:false});
- $('atlas-zoom-in').onclick=()=>{atlas.zoom=clamp(atlas.zoom*1.3,.008,4.2);atlas.dirty=true;};
- $('atlas-zoom-out').onclick=()=>{atlas.zoom=clamp(atlas.zoom/1.3,.008,4.2);atlas.dirty=true;};
- $('atlas-center').onclick=()=>{atlas.x=player.x;atlas.y=player.y;atlas.dirty=true;};
+ cv.addEventListener('wheel',ev=>{ev.preventDefault();const box=cv.getBoundingClientRect();changeAtlasZoom(Math.exp(-clamp(ev.deltaY,-300,300)*.002),ev.clientX-box.left,ev.clientY-box.top);},{passive:false});
+ $('atlas-zoom-in').onclick=()=>changeAtlasZoom(1.4);
+ $('atlas-zoom-out').onclick=()=>changeAtlasZoom(1/1.4);
+ $('atlas-center').onclick=atlasFitPlayer;
  requestAnimationFrame(drawAtlas);
 }
+
 function showPause(){show(`<div class="hero-kicker">ПУТЕШЕСТВИЕ ПРИОСТАНОВЛЕНО</div><div class="overlay-title">ПАУЗА</div><p class="overlay-copy">Твоё место во Вселенной сохранено. Материя и улучшения останутся с тобой.</p><div class="stat-list"><div><strong>${fmt(g.total)}</strong><small>Всего материи</small></div><div><strong>${timeFmt(g.time)}</strong><small>Игровое время</small></div><div><strong>${g.collects}</strong><small>Поглощено объектов</small></div><div><strong>${g.rare}</strong><small>Реликвий найдено</small></div></div><div class="modal-actions">${continueButton()}<button id="pause-map" class="secondary-button">Карта</button></div>`);attachContinue();$('pause-map').onclick=showMap;}
 function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function restartCampaign(){
