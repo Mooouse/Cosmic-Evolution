@@ -105,3 +105,11 @@
 @media(pointer:coarse) and (max-height:500px){.flight-stick{bottom:18px;width:104px;height:104px}.center-abilities{bottom:22px}}
 
 .atlas-measures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:10px 0 16px}.atlas-measures>div{padding:12px 14px;border:1px solid #284554;background:#0a1723;border-radius:6px}.atlas-measures small{display:block;font-size:9px;letter-spacing:1px;color:#86a9bb;margin-bottom:8px}.atlas-measures strong{font-size:clamp(13px,1.7vw,20px);font-weight:600;color:#d4f3ff;overflow-wrap:anywhere}.gravity-key{color:#b8a2ff}@media(max-width:650px){.atlas-measures{gap:5px;margin:5px 0 10px}.atlas-measures>div{padding:9px 7px}.atlas-measures small{font-size:8px;line-height:1.4;letter-spacing:.3px}.atlas-measures strong{font-size:12px}.atlas-legend{line-height:1.5}.atlas-wrap{height:44vh}}
+
+/* Observatory atlas and lethal landmarks. */
+.atlas-danger-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 12px;margin-bottom:10px;border-left:2px solid #9c757d;background:#10151e;color:#aebbc8;font-size:11px;line-height:1.6;text-align:left}
+.atlas-danger-bar .secondary-button{flex-shrink:0;min-height:34px;padding:7px 12px;font-size:10px;letter-spacing:.6px}
+.abyss-key{color:#bd9299}.atlas-mark.known{border-radius:0;background:#375765}.atlas-mark.you{width:6px;height:6px;background:#c6e2ec}
+.abyss-warning{position:fixed;z-index:12;bottom:110px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 28px);padding:10px 16px;border:1px solid #8c6671;background:#100e18ed;color:#edd5dc;font-size:11px;line-height:1.5;text-align:center;pointer-events:none;box-shadow:0 4px 25px #0008}
+.abyss-warning[hidden]{display:none}
+@media(max-width:650px){.atlas-danger-bar{flex-direction:column;align-items:stretch;gap:5px;font-size:10px}.atlas-danger-bar .secondary-button{width:100%}.abyss-warning{bottom:140px;font-size:10px}}

@@ -116,7 +116,7 @@ function traceFrame(lensFails=false){
   sky(){calls.push("sky")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
   renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
-  renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
+  renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
   paintBlackHole(){calls.push("blackhole")},project(){return{x:960,y:540}},
   player:{x:0,y:0,r:200},camera:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
   screenFlash:0,shake:0,entities:[{}],blackHoleLensRetryAt:0,renderTicks:0,
@@ -267,7 +267,7 @@ console.log('PASS: map fits real viewport and horizon; readable scale at four ex
 {
  const active=new Set(),entities=[];
  const sim={W:1920,H:1080,CHUNK:480,camera:{zoom:.08,x:0,y:0},player:{x:0,y:0},
-  g:{endless:true,depleted:{}},loadedChunks:new Set(),absorbingMacroKeys:active,entities,
+  g:{endless:true,depleted:{}},abyssPhysical:[],loadedChunks:new Set(),absorbingMacroKeys:active,entities,
   seedHash:()=>0,chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
   blackHoleGravityRadius:()=>1e8,absorptionKey:e=>`${e.chunk}:${e.index}`,
   distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:8,index:0,chunk:`${cx},${cy}`,material:'ore',value:10}]};
@@ -285,7 +285,7 @@ console.log('PASS: distant dust becomes physical without duplicate sector slots'
 // simply shifting all samples outwards (which never produces a donut).
 const lensStart=game.indexOf('const EINSTEIN_RING_SCALE=');
 const lensStop=game.indexOf('let gpuLens=',lensStart);
-const lensBox={BLACK_HOLE_CORE_FRACTION:.245,clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+const lensBox={tester:{ring:1},BLACK_HOLE_CORE_FRACTION:.245,clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
 vm.createContext(lensBox);
 vm.runInContext(game.slice(lensStart,lensStop),lensBox);
 for(const R of [8,80,300,1000]){
@@ -303,3 +303,87 @@ for(const R of [8,80,300,1000]){
  assert.ok(Math.abs(derivative-1)<.001,'No seam at lens boundary');
 }
 console.log('PASS: Einstein ring, reversed inner image, scale invariance and seamless outer edge');
+
+// Ring control changes the mapping immediately and stays outside the horizon.
+for(const factor of [.6,1,1.8,2.5]){
+ lensBox.tester.ring=factor;
+ const R=200,ring=R*.245*2.05*factor;
+ assert.ok(ring>R*.245);
+ assert.ok(Math.abs(lensBox.lensSourceRadius(ring,R,R*2.3))<1e-8);
+}
+console.log('PASS: tester ring size works from 0.6x through 2.5x');
+
+// The middle zoom band (including roughly 3x player size) used to fall back
+// to the square streaming patch. Execute the actual render dispatch there.
+const distantStart=game.indexOf('function renderDistantBodies(){');
+const distantStop=game.indexOf('\nfunction respawn(',distantStart);
+for(const zoom of [.4,.25,.19,.13,.08]){
+ let calls=0;const box={g:{endless:true},camera:{zoom},renderCosmicDust(){calls++}};
+ vm.createContext(box);vm.runInContext(game.slice(distantStart,distantStop),box);
+ box.renderDistantBodies();assert.equal(calls,1,'Every endless zoom must use viewport-wide resources');
+}
+console.log('PASS: viewport-wide resources also render through the 3x-size zoom band');
+
+// Execute generation and gravity at ordinary and extreme coordinates.
+const abyssStart=game.indexOf('const ABYSS_BASE=');
+const abyssStop=game.indexOf('function refreshAbysses()',abyssStart);
+const seedStart=game.indexOf('function seedHash('),seedStop=game.indexOf('\nfunction chunkInfo(',seedStart);
+const abyssBox={CHUNK:480,WORLD_SEED:0x17aba37,player:{x:0,y:0,r:300},
+ clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+vm.createContext(abyssBox);
+vm.runInContext(game.slice(seedStart,seedStop)+game.slice(abyssStart,abyssStop),abyssBox);
+const nearest=abyssBox.nearestAbyss();assert.ok(nearest&&nearest.r>300*20);
+assert.ok(Math.hypot(nearest.x,nearest.y)>nearest.r*5,'Spawn must be outside the danger field');
+const original=JSON.stringify(nearest);assert.equal(JSON.stringify(abyssBox.nearestAbyss()),original);
+for(const radius of [1e4,1e50,1e110,1e140]){
+ const h={x:radius*10,y:-radius*10,r:radius};
+ const far=abyssBox.abyssPull(h,h.x+radius*6,h.y,200);
+ assert.equal(far.x,0);assert.equal(far.y,0);
+ const pull=abyssBox.abyssPull(h,h.x+radius*2,h.y,200);
+ assert.ok(pull.x<0&&Number.isFinite(pull.x));
+ assert.ok(abyssBox.crossesAbyss(h,h.x-radius*2,h.y,h.x+radius*2,h.y),'Fast flight cannot tunnel through horizon');
+ assert.ok(!abyssBox.crossesAbyss(h,h.x-radius*2,h.y+radius*2,h.x+radius*2,h.y+radius*2));
+ abyssBox.player={x:radius*10,y:-radius*10,r:radius/50};
+ const large=abyssBox.nearestAbyss();assert.ok(large&&Number.isFinite(large.r));
+ const bodies=abyssBox.abyssCandidates(h.x,h.y,radius*5,radius/100);
+ assert.ok(bodies.length<1000,'Landmark query must stay bounded');
+ assert.equal(new Set(bodies.map(e=>e.id)).size,bodies.length);
+}
+console.log('PASS: permanent giant landmarks, safe origin, attraction and swept lethal collision up to 1e140');
+
+// Run the actual loss/reset path, including the write to the active save.
+const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction testerRefresh()',resetStart);
+const freshStart=game.indexOf('const fresh ='),freshStop=game.indexOf('\nlet g =',freshStart);
+const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='';
+const resetBox={g:{tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,particles:false,controlMode:'keys',flightFeel:'direct'},
+ cosmicAbsorptions:[{}],absorbingMacroKeys:new Set(['taken']),visitedChunks:new Set(['1,1']),loadedChunks:new Set(['1,1']),distantChunkCache:new Map(),macroLoaded:new Set(),macroCache:new Map(),macroLODCache:new Map(),macroBackdrop:null,macroBackdropOld:null,macroEntities:[{}],entities:[{}],
+ TEST_MODE:false,tester:{ring:1.5},player:{x:123,y:456,r:1e20,vx:200,vy:300},camera:{x:123,y:456,zoom:1e-10},particles:[{}],shockwaves:[{}],energyArcs:[{}],texts:[{}],radiusAt:()=>13,
+ $:()=>resetNode,visitPosition(){},streamField(){},renderUI(){},testerRefresh(){},testerToggle(){},clearFlightInput(){},
+ fmt:String,timeFmt:String,continueButton:()=>'<button>НАЧАТЬ С НУЛЯ</button>',attachContinue(){},
+ save(){savedDeath=JSON.parse(JSON.stringify(resetBox.g))},show(html){deathScreen=html},
+ running:true,pulseCd:13,boostCd:6,boostTime:1};
+vm.createContext(resetBox);vm.runInContext(game.slice(freshStart,freshStop)+game.slice(resetStart,resetStop),resetBox);
+resetBox.dieInAbyss({name:'ЭРЕБ'});
+assert.equal(savedDeath.tier,0);assert.equal(savedDeath.matter,0);assert.equal(savedDeath.credits,0);
+assert.equal(savedDeath.upgrade.gravity,0);assert.equal(savedDeath.materials.exotic,0);
+assert.equal(Object.keys(savedDeath.depleted).length,0);assert.equal(resetBox.cosmicAbsorptions.length,0);
+assert.equal(resetBox.player.x,0);assert.equal(resetBox.player.vx,0);assert.equal(resetBox.camera.zoom,1);
+assert.equal(resetBox.running,false);assert.equal(resetBox.boostCd,0);
+assert.equal(savedDeath.music,false);assert.equal(savedDeath.controlMode,'keys');
+assert.equal(resetBox.tester.ring,1.5);assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
+console.log('PASS: death resets and saves all progression, retains preferences and pauses simulation');
+
+// A rival consumes matter without awarding it to the player or reviving it.
+const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
+let rivalMarks=0;
+const rivalBox={abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
+ abyssPull:abyssBox.abyssPull,crossesAbyss:abyssBox.crossesAbyss,absorptionKey:e=>e.index,
+ markHarvested(){rivalMarks++},cosmicSceneDirty:false};
+vm.createContext(rivalBox);vm.runInContext(game.slice(rivalStart,rivalStop),rivalBox);
+const matter={x:1100,y:0,index:1};assert.ok(rivalBox.pullBodyIntoAbyss(matter,.05));
+assert.ok(matter.x<1100&&!matter.dead,'Rival attracts before contact');
+assert.ok(rivalBox.pullBodyIntoAbyss(matter,.5));assert.equal(matter.dead,true);assert.equal(rivalMarks,1);
+rivalBox.pullBodyIntoAbyss(matter,.5);assert.equal(rivalMarks,1);
+const bag={},galaxy={x:1001,y:0,index:4,captureBag:bag,captureKey:'galaxy'};
+rivalBox.pullBodyIntoAbyss(galaxy,.5);assert.equal(bag.galaxy,1<<4);
+console.log('PASS: rival gravity consumes dust and distant galaxies exactly once without rewards');

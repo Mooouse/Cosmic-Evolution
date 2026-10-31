@@ -7,7 +7,7 @@
   <meta name="description" content="Cosmic Evolution — 2D космическая игра про гравитацию, рост и эволюцию от пылинки до Вселенной." />
   <title>Cosmic Evolution — From Dust to Infinity</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="styles.css?v=3.16.0" />
+  <link rel="stylesheet" href="styles.css?v=3.17.0" />
 </head>
 <body>
   <canvas id="universe" aria-label="Игровое поле Cosmic Evolution"></canvas>
@@ -37,6 +37,7 @@
     <div class="zoom-indicator"><span>◌</span><span id="zoom-label">МАСШТАБ 1×</span></div>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
   </div>
+  <div id="abyss-warning" class="abyss-warning" hidden role="status"></div>
   <section id="tester-panel" class="tester-panel hidden" aria-label="Панель тестирования" aria-hidden="true">
     <div class="tester-header"><div><small>РАЗРАБОТКА / F2</small><strong>ТЕСТЕРСКАЯ ПАНЕЛЬ</strong></div><button id="tester-close" type="button" title="Закрыть панель">×</button></div>
     <div id="tester-stats" class="tester-stats">FPS / объекты / координаты</div>
@@ -46,11 +47,13 @@
     <label class="tester-line"><span>Гравитация <b data-test-value="gravity">1×</b></span><input data-test="gravity" type="range" min=".5" max="8" step=".25" value="1"></label>
     <label class="tester-line"><span>Сбор материи <b data-test-value="loot">1×</b></span><input data-test="loot" type="range" min=".25" max="30" step=".25" value="1"></label>
     <label class="tester-line"><span>Масштаб камеры <b data-test-value="zoom">1×</b></span><input data-test="zoom" type="range" min=".2" max="6" step=".1" value="1"></label>
+    <label class="tester-line"><span>Размер бублика <b data-test-value="ring">1×</b></span><input data-test="ring" aria-label="Размер бублика" type="range" min=".6" max="2.5" step=".05" value="1"></label>
     <label class="tester-line"><span>Плотность добычи <b data-test-value="density">16/32</b></span><input data-test="density" type="range" min="4" max="32" step="1" value="16"></label>
     <label class="tester-line"><span>Звёздная пыль (баланс)</span><input id="tester-credits" type="number" min="0" max="1000000000000" step="1000" value="0"></label>
     <div class="tester-actions">
       <button id="tester-missions" type="button">✓ Выполнить задачи</button>
       <button id="tester-next" type="button">↑ Следующая форма</button>
+      <button id="tester-abyss" type="button">◉ К сверхмассивной дыре</button>
       <button id="tester-jump" type="button">➤ +10 секторов</button>
       <button id="tester-reset-mods" type="button">↻ Сбросить множители</button>
       <button id="tester-new-game" type="button" class="danger">⟲ Новая игра</button><button id="tester-copy-save" class="tester-copy" type="button">⇄ Копировать сохранение</button>
@@ -58,6 +61,6 @@
     <p class="tester-note">Тестовые параметры сохраняются отдельно. Изменения стадии и валюты влияют на текущее сохранение. Сектора и собранная материя остаются постоянными.</p>
   </section>
   <div id="modal" class="modal-backdrop"><div class="modal-card intro-card"><div class="hero-art" aria-hidden="true"><div class="hero-ring r1"></div><div class="hero-ring r2"></div><div class="hero-ring r3"></div><div class="hero-core"></div><span class="hero-star s1">✦</span><span class="hero-star s2">✦</span><span class="hero-star s3">✧</span></div><div class="hero-kicker">ТВОЯ ВСЕЛЕННАЯ НАЧИНАЕТСЯ ЗДЕСЬ</div><h1>COSMIC<br/><span>EVOLUTION</span></h1><p class="modal-lead">Начни с одной частицы. Поглощай материю, развивай гравитацию и стань бесконечно растущей чёрной дырой.</p><div class="intro-features"><span>✧ 28 форм эволюции</span><span>◉ Свободный космос</span><span>◈ Исследуй новые секторы</span></div><button id="btn-start" class="primary-button">НАЧАТЬ ЭВОЛЮЦИЮ <span>→</span></button><small class="intro-note">Плавный полёт за курсором / WASD / мобильный джойстик · E — импульс · Shift — рывок · Оригинальная космическая музыка · Автосохранение</small></div></div>
-  <script src="game.js?v=3.16.0" defer></script>
+  <script src="game.js?v=3.17.0" defer></script>
 </body>
 </html>

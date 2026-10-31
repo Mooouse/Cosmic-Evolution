@@ -65,7 +65,7 @@ function stageRecipe(t=g.tier){
 const TEST_MODE = new URLSearchParams(location.search).get('tester')==='1';
 const SAVE_KEY = TEST_MODE?'cosmic-evolution-tester-save-v1':'cosmic-evolution-save-v1';
 const TEST_KEY = 'cosmic-evolution-tester-v1';
-const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,density:16,showStats:true});
+const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,ring:1,density:16,showStats:true});
 let tester={...TEST_DEFAULTS};
 try {
  const savedTester=JSON.parse(localStorage.getItem(TEST_KEY)||'null');
@@ -641,6 +641,27 @@ function harvestCosmicLOD(dt){
   absorbingMacroKeys.add(absorptionKey(body));cosmicAbsorptions.push(body);budget--;
  }
 }
+function promoteAbyssMatter(){
+ if(!g.endless||!abyssPhysical.length||cosmicAbsorptions.length>=160)return;
+ const view=cosmicVisibleLOD();let budget=24;
+ for(const level of view.levels){
+  const opacity=level===view.low?1-view.fraction:view.fraction;if(opacity<.025)continue;
+  const stride=2**level,firstX=Math.floor(view.left/stride)*stride,firstY=Math.floor(view.top/stride)*stride;
+  const columns=Math.min(36,Math.ceil((view.right-firstX)/stride)+1),rows=Math.min(28,Math.ceil((view.bottom-firstY)/stride)+1);
+  for(let iy=0;iy<rows;iy++)for(let ix=0;ix<columns;ix++){
+   const gx=firstX+ix*stride,gy=firstY+iy*stride,key=level===0?macroKey(gx,gy):`${level}:${gx}:${gy}`;
+   if(level===0&&macroLoaded.has(key))continue;
+   const bag=level===0?g.depletedMacro:g.depletedCosmic,mask=(bag[key]||0)>>>0;
+   for(const e of (level===0?macroNodes(gx,gy):macroLODNodes(gx,gy,level))){
+    if(budget<=0||cosmicAbsorptions.length>=160)return;
+    if((mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
+    if(!abyssPhysical.some(h=>Math.hypot(e.x-h.x,e.y-h.y)<h.r*5))continue;
+    const body={...e,cosmic:true,gravityBound:true,rivalBound:true,vx:0,vy:0,captureBag:bag,captureKey:key,captureOpacity:opacity};
+    absorbingMacroKeys.add(absorptionKey(body));cosmicAbsorptions.push(body);budget--;
+   }
+  }
+ }
+}
 function finishCosmicAbsorption(e){
  const bag=e.captureBag,key=e.captureKey,mask=(bag[key]||0)>>>0;
  if(mask&(1<<e.index)){e.dead=true;return;}
@@ -763,7 +784,8 @@ function streamField(){
  if(CHUNK*camera.zoom<2||!Number.isSafeInteger(Math.floor(player.x/CHUNK))||!Number.isSafeInteger(Math.floor(player.y/CHUNK))){
   entities=entities.filter(e=>(e.absorbing||e.gravityBound)&&!e.dead);loadedChunks.clear();streamMacroBodies();return;
  }
- // Physics and individual sprites exist only around the player. The far field uses stars/nebulae.
+ // Keep physics bounded; stationary resources use the SAME viewport-wide layer
+ // inside and outside this bubble at every endless-stage zoom.
  // This prevents 4K zoom-outs from loading thousands of gradient/shadow draw calls.
  const cx0=Math.floor(player.x/CHUNK),cy0=Math.floor(player.y/CHUNK);
  const zoom=Math.max(.12,camera.zoom);
@@ -809,7 +831,7 @@ function cosmicDustView(){
  return {zoom,cell,step,left,top,columns:Math.ceil(W/cell/step)+4,rows:Math.ceil(H/cell/step)+4};
 }
 function promoteCosmicDust(){
- if(!g.endless||camera.zoom>=.13)return;
+ if(!g.endless)return;
  const view=cosmicDustView();if(!view)return;
  const {zoom,step,left,top,columns,rows}=view,range=blackHoleGravityRadius()*zoom;
  let budget=64;
@@ -821,7 +843,7 @@ function promoteCosmicDust(){
   for(const e of distantSamples(cx,cy)){
    if(budget<=0)break;
    if(e.index>=quota||(mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
-   if(Math.hypot(e.x-player.x,e.y-player.y)*zoom>range+e.r*zoom)continue;
+   if(Math.hypot(e.x-player.x,e.y-player.y)*zoom>range+e.r*zoom&&!abyssPhysical.some(h=>Math.hypot(e.x-h.x,e.y-h.y)<h.r*5))continue;
    const body={...e,vx:0,vy:0,gravityBound:true};
    absorbingMacroKeys.add(absorptionKey(body));entities.push(body);budget--;
   }
@@ -843,6 +865,7 @@ function renderCosmicDust(){
    if(e.index>=quota||(mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
    const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5;
    if(x<0||y<0||x>W||y>H)continue;
+   if(zoom>=.13){renderEntity(e,0,true);continue;}
    const r=clamp(e.r*zoom*.65,.65,2.8);
    ctx.fillStyle=MATERIALS[e.material]?.color||'#9bbddd';
    ctx.fillRect(x-r,y-r,r*2,r*2);
@@ -853,7 +876,7 @@ function renderCosmicDust(){
 
 function renderDistantBodies(){
  // At giant scales the real macro deposits replace microscopic dust.
- if(g.endless&&camera.zoom<.13){renderCosmicDust();return;}
+ if(g.endless){renderCosmicDust();return;}
  if(g.tier>=18&&camera.zoom<.13)return;
  const zoom=Math.max(.014,camera.zoom),dx=W*.5/zoom,dy=H*.5/zoom;
  const minX=Math.floor((camera.x-dx)/CHUNK)-1,maxX=Math.floor((camera.x+dx)/CHUNK)+1;
@@ -923,6 +946,142 @@ function animateAbsorption(e,dt){
 }
 
 visitPosition();streamField();
+// Permanent, lethal landmarks. Their coordinates/radii are independent of
+// camera zoom, player growth and atlas LOD; origin lies outside every field.
+const ABYSS_BASE=CHUNK*24,ABYSS_STEP=64;
+let abyssPhysical=[],abyssVisual=[],abyssTimer=0,abyssNotice='';
+function abyssCandidates(x,y,extent=0,minRadius=0){
+ const result=[];
+ const first=clamp(Math.floor(Math.log(Math.max(1,minRadius/ABYSS_BASE))/Math.log(ABYSS_STEP)),0,80);
+ const last=clamp(Math.ceil(Math.log(Math.max(1,(Math.max(Math.abs(x),Math.abs(y))+extent)/ABYSS_BASE))/Math.log(ABYSS_STEP))+1,first,80);
+ for(let level=first;level<=last;level++){
+  const base=ABYSS_BASE*ABYSS_STEP**level,cell=base*24;
+  // Tiny cells no longer have representable coordinates this far from zero.
+  if(Math.max(Math.abs(x/cell),Math.abs(y/cell))>1e12)continue;
+  const cx=Math.floor(x/cell),cy=Math.floor(y/cell),n=Math.min(4,Math.ceil(extent/cell)+1);
+  for(let iy=-n;iy<=n;iy++)for(let ix=-n;ix<=n;ix++){
+   const gx=cx+ix,gy=cy+iy,rng=chunkRandom(seedHash(gx,gy)^Math.imul(level+1,1597334677));
+   const px=(gx+.38+rng()*.24)*cell,py=(gy+.38+rng()*.24)*cell;
+   const r=base*(.75+rng()*.5),id=`${level}:${gx}:${gy}`;
+   if(r<minRadius||Math.hypot(px-x,py-y)>extent+r*7)continue;
+   const names=['ЭРЕБ','НИКТА','БЕЗДНА','ЛЕВИАФАН','ГОЛИАФ','ХАОС'];
+   result.push({x:px,y:py,r,level,id,name:names[Math.floor(rng()*names.length)]+' '+(level+1)+' · '+Math.abs(seedHash(gx,gy)%997)});
+  }
+ }
+ return result;
+}
+function nearestAbyss(){
+ // Search with a wide radius at the next truly enormous world scale.
+ const level=clamp(Math.ceil(Math.log(Math.max(1,player.r*18/ABYSS_BASE))/Math.log(ABYSS_STEP)),0,80);
+ const base=ABYSS_BASE*ABYSS_STEP**level;
+ const bodies=abyssCandidates(player.x,player.y,base*40,base*.7);
+ return bodies.sort((a,b)=>(Math.hypot(a.x-player.x,a.y-player.y)-a.r)-(Math.hypot(b.x-player.x,b.y-player.y)-b.r))[0];
+}
+function abyssPull(h,x,y,speed){
+ const dx=h.x-x,dy=h.y-y,d=Math.hypot(dx,dy),q=d/h.r;
+ if(q>=5||d===0)return {x:0,y:0};
+ const influence=clamp((5-q)/4,0,1),v=speed*4.5*influence*influence;
+ return {x:dx/d*v,y:dy/d*v};
+}
+function crossesAbyss(h,x0,y0,x1,y1){
+ // Normalise before squaring: even 1e140-world-unit horizons remain finite.
+ const ax=(x0-h.x)/h.r,ay=(y0-h.y)/h.r,bx=(x1-h.x)/h.r,by=(y1-h.y)/h.r;
+ const dx=bx-ax,dy=by-ay,length=dx*dx+dy*dy;
+ const t=length>0?clamp(-(ax*dx+ay*dy)/length,0,1):0;
+ return Math.hypot(ax+dx*t,ay+dy*t)<=1;
+}
+function refreshAbysses(){
+ abyssPhysical=abyssCandidates(player.x,player.y,Math.max(player.r,Math.hypot(player.vx,player.vy)*.4));
+ const zoom=Math.max(1e-155,camera.zoom);
+ abyssVisual=abyssCandidates(camera.x,camera.y,Math.hypot(W,H)/zoom,2/zoom);
+}
+function updateAbysses(dt,speed,oldX,oldY){
+ abyssTimer-=dt;if(abyssTimer<=0){abyssTimer=.18;refreshAbysses();}
+ let strongest=null,strongestPull=0;
+ for(const h of abyssPhysical){
+  const pull=abyssPull(h,player.x,player.y,speed),force=Math.hypot(pull.x,pull.y);
+  player.x+=pull.x*dt;player.y+=pull.y*dt;
+  if(force>strongestPull){strongest=h;strongestPull=force;}
+  if(crossesAbyss(h,oldX,oldY,player.x,player.y)){dieInAbyss(h);return false;}
+ }
+ const ahead=strongest||abyssPhysical.slice().sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
+ const warning=$('abyss-warning');
+ const notice=strongest?`⚠ ${strongest.name} · ГРАВИТАЦИОННЫЙ ЗАХВАТ · До горизонта ${atlasNumber(Math.max(0,Math.hypot(strongest.x-player.x,strongest.y-player.y)-strongest.r)/CHUNK)} сект. · Вход = потеря всего прогресса`:ahead?`⚠ ВПЕРЕДИ ${ahead.name} · До горизонта ${atlasNumber(Math.max(0,Math.hypot(ahead.x-player.x,ahead.y-player.y)-ahead.r)/CHUNK)} сект. · Смертельная чёрная дыра`:'';
+ if(notice!==abyssNotice){abyssNotice=notice;warning.textContent=notice;warning.hidden=!notice;}
+ return true;
+}
+function pullBodyIntoAbyss(e,dt){
+ if(e.dead)return true;
+ for(const h of abyssPhysical){
+  const d=Math.hypot(h.x-e.x,h.y-e.y);if(d>h.r*5)continue;
+  const zoom=Math.max(1e-155,camera.zoom),pull=abyssPull(h,e.x,e.y,180/zoom);
+  const x=e.x,y=e.y;e.x+=pull.x*dt;e.y+=pull.y*dt;
+  // Keep a single live image while the rival moves it out of its sector.
+  e.gravityBound=true;e.rivalBound=true;e.absorbing=0;absorbingMacroKeys.add(absorptionKey(e));
+  if(crossesAbyss(h,x,y,e.x,e.y)){
+   if(e.captureBag)e.captureBag[e.captureKey]=((e.captureBag[e.captureKey]||0)|(1<<e.index))>>>0;
+   else markHarvested(e);
+   e.dead=true;absorbingMacroKeys.delete(absorptionKey(e));cosmicSceneDirty=true;return true;
+  }
+  return true;
+ }
+ e.rivalBound=false;return false;
+}
+function paintAbyss(c,x,y,r,w,h){
+ if(r<1||x+r*1.3<0||y+r*1.3<0||x-r*1.3>w||y-r*1.3>h)return;
+ c.save();c.globalAlpha=1;
+ if(r>Math.max(w,h)*32){
+  // Locally a gigantic horizon is a wall. Avoid astronomical canvas arcs.
+  const dx=w/2-x,dy=h/2-y,d=Math.hypot(dx,dy),nx=dx/(d||1),ny=dy/(d||1);
+  const edgeX=x+nx*r,edgeY=y+ny*r,span=Math.hypot(w,h)*4;
+  if(d+span<r){c.fillStyle='#010205';c.fillRect(0,0,w,h);}
+  else if(d-span<r){
+   c.translate(edgeX,edgeY);c.rotate(Math.atan2(ny,nx));
+   c.fillStyle='#010205';c.fillRect(-span,-span,span,span*2);
+   const light=c.createLinearGradient(0,0,65,0);light.addColorStop(0,'rgba(201,221,241,.5)');light.addColorStop(1,'rgba(85,116,160,0)');
+   c.fillStyle=light;c.fillRect(0,-span,65,span*2);
+  }
+  c.restore();return;
+ }
+ const glow=c.createRadialGradient(x,y,r*.96,x,y,r*1.28);
+ glow.addColorStop(0,'rgba(0,0,0,1)');glow.addColorStop(.14,'rgba(207,222,235,.42)');glow.addColorStop(.33,'rgba(116,145,174,.16)');glow.addColorStop(1,'rgba(77,100,150,0)');
+ c.fillStyle=glow;c.beginPath();c.arc(x,y,r*1.28,0,TAU);c.fill();
+ c.fillStyle='#010205';c.beginPath();c.arc(x,y,r,0,TAU);c.fill();
+ c.strokeStyle='rgba(222,232,245,.65)';c.lineWidth=Math.max(.8,Math.min(2,r*.008));c.stroke();
+ c.strokeStyle='rgba(136,164,195,.16)';c.lineWidth=1;
+ c.beginPath();c.ellipse(x,y,r*1.17,r*1.07,-.25,0,TAU);c.stroke();
+ c.restore();
+}
+function renderAbysses(){
+ const zoom=Math.max(1e-155,camera.zoom);
+ for(const h of abyssVisual){const p=project(h.x,h.y);paintAbyss(ctx,p.x,p.y,h.r*zoom,W,H);}
+ const h=abyssPhysical.slice().sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
+ if(h){
+  const p=project(h.x,h.y);
+  if(p.x<30||p.y<100||p.x>W-30||p.y>H-130){
+   const angle=Math.atan2(p.y-H/2,p.x-W/2),x=W/2+Math.cos(angle)*W*.36,y=H/2+Math.sin(angle)*H*.30;
+   ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.fillStyle='#d6a8b4';
+   ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-7,-5);ctx.lineTo(-4,0);ctx.lineTo(-7,5);ctx.closePath();ctx.fill();ctx.restore();
+   ctx.save();ctx.fillStyle='#c1a8b5';ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(h.name,x,y+20);ctx.restore();
+  }
+ }
+}
+function atlasShowAbyss(){
+ const h=nearestAbyss();if(!h)return;
+ const bounds=$('atlas-canvas').getBoundingClientRect();
+ const left=Math.min(player.x,h.x-h.r*1.6),right=Math.max(player.x,h.x+h.r*1.6);
+ const top=Math.min(player.y,h.y-h.r*1.6),bottom=Math.max(player.y,h.y+h.r*1.6);
+ atlas.x=(left+right)/2;atlas.y=(top+bottom)/2;
+ atlas.zoom=clamp(Math.min(bounds.width/(right-left),bounds.height/(bottom-top))*.8*CHUNK/27,1e-155,12);atlas.dirty=true;
+}
+function testerVisitAbyss(){
+ const h=nearestAbyss();if(!h)return;
+ player.x=h.x-h.r*5.3;player.y=h.y;player.vx=player.vy=0;
+ camera.x=player.x;camera.y=player.y;abyssTimer=0;clearFlightInput();
+ testerRemakeNearby();refreshAbysses();save();testerToggle(false);showMap();atlasShowAbyss();
+ toast('Снаружи поля притяжения. Вход за горизонт уничтожит тестовый прогресс.');
+}
+
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
 function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
@@ -990,7 +1149,10 @@ function update(dt){
  // Direct flight stops almost immediately; "smooth" gives optional controlled inertia.
  const response=g.flightFeel==='smooth'?(ax||ay?7:11):(ax||ay?23:34),lerp=1-Math.exp(-dt*response);
  player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
- player.x+=player.vx*dt;player.y+=player.vy*dt;visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
+ const oldX=player.x,oldY=player.y;
+ player.x+=player.vx*dt;player.y+=player.vy*dt;
+ if(!updateAbysses(dt,speed,oldX,oldY))return;
+ visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
  let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20)),collectR=g.endless?blackHoleCoreWorldRadius():Math.min(player.r,MACRO_SIZE*20)+4;
@@ -1007,6 +1169,7 @@ function update(dt){
  // simulated; objects jumped when their turn in the queue arrived.
  for(const e of nearbyObjects){
   if(e.dead)continue;
+  if(pullBodyIntoAbyss(e,dt))continue;
   if(animateAbsorption(e,dt))continue;
   if(g.endless){applyBlackHoleGravity(e,dt);continue;}
   let dx=player.x-e.x,dy=player.y-e.y;
@@ -1032,8 +1195,8 @@ function update(dt){
   }
  }
  entities=entities.filter(e=>!e.dead);macroEntities=macroEntities.filter(e=>!e.dead);
- for(let i=cosmicAbsorptions.length-1;i>=0;i--){if(!animateAbsorption(cosmicAbsorptions[i],dt))applyBlackHoleGravity(cosmicAbsorptions[i],dt);if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);}
- harvestCosmicLOD(dt);if(streamTimer>.32){streamTimer=0;streamField();promoteCosmicDust();}
+ for(let i=cosmicAbsorptions.length-1;i>=0;i--){if(pullBodyIntoAbyss(cosmicAbsorptions[i],dt)){cosmicAbsorptions.splice(i,1);continue;}if(!animateAbsorption(cosmicAbsorptions[i],dt))applyBlackHoleGravity(cosmicAbsorptions[i],dt);if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);}
+ harvestCosmicLOD(dt);if(streamTimer>.32){streamTimer=0;streamField();promoteCosmicDust();promoteAbyssMatter();}
  // No random refill events: only unexplored, persistent sectors supply new matter.
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*2);p.vy*=Math.exp(-dt*2);p.life-=dt;}
  particles=particles.filter(p=>p.life>0);
@@ -1208,11 +1371,12 @@ function getAccretionTexture(type=2){
 // The GPU samples the completed world buffer directly. There is no per-frame
 // getImageData/readback or million-pixel JavaScript loop on the normal path.
 const EINSTEIN_RING_SCALE=2.05;
+function einsteinRingScale(){return EINSTEIN_RING_SCALE*clamp(Number(tester.ring)||1,.6,2.5);}
 // Signed inverse lens equation: a source behind the centre becomes a ring,
 // with a reversed secondary image between that ring and the opaque horizon.
 // This warps the actual scene; it never paints an artificial luminous torus.
 function lensSourceRadius(d,R,outer){
- const core=R*BLACK_HOLE_CORE_FRACTION,einstein=core*EINSTEIN_RING_SCALE;
+ const core=R*BLACK_HOLE_CORE_FRACTION,einstein=core*einsteinRingScale();
  const border=clamp((outer-d)/Math.max(1,R*.50),0,1);
  return d-einstein*einstein/Math.max(core*.99,d)*border*border*(3-2*border);
 }
@@ -1236,6 +1400,7 @@ function initGpuLens(){
  uniform vec2 center;
  uniform float radius;
  uniform float outerRadius;
+ uniform float ringScale;
  void main(){
   vec2 pixel=vec2(uv.x,1.-uv.y)*viewport;
   vec2 delta=pixel-center;
@@ -1243,7 +1408,7 @@ function initGpuLens(){
   vec4 original=texture2D(scene,uv);
   if(d<core*.99||d>=outerRadius){gl_FragColor=original;return;}
   float border=clamp((outerRadius-d)/max(1.,radius*.50),0.,1.);
-  float einstein=core*${EINSTEIN_RING_SCALE};
+  float einstein=core*ringScale;
   float sourceRadius=d-einstein*einstein/max(core*.99,d)*border*border*(3.-2.*border);
   vec2 source=(center+delta*(sourceRadius/max(.000001,d)))/viewport;
   if(source.x<0.||source.y<0.||source.x>1.||source.y>1.){gl_FragColor=original;return;}
@@ -1268,7 +1433,7 @@ function initGpuLens(){
  gl.uniform1i(gl.getUniformLocation(program,'scene'),0);
  const state={surface,gl,width:0,height:0,maxSize:gl.getParameter(gl.MAX_TEXTURE_SIZE),
   viewport:gl.getUniformLocation(program,'viewport'),center:gl.getUniformLocation(program,'center'),
-  radius:gl.getUniformLocation(program,'radius'),outer:gl.getUniformLocation(program,'outerRadius')};
+  ring:gl.getUniformLocation(program,'ringScale'),radius:gl.getUniformLocation(program,'radius'),outer:gl.getUniformLocation(program,'outerRadius')};
  surface.addEventListener('webglcontextlost',event=>{event.preventDefault();gpuLensUnavailable=true;gpuLens=null;});
  surface.addEventListener('webglcontextrestored',()=>{gpuLensUnavailable=false;gpuLens=null;});
  return state;
@@ -1284,7 +1449,7 @@ function renderGpuLens(p,R,outer){
    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,frameCanvas);
   }else gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,frameCanvas);
   gl.uniform2f(state.viewport,W,H);gl.uniform2f(state.center,p.x,p.y);
-  gl.uniform1f(state.radius,R);gl.uniform1f(state.outer,outer);
+  gl.uniform1f(state.ring,einsteinRingScale());gl.uniform1f(state.radius,R);gl.uniform1f(state.outer,outer);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   // Consume the WebGL drawing buffer synchronously, before the browser can
   // discard it. The opaque horizon is still painted afterwards on frameCtx.
@@ -1462,12 +1627,12 @@ function paintEvolutionDetails(x,y,r,time,tier){
 }
 // Three LOD levels: a cheap pixel at distance, plain discs in the middle,
 // detailed shapes close to the player. The object itself is never deleted by LOD.
-function renderEntity(e,time){
+function renderEntity(e,time,staticDust=false){
  const px=(e.x-camera.x)*camera.zoom+W/2,py=(e.y-camera.y)*camera.zoom+H/2;
  const r=e.r*camera.zoom*(e.absorbScale??1);
  if(px<-r-12||px>W+r+12||py<-r-12||py>H+r+12)return;
  const near=(e.x-player.x)**2+(e.y-player.y)**2<560*560;
- if(g.endless&&camera.zoom<.13&&!e.gravityBound&&!e.absorbing)return;
+ if(g.endless&&!staticDust&&!e.gravityBound&&!e.absorbing)return;
  if(!g.endless&&g.tier>=18&&camera.zoom<.13&&r<2.25)return;
  if(r<1.6){ctx.fillStyle=e.kind==='hazard'?'#ed6d88':e.kind==='relic'?'#ffd790':MATERIALS[e.material]?.color||'#8bc9ed';ctx.fillRect(px,py,1.8,1.8);return;}
  if(e.kind==='matter'){
@@ -1551,6 +1716,7 @@ function render(time){
   paintBlackHole(p.x,p.y,r,time);
   ctx.restore();
  }
+ renderAbysses();
  // Atomic presentation: the screen never sees a partially completed frame.
  // Do not reset canvas.width/height or use a desynchronized front context.
  screenCtx.save();
@@ -1652,9 +1818,9 @@ function drawAtlas(){
   const p=projectMap(e.x,e.y);if(p.x<-20||p.y<-20||p.x>w+20||p.y>h+20)return;
   const r=clamp(e.r*scale*.35,1.5,18)*(e.absorbScale??1);
   c.globalAlpha=clamp(opacity,0,1)*.8;
-  c.fillStyle=e.kind==='blackhole'?'#03070f':GALAXY_PALETTES[(e.palette||0)%9][0];
-  c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.fill();
-  if(e.kind==='blackhole'){c.strokeStyle='#d8b5ff';c.lineWidth=1;c.stroke();}
+  // Muted star-cloud silhouettes instead of flat coloured counters.
+  const sprite=e.kind==='blackhole'?blackHoleSprite(e.holeType||0):cosmicSprite(e.material,e.shape,e.style||0,5);
+  c.drawImage(sprite,p.x-r*1.8,p.y-r*1.8,r*3.6,r*3.6);
  }
  if(g.tier>=13){
   const view=cosmicViewAt(atlas.x,atlas.y,w,h,scale);
@@ -1675,6 +1841,16 @@ function drawAtlas(){
   for(const e of cosmicAbsorptions)if(!e.dead)plotBody(e,e.captureOpacity);
  }
  c.globalAlpha=1;
+ for(const h0 of abyssCandidates(atlas.x,atlas.y,Math.hypot(w,h)/scale,3/scale)){
+  const p=projectMap(h0.x,h0.y),r=h0.r*scale;
+  paintAbyss(c,p.x,p.y,r,w,h);
+  if(p.x+r<0||p.y+r<0||p.x-r>w||p.y-r>h)continue;
+  // Keep the label on the visible part of even a screen-sized horizon.
+  const tx=clamp(p.x,100,w-160),ty=clamp(p.y-r-25,22,h-80);
+  c.font='600 11px Inter,sans-serif';c.fillStyle='#dce6ee';c.fillText(h0.name,tx,ty);
+  c.font='10px Inter,sans-serif';c.fillStyle='#ab8588';
+  c.fillText(`ГОРИЗОНТ ${atlasNumber(h0.r*2/CHUNK)} сект. · СМЕРТЕЛЬНО`,tx,ty+15);
+ }
  const playerPoint=projectMap(player.x,player.y);
  // Both the event horizon and gravity field are drawn at their TRUE map size.
  const bodyRadius=(g.endless?blackHoleCoreWorldRadius():player.r)*scale;
@@ -1695,7 +1871,7 @@ function drawAtlas(){
   c.font='600 10px Inter,sans-serif';c.fillText('ТЫ',playerPoint.x+Math.max(9,bodyRadius+7),playerPoint.y-5);
  }
  const origin=projectMap(0,0);
- if(origin.x>15&&origin.y>15&&origin.x<w-70&&origin.y<h-20){
+ if(Math.hypot(origin.x-playerPoint.x,origin.y-playerPoint.y)>35&&origin.x>15&&origin.y>15&&origin.x<w-70&&origin.y<h-20){
   c.strokeStyle='#9caebf';c.beginPath();c.arc(origin.x,origin.y,4,0,TAU);c.stroke();
   c.fillStyle='#91a5b9';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
  }
@@ -1716,9 +1892,10 @@ function showMap(){
  atlas={x:player.x,y:player.y,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
  show(`<div class="atlas-top"><div><div class="eyebrow">ГАЛАКТИЧЕСКАЯ НАВИГАЦИЯ</div><div class="overlay-title">МАСШТАБ ВСЕЛЕННОЙ</div></div><span class="atlas-north">N ↑</span></div>
  <div class="atlas-measures"><div><small>${g.endless?'ДИАМЕТР ГОРИЗОНТА':'ТВОЙ ДИАМЕТР'}</small><strong id="atlas-diameter"></strong></div><div><small>ШИРИНА ИГРОВОГО ЭКРАНА</small><strong id="atlas-viewport"></strong></div><div><small>ШИРИНА КАРТЫ</small><strong id="atlas-span"></strong></div></div>
+ <div class="atlas-danger-bar"><span id="atlas-threat"></span><button id="atlas-abyss" class="secondary-button">ОБЗОР ГИГАНТОВ ↗</button></div>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">−</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">⌖</button></div></div>
- <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span></div>
+ <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ СМЕРТЕЛЬНЫЙ ГОРИЗОНТ</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Все расстояния — в секторах мира.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
@@ -1729,29 +1906,45 @@ function showMap(){
  $('atlas-zoom-in').onclick=()=>changeAtlasZoom(1.4);
  $('atlas-zoom-out').onclick=()=>changeAtlasZoom(1/1.4);
  $('atlas-center').onclick=atlasFitPlayer;
+ $('atlas-abyss').onclick=atlasShowAbyss;
+ const giant=nearestAbyss();
+ $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${atlasNumber(giant.r*2/CHUNK)} сект. · в ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. За горизонтом весь прогресс теряется.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
  requestAnimationFrame(drawAtlas);
 }
 
 function showPause(){show(`<div class="hero-kicker">ПУТЕШЕСТВИЕ ПРИОСТАНОВЛЕНО</div><div class="overlay-title">ПАУЗА</div><p class="overlay-copy">Твоё место во Вселенной сохранено. Материя и улучшения останутся с тобой.</p><div class="stat-list"><div><strong>${fmt(g.total)}</strong><small>Всего материи</small></div><div><strong>${timeFmt(g.time)}</strong><small>Игровое время</small></div><div><strong>${g.collects}</strong><small>Поглощено объектов</small></div><div><strong>${g.rare}</strong><small>Реликвий найдено</small></div></div><div class="modal-actions">${continueButton()}<button id="pause-map" class="secondary-button">Карта</button></div>`);attachContinue();$('pause-map').onclick=showMap;}
 function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
+function resetCampaignState(resetModifiers=false){
+ const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,quality:g.quality,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel};
+ cosmicAbsorptions.length=0;absorbingMacroKeys.clear();
+ const next=fresh();Object.assign(g,next,preferences);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
+ if(resetModifiers&&TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
+ player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);lastReveal={x:Infinity,y:Infinity,r:-Infinity};
+ player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
+ screenFlash=0;morph=null;running=false;abyssTimer=0;abyssPhysical=[];abyssVisual=[];abyssNotice='';$('abyss-warning').hidden=true;clearFlightInput();pulseCd=boostCd=boostTime=0;visitPosition();streamField();save();renderUI(true);testerRefresh();testerToggle(false);
+}
+function dieInAbyss(h){
+ const mass=fmt(g.total),duration=timeFmt(g.time);
+ resetCampaignState(false);
+ // Save the reset immediately: reload cannot restore the lost run.
+ save();
+ show(`<div class="eyebrow">ГОРИЗОНТ ПЕРЕСЕЧЁН</div><div class="overlay-title">ПОГЛОЩЁН БЕЗДНОЙ</div><p class="overlay-copy">${h.name} поглотила тебя. Вся материя, улучшения, формы эволюции и исследованная карта этого прохождения потеряны.</p><div class="stat-list"><div><strong>${mass}</strong><small>Потеряно материи</small></div><div><strong>${duration}</strong><small>Длительность прохождения</small></div></div><p class="overlay-copy">Новая Вселенная начинается с космической пыли.</p>${continueButton('НАЧАТЬ С НУЛЯ')}`);
+ attachContinue();
+}
 function restartCampaign(){
  if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
- cosmicAbsorptions.length=0;absorbingMacroKeys.clear();
- const next=fresh();Object.assign(g,next);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
- if(TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
- player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);lastReveal={x:Infinity,y:Infinity,r:-Infinity};
- player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
- screenFlash=0;morph=null;running=true;visitPosition();streamField();save();renderUI(true);testerRefresh();testerToggle(false);
+ resetCampaignState(true);running=true;
  $('modal').classList.add('off');toast('Новая Вселенная создана · предыдущий прогресс сохранён');
 }
+
 function testerRefresh(){
  const panel=$('tester-panel');if(!panel)return;
  $('tester-tier').value=String(g.tier);
  $('tester-credits').value=String(Math.round(g.credits));
  const progress=panel.querySelector('[data-test="progress"]');progress.value=String(Math.round(stageFraction()*100));
  $('test-progress-val').textContent=progress.value+'%';
- for(const k of ['speed','gravity','loot','zoom','density']){
+ for(const k of ['speed','gravity','loot','zoom','ring','density']){
   const input=panel.querySelector(`[data-test="${k}"]`),label=panel.querySelector(`[data-test-value="${k}"]`);
   input.value=tester[k];label.textContent=k==='density'?`${tester[k]}/32`:`${tester[k]}×`;
  }
@@ -1807,6 +2000,7 @@ function testerInit(){
  $('tester-next').onclick=()=>testerSetTier(g.tier+1);
  $('tester-jump').onclick=()=>{player.x+=CHUNK*10;player.vx=player.vy=0;camera.x=player.x;camera.y=player.y;
   visitPosition();testerRemakeNearby();renderUI(true);toast('Перемещение в новый сектор (тест)');};
+ $('tester-abyss').onclick=testerVisitAbyss;
  $('tester-reset-mods').onclick=()=>{
   Object.assign(tester,TEST_DEFAULTS);saveTester();testerRemakeNearby();testerRefresh();
   toast('Тестовые множители сброшены');};
