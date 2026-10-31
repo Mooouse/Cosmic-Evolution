@@ -116,7 +116,7 @@ function traceFrame(lensFails=false){
   sky(){calls.push("sky")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
   renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
-  renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
+  clipPlayerHorizon(){calls.push("occlusion")},renderWaypoint(){},renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
   paintBlackHole(){calls.push("blackhole")},project(){return{x:960,y:540}},
   player:{x:0,y:0,r:200},camera:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
   screenFlash:0,shake:0,entities:[{}],blackHoleLensRetryAt:0,renderTicks:0,
@@ -132,7 +132,10 @@ function traceFrame(lensFails=false){
  assert.equal(screenCtx.globalCompositeOperation,"source-over","Front context state must be restored");
  return calls;
 }
-traceFrame(false);
+const occludedFrame=traceFrame(false);
+assert.ok(occludedFrame.indexOf('occlusion')>occludedFrame.indexOf('sky'));
+assert.ok(occludedFrame.indexOf('occlusion')<occludedFrame.indexOf('distant'));
+assert.ok(occludedFrame.lastIndexOf('occlusion')<occludedFrame.indexOf('lens'));
 traceFrame(true);
 console.log("PASS: complete atomic screen frames and lens-readback failure isolation");
 
@@ -328,7 +331,7 @@ console.log('PASS: viewport-wide resources also render through the 3x-size zoom 
 const abyssStart=game.indexOf('const ABYSS_BASE=');
 const abyssStop=game.indexOf('function refreshAbysses()',abyssStart);
 const seedStart=game.indexOf('function seedHash('),seedStop=game.indexOf('\nfunction chunkInfo(',seedStart);
-const abyssBox={CHUNK:480,WORLD_SEED:0x17aba37,player:{x:0,y:0,r:300},
+const abyssBox={CHUNK:480,TAU:Math.PI*2,WORLD_SEED:0x17aba37,player:{x:0,y:0,r:300},
  clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
 vm.createContext(abyssBox);
 vm.runInContext(game.slice(seedStart,seedStop)+game.slice(abyssStart,abyssStop),abyssBox);
@@ -387,3 +390,73 @@ rivalBox.pullBodyIntoAbyss(matter,.5);assert.equal(rivalMarks,1);
 const bag={},galaxy={x:1001,y:0,index:4,captureBag:bag,captureKey:'galaxy'};
 rivalBox.pullBodyIntoAbyss(galaxy,.5);assert.equal(bag.galaxy,1<<4);
 console.log('PASS: rival gravity consumes dust and distant galaxies exactly once without rewards');
+
+// Catalogue identities survive every zoom; nearby subpixel holes form an
+// explicitly counted group, never a newly generated replacement object.
+const catalogue=abyssBox.buildAbyssCatalogue();
+assert.ok(catalogue.length>=81&&catalogue.length<=243);
+assert.equal(JSON.stringify(abyssBox.buildAbyssCatalogue()),JSON.stringify(catalogue));
+for(let level=0;level<=80;level++){
+ const band=catalogue.filter(h=>h.level===level);assert.ok(band.length>=1&&band.length<=3);
+ for(const h of band){
+  assert.ok(Math.hypot(h.x,h.y)>h.r*5);
+  for(const other of band)if(other!==h)assert.ok(Math.hypot(other.x-h.x,other.y-h.y)>Math.max(other.r,h.r)*12);
+ }
+}
+const markerStart=game.indexOf('function atlasAbyssMarkers('),markerStop=game.indexOf('function atlasFocusHoles(',markerStart);
+const markerBox={abyssCandidates:abyssBox.abyssCandidates};vm.createContext(markerBox);
+vm.runInContext(game.slice(markerStart,markerStop),markerBox);
+const tracked=catalogue[0];
+for(const radiusPx of [200,20,3,.1,.00001]){
+ const markers=markerBox.atlasAbyssMarkers(tracked.x,tracked.y,1100,550,radiusPx/tracked.r);
+ const found=markers.flatMap(m=>m.bodies).filter(h=>h.id===tracked.id);
+ assert.equal(found.length,1,'A zoomed-out landmark must remain represented exactly once');
+ assert.equal(JSON.stringify(found[0]),JSON.stringify(tracked));
+}
+assert.ok(!game.includes("kind:blackhole?'blackhole'"));
+assert.ok(!game.includes("kind:hole?'blackhole'"));
+console.log('PASS: sparse non-grid catalogue; same named holes stay on map from 200 px to subpixel scales');
+
+// Pins retain world coordinates, labels, IDs and preferred zoom in the save.
+const normalStart=game.indexOf('function normaliseMapPins('),normalStop=game.indexOf('\ng.mapPins=',normalStart);
+const pinStart=game.indexOf('function addMapPin('),pinStop=game.indexOf('function refreshPinPanel(',pinStart);
+let pinSaves=0;
+const pinBox={g:{mapPins:[],nextPinId:1,activePin:null},atlas:{zoom:.01},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),save(){pinSaves++}};
+vm.createContext(pinBox);vm.runInContext(game.slice(normalStart,normalStop)+game.slice(pinStart,pinStop),pinBox);
+const firstPin=pinBox.addMapPin(123,-456,.01),farPin=pinBox.addMapPin(1e120,-1e120,1e-120);
+firstPin.name='Путь к Эребу';const loadedPins=pinBox.normaliseMapPins(JSON.parse(JSON.stringify(pinBox.g.mapPins)));
+assert.equal(JSON.stringify(loadedPins),JSON.stringify(pinBox.g.mapPins));
+assert.equal(loadedPins[1].x,1e120);assert.equal(pinBox.g.activePin,farPin.id);
+pinBox.removeMapPin(farPin.id);assert.equal(pinBox.g.activePin,firstPin.id);assert.equal(pinBox.g.mapPins.length,1);
+assert.ok(pinSaves>=3);
+assert.equal(pinBox.normaliseMapPins([{id:1,x:NaN,y:0},{id:2,x:1,y:2},{id:2,x:3,y:4}]).length,1);
+console.log('PASS: map pins persist exact world coordinates across reload; invalid/duplicate saves rejected');
+
+// Reproduce the v3.17 bug: rival attraction returned true for a LIVE body,
+// and the outer update loop mistakenly removed it from the active collection.
+const activeLoopStart=game.indexOf(' for(let i=cosmicAbsorptions.length-1;i>=0;i--)');
+const activeLoopStop=game.indexOf('\n harvestCosmicLOD(',activeLoopStart);
+const moving={x:1100,y:0,index:8};
+const rivalLoop={cosmicAbsorptions:[moving],dt:.05,pullBodyIntoAbyss:rivalBox.pullBodyIntoAbyss,
+ animateAbsorption(){throw new Error('Rival owns this body')},applyBlackHoleGravity(){throw new Error('Rival owns this body')}};
+vm.createContext(rivalLoop);vm.runInContext(game.slice(activeLoopStart,activeLoopStop),rivalLoop);
+assert.equal(rivalLoop.cosmicAbsorptions.length,1);assert.ok(moving.x<1100&&!moving.dead);
+rivalLoop.dt=.5;vm.runInContext(game.slice(activeLoopStart,activeLoopStop),rivalLoop);
+assert.equal(rivalLoop.cosmicAbsorptions.length,0);assert.equal(moving.dead,true);
+console.log('PASS: rival-bound matter remains visible and simulated until actually consumed');
+
+// Adjacent dust LODs share the same representative sector. Only the other
+// sectors smoothly fade, rather than the entire field rerolling at a zoom step.
+const sampleStart=game.indexOf('function dustRepresentative('),sampleStop=game.indexOf('function promoteCosmicDust()',sampleStart);
+const sampleBox={seedHash:abyssBox.seedHash};vm.createContext(sampleBox);vm.runInContext(game.slice(sampleStart,sampleStop),sampleBox);
+for(const step of [1,2,4,8,16])for(const gx of [-8*step,0,12*step]){
+ const gy=-4*step,parent=sampleBox.dustRepresentative(gx,gy,step*2);
+ let visible=0;
+ for(let iy=0;iy<2;iy++)for(let ix=0;ix<2;ix++){
+  const s=sampleBox.dustSample(gx+ix*step,gy+iy*step,{step,blend:1});
+  if(s.weight>0){visible++;assert.equal(s.x,parent.x);assert.equal(s.y,parent.y);}
+ }
+ assert.equal(visible,1);
+}
+assert.ok(!game.slice(game.indexOf('function visitPosition('),game.indexOf('function markHarvested(')).includes('toast('));
+console.log('PASS: no dust-field reroll at zoom boundaries; exploration notifications removed');

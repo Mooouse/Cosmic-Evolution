@@ -75,7 +75,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',controlV:2,worldX:0,worldY:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -95,6 +95,15 @@ try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
   }
  }
 }catch(_){/* storage may be unavailable */}
+function normaliseMapPins(value){
+ if(!Array.isArray(value))return [];
+ const ids=new Set();
+ return value.filter(p=>p&&Number.isSafeInteger(p.id)&&p.id>0&&!ids.has(p.id)&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&(ids.add(p.id),true)).slice(0,64)
+  .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32)}));
+}
+g.mapPins=normaliseMapPins(g.mapPins);
+g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
+if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
 let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTimer=0,saveTimer=0,eventTimer=0;
 // Physical size is continuous across all stages, including save/load and evolution.
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
@@ -329,7 +338,7 @@ function visitPosition(force=false){
   visitedChunks.add(key);g.visited.push(key);added++;
  }
  g.stageExplored=(g.stageExplored||0)+added;
- if(added>0&&g.stageExplored%20<added)toast(`◈ Исследовано ${fmt(exploredCount())} секторов`);
+
 }
 function markHarvested(e){
  if(e.chunk!==undefined&&Number.isInteger(e.index)){
@@ -399,7 +408,7 @@ function macroNodes(cx,cy){
   const holeType=identity%17===0?2:identity%5===0?1:0; // stellar, intermediate, supermassive
   const style=(identity>>>8)%8,palette=(identity>>>17)%9;
   saved.push({x:x+scatterX,y:y+scatterY,r:blackhole?r*(holeType===2?1.7:holeType===1?1.2:.85):r,
-   index:i,chunk:key,macro:true,material:blackhole?'exotic':material,kind:blackhole?'blackhole':'matter',holeType,
+   index:i,chunk:key,macro:true,material:blackhole?'exotic':material,kind:'matter',holeType,
    grade:18,value:Math.round(12+Math.pow(r/25,1.6)*(blackhole?16:7)),vx:0,vy:0,
    spin:rng()*TAU,twinkle:rng()*TAU,primed:false,dead:false,
    shape:Math.floor(rng()*3),style,palette,hue:230});
@@ -536,7 +545,7 @@ function macroLODNodes(gx,gy,level){
   const shape=(sub>>>4)%3,style=(sub>>>7)%8,palette=(sub>>>19)%9;
   const hole=j===0&&(sub%17===0),isUniverse=j===1&&sub%31===0,holeType=(sub>>>13)%3;
   const r=Math.max(30,Math.min(span*.34,span*(.09+rng()*.16)));
-  nodes.push({x:rx,y:ry,r,style,palette,shape,holeType,material:hole||isUniverse?'exotic':'gas',kind:hole?'blackhole':isUniverse?'universe':'matter',cosmic:true,level,gx,gy,index:j});
+  nodes.push({x:rx,y:ry,r,style,palette,shape,holeType,material:hole||isUniverse?'exotic':'gas',kind:isUniverse?'universe':'matter',cosmic:true,level,gx,gy,index:j});
  }
  if(macroLODCache.size>=1400){
   const stale=macroLODCache.keys();for(let i=0;i<220;i++)macroLODCache.delete(stale.next().value);
@@ -715,6 +724,11 @@ function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
 // physical bodies are drawn every frame. This avoids thousands of drawImage
 // operations per frame on giant black holes and high-DPI screens.
 let macroBackdrop=null,macroBackdropOld=null,macroFadeStart=0,macroBlend=null;
+function clipPlayerHorizon(){
+ if(!g.endless)return;
+ const p=project(player.x,player.y),r=blackHoleCoreWorldRadius()*camera.zoom;
+ ctx.beginPath();ctx.rect(0,0,W,H);ctx.moveTo(p.x+r,p.y);ctx.arc(p.x,p.y,r,0,TAU);ctx.clip('evenodd');
+}
 function renderMacroField(time){
  macroVisibleCount=0;
  if(g.tier<13)return;
@@ -722,9 +736,10 @@ function renderMacroField(time){
  // a captured object cannot leave a frozen duplicate in a backdrop crossfade.
  if(g.tier===TA.length-1){
   renderMacroBackground(time);
+  ctx.save();clipPlayerHorizon();
   for(const e of macroEntities)if(drawMacro(e,time,camera.zoom,1))macroVisibleCount++;
   for(const e of cosmicAbsorptions)if(!e.dead)drawMacro(e,time,camera.zoom,e.captureOpacity);
-  return;
+  ctx.restore();return;
  }
  const worldZoom=Math.max(1e-155,camera.zoom),nearCenter=macroKey(Math.floor(player.x/MACRO_SIZE),Math.floor(player.y/MACRO_SIZE));
  const ratio=macroBackdrop?worldZoom/macroBackdrop.zoom:1;
@@ -825,10 +840,25 @@ function cosmicDustView(){
  const zoom=Math.max(1e-155,camera.zoom),cell=CHUNK*zoom;
  if(cell<2)return null;
  const nx=W/cell+4,ny=H/cell+4;
- const step=2**Math.max(0,Math.ceil(Math.log2(Math.sqrt(nx*ny/240))));
+ const lod=Math.max(0,Math.log2(Math.sqrt(nx*ny/96))),level=Math.floor(lod);
+ const step=2**level,blend=lod-level;
  const left=Math.floor((camera.x-W*.5/zoom)/CHUNK/step)*step-step;
  const top=Math.floor((camera.y-H*.5/zoom)/CHUNK/step)*step-step;
- return {zoom,cell,step,left,top,columns:Math.ceil(W/cell/step)+4,rows:Math.ceil(H/cell/step)+4};
+ return {zoom,cell,step,blend,left,top,columns:Math.ceil(W/cell/step)+4,rows:Math.ceil(H/cell/step)+4};
+}
+function dustRepresentative(gx,gy,step){
+ let x=gx,y=gy;
+ for(let size=step;size>1;size/=2){
+  const seed=seedHash(x/size+Math.log2(size)*97,y/size-311),half=size/2;
+  x+=(seed&1)*half;y+=((seed>>>1)&1)*half;
+ }
+ return {x,y};
+}
+function dustSample(gx,gy,view){
+ const {step,blend}=view,body=dustRepresentative(gx,gy,step);
+ const parent=dustRepresentative(Math.floor(gx/(step*2))*step*2,Math.floor(gy/(step*2))*step*2,step*2);
+ const f=blend*blend*(3-2*blend);
+ return {...body,weight:body.x===parent.x&&body.y===parent.y?1:1-f};
 }
 function promoteCosmicDust(){
  if(!g.endless)return;
@@ -836,8 +866,9 @@ function promoteCosmicDust(){
  const {zoom,step,left,top,columns,rows}=view,range=blackHoleGravityRadius()*zoom;
  let budget=64;
  for(let iy=0;iy<rows&&budget>0;iy++)for(let ix=0;ix<columns&&budget>0;ix++){
-  const gx=left+ix*step,gy=top+iy*step,seed=seedHash(gx/step,gy/step);
-  const cx=gx+(seed%step),cy=gy+((seed>>>12)%step),key=chunkKey(cx,cy);
+  const gx=left+ix*step,gy=top+iy*step,sample=dustSample(gx,gy,view);
+  if(sample.weight<.04)continue;
+  const cx=sample.x,cy=sample.y,key=chunkKey(cx,cy);
   if(loadedChunks.has(key))continue;
   const quota=sectorQuota(chunkInfo(cx,cy),cx,cy),mask=(g.depleted[key]||0)>>>0;
   for(const e of distantSamples(cx,cy)){
@@ -858,8 +889,9 @@ function renderCosmicDust(){
  for(let iy=0;iy<rows;iy++)for(let ix=0;ix<columns;ix++){
   const gx=left+ix*step,gy=top+iy*step;
   // Select a stable actual sector within each group, not a decorative refill.
-  const seed=seedHash(gx/step,gy/step);
-  const cx=gx+(seed%step),cy=gy+((seed>>>12)%step),key=chunkKey(cx,cy);
+  const sample=dustSample(gx,gy,view);ctx.globalAlpha=opacity*sample.weight;
+  if(sample.weight<.001)continue;
+  const cx=sample.x,cy=sample.y,key=chunkKey(cx,cy);
   const info=chunkInfo(cx,cy),quota=sectorQuota(info,cx,cy),mask=(g.depleted[key]||0)>>>0;
   for(const e of distantSamples(cx,cy)){
    if(e.index>=quota||(mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
@@ -950,32 +982,40 @@ visitPosition();streamField();
 // camera zoom, player growth and atlas LOD; origin lies outside every field.
 const ABYSS_BASE=CHUNK*24,ABYSS_STEP=64;
 let abyssPhysical=[],abyssVisual=[],abyssTimer=0,abyssNotice='';
-function abyssCandidates(x,y,extent=0,minRadius=0){
- const result=[];
- const first=clamp(Math.floor(Math.log(Math.max(1,minRadius/ABYSS_BASE))/Math.log(ABYSS_STEP)),0,80);
- const last=clamp(Math.ceil(Math.log(Math.max(1,(Math.max(Math.abs(x),Math.abs(y))+extent)/ABYSS_BASE))/Math.log(ABYSS_STEP))+1,first,80);
- for(let level=first;level<=last;level++){
-  const base=ABYSS_BASE*ABYSS_STEP**level,cell=base*24;
-  // Tiny cells no longer have representable coordinates this far from zero.
-  if(Math.max(Math.abs(x/cell),Math.abs(y/cell))>1e12)continue;
-  const cx=Math.floor(x/cell),cy=Math.floor(y/cell),n=Math.min(4,Math.ceil(extent/cell)+1);
-  for(let iy=-n;iy<=n;iy++)for(let ix=-n;ix<=n;ix++){
-   const gx=cx+ix,gy=cy+iy,rng=chunkRandom(seedHash(gx,gy)^Math.imul(level+1,1597334677));
-   const px=(gx+.38+rng()*.24)*cell,py=(gy+.38+rng()*.24)*cell;
-   const r=base*(.75+rng()*.5),id=`${level}:${gx}:${gy}`;
-   if(r<minRadius||Math.hypot(px-x,py-y)>extent+r*7)continue;
-   const names=['ЭРЕБ','НИКТА','БЕЗДНА','ЛЕВИАФАН','ГОЛИАФ','ХАОС'];
-   result.push({x:px,y:py,r,level,id,name:names[Math.floor(rng()*names.length)]+' '+(level+1)+' · '+Math.abs(seedHash(gx,gy)%997)});
+// A small fixed catalogue, not a grid or a zoom-dependent set of proxies.
+// There are only 1–3 irregularly placed landmarks per vast logarithmic band.
+function buildAbyssCatalogue(){
+ const catalogue=[],names=['ЭРЕБ','НИКТА','БЕЗДНА','ЛЕВИАФАН','ГОЛИАФ','ХАОС'];
+ for(let level=0;level<=80;level++){
+  const rng=chunkRandom(seedHash(level+917,314159)^0x62b9d14f),base=ABYSS_BASE*ABYSS_STEP**level;
+  const count=level===0?3:1+Math.floor(rng()*3),band=[];
+  for(let i=0;i<count;i++){
+   let h;
+   for(let attempt=0;attempt<32;attempt++){
+    const angle=rng()*TAU,distance=base*(18+rng()*39),r=base*(.65+rng()*1.25);
+    h={x:Math.cos(angle)*distance,y:Math.sin(angle)*distance,r,level,id:`abyss:${level}:${i}`,
+     name:names[Math.floor(rng()*names.length)]+' '+(level+1)+' · '+(i+1)};
+    if(band.every(other=>Math.hypot(other.x-h.x,other.y-h.y)>Math.max(other.r,h.r)*12))break;
+   }
+   band.push(h);catalogue.push(Object.freeze(h));
   }
  }
- return result;
+ return Object.freeze(catalogue);
+}
+const ABYSS_CATALOGUE=buildAbyssCatalogue();
+function abyssCandidates(x,y,extent=0,minRadius=0){
+ // No size cutoff: even subpixel landmarks keep their identity on the atlas.
+ // World rendering can cull pixels; neither zoom nor LOD creates new holes.
+ return ABYSS_CATALOGUE.filter(h=>Math.hypot(h.x-x,h.y-y)<=extent+h.r*7);
 }
 function nearestAbyss(){
- // Search with a wide radius at the next truly enormous world scale.
- const level=clamp(Math.ceil(Math.log(Math.max(1,player.r*18/ABYSS_BASE))/Math.log(ABYSS_STEP)),0,80);
- const base=ABYSS_BASE*ABYSS_STEP**level;
- const bodies=abyssCandidates(player.x,player.y,base*40,base*.7);
- return bodies.sort((a,b)=>(Math.hypot(a.x-player.x,a.y-player.y)-a.r)-(Math.hypot(b.x-player.x,b.y-player.y)-b.r))[0];
+ let nearest=null,distance=Infinity;
+ for(const h of ABYSS_CATALOGUE){
+  if(h.r<player.r*18)continue;
+  const d=Math.hypot(h.x-player.x,h.y-player.y)-h.r;
+  if(d<distance){nearest=h;distance=d;}
+ }
+ return nearest||ABYSS_CATALOGUE[ABYSS_CATALOGUE.length-1];
 }
 function abyssPull(h,x,y,speed){
  const dx=h.x-x,dy=h.y-y,d=Math.hypot(dx,dy),q=d/h.r;
@@ -1087,11 +1127,11 @@ function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1})
 function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
  g.materials[mat]=(g.materials[mat]||0)+gain;
- if((mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
- let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;if(player.r<CHUNK*4)burst(e.x,e.y,22,'#f9d797',.9);pickupFeedback(val,true);}else if(player.r<CHUNK*4&&Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
+ if(!g.endless&&(mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
+ let credits=e.kind==='relic'?Math.round(val*1.7):Math.max(1,Math.floor(val*.75));g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+1;g.stageRare++;g.rare++;if(!g.endless&&player.r<CHUNK*4)burst(e.x,e.y,22,'#f9d797',.9);pickupFeedback(val,true);}else if(!g.endless&&player.r<CHUNK*4&&Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
  player.targetR=currentRadius();
- if(e.kind!=='relic')pickupFeedback(val,false);if(player.r<CHUNK*4&&g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
+ if(e.kind!=='relic')pickupFeedback(val,false);if(!g.endless&&player.r<CHUNK*4&&g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
 // Bodies larger than you stay in the universe; avoid them until you outgrow them.
 function collideWithGiant(e,dx,dy,dist){
  if(g.tier===TA.length-1||player.shield>0)return;
@@ -1195,7 +1235,7 @@ function update(dt){
   }
  }
  entities=entities.filter(e=>!e.dead);macroEntities=macroEntities.filter(e=>!e.dead);
- for(let i=cosmicAbsorptions.length-1;i>=0;i--){if(pullBodyIntoAbyss(cosmicAbsorptions[i],dt)){cosmicAbsorptions.splice(i,1);continue;}if(!animateAbsorption(cosmicAbsorptions[i],dt))applyBlackHoleGravity(cosmicAbsorptions[i],dt);if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);}
+ for(let i=cosmicAbsorptions.length-1;i>=0;i--){if(pullBodyIntoAbyss(cosmicAbsorptions[i],dt)){if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);continue;}if(!animateAbsorption(cosmicAbsorptions[i],dt))applyBlackHoleGravity(cosmicAbsorptions[i],dt);if(cosmicAbsorptions[i].dead)cosmicAbsorptions.splice(i,1);}
  harvestCosmicLOD(dt);if(streamTimer>.32){streamTimer=0;streamField();promoteCosmicDust();promoteAbyssMatter();}
  // No random refill events: only unexplored, persistent sectors supply new matter.
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.exp(-dt*2);p.vy*=Math.exp(-dt*2);p.life-=dt;}
@@ -1694,10 +1734,13 @@ function render(time){
  // Restore the compositing baseline every frame; otherwise a previous
  // effect can accidentally carry semi-transparency onto the next frame.
  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
- sky(time);renderDistantBodies();renderMacroField(time);
+ sky(time);
+ ctx.save();clipPlayerHorizon();renderDistantBodies();renderMacroField(time);ctx.restore();
  ctx.save();
  if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));
+ ctx.save();clipPlayerHorizon();
  for(const e of entities)renderEntity(e,time);
+ ctx.restore();
  // A temporary Canvas readback failure must not abort this frame before
  // drawing the opaque horizon. Keep the lens optional, not the black hole.
  if(time>=blackHoleLensRetryAt){
@@ -1706,7 +1749,7 @@ function render(time){
  }
  renderPlayer(time);renderParticles();
  ctx.restore();
- if(screenFlash>0){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
+ if(screenFlash>0&&!g.endless){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
  // Compositing invariant: the event horizon is drawn after every distortion,
  // light effect and entity. It can never fade behind the background.
  if(g.tier===TA.length-1){
@@ -1716,7 +1759,7 @@ function render(time){
   paintBlackHole(p.x,p.y,r,time);
   ctx.restore();
  }
- renderAbysses();
+ renderAbysses();renderWaypoint();
  // Atomic presentation: the screen never sees a partially completed frame.
  // Do not reset canvas.width/height or use a desynchronized front context.
  screenCtx.save();
@@ -1782,6 +1825,78 @@ function changeAtlasZoom(factor,anchorX,anchorY){
  }
  atlas.dirty=true;
 }
+function atlasAbyssMarkers(x,y,w,h,scale){
+ const result=[];
+ for(const body of abyssCandidates(x,y,Math.hypot(w,h)/scale)){
+  const px=w/2+(body.x-x)*scale,py=h/2+(body.y-y)*scale,r=body.r*scale;
+  if(px+r<0||py+r<0||px-r>w||py-r>h)continue;
+  const group=r<4?result.find(m=>m.r<4&&Math.hypot(m.x-px,m.y-py)<14):null;
+  if(group)group.bodies.push(body);
+  else result.push({x:px,y:py,r,bodies:[body]});
+ }
+ return result;
+}
+function atlasFocusHoles(bodies){
+ const bounds=$('atlas-canvas').getBoundingClientRect();
+ let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
+ for(const h of bodies){left=Math.min(left,h.x-h.r*2);right=Math.max(right,h.x+h.r*2);top=Math.min(top,h.y-h.r*2);bottom=Math.max(bottom,h.y+h.r*2);}
+ atlas.x=(left+right)/2;atlas.y=(top+bottom)/2;
+ atlas.zoom=clamp(Math.min(bounds.width/(right-left),bounds.height/(bottom-top))*.8*CHUNK/27,1e-155,12);atlas.dirty=true;
+}
+function addMapPin(x,y,zoom=atlas.zoom){
+ if(!Number.isFinite(x)||!Number.isFinite(y)||g.mapPins.length>=64)return null;
+ const id=g.nextPinId++,pin={id,x,y,zoom:clamp(zoom,1e-155,12),name:`Метка ${id}`};
+ g.mapPins.push(pin);g.activePin=id;save();return pin;
+}
+function removeMapPin(id){
+ g.mapPins=g.mapPins.filter(p=>p.id!==id);
+ if(g.activePin===id)g.activePin=g.mapPins.length?g.mapPins[g.mapPins.length-1].id:null;
+ save();
+}
+function refreshPinPanel(){
+ const list=$('atlas-pin-list');if(!list)return;
+ list.replaceChildren();
+ const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=g.mapPins.length?'Выбери метку':'Нет меток';list.append(placeholder);
+ for(const pin of g.mapPins){const option=document.createElement('option');option.value=String(pin.id);option.textContent=pin.name;list.append(option);}
+ list.value=g.activePin?String(g.activePin):'';
+ const pin=g.mapPins.find(p=>p.id===g.activePin);
+ $('atlas-pin-name').value=pin?.name||'';$('atlas-pin-name').disabled=!pin;
+ $('atlas-pin-go').disabled=!pin;$('atlas-pin-delete').disabled=!pin;
+ $('atlas-pin-add').setAttribute('aria-pressed',String(!!atlas.placingPin));
+ $('atlas-pin-hint').textContent=atlas.placingPin?'Нажми на карту, чтобы поставить метку.':'Метки сохраняются. Нажми на метку, чтобы выбрать её; на дыру — чтобы приблизить.';
+ $('atlas-canvas').style.cursor=atlas.placingPin?'crosshair':'grab';
+}
+function atlasMapClick(px,py){
+ const bounds=$('atlas-canvas').getBoundingClientRect(),scale=atlasScale();
+ if(atlas.placingPin){
+  const pin=addMapPin(atlas.x+(px-bounds.width/2)/scale,atlas.y+(py-bounds.height/2)/scale);
+  if(!pin)toast('На карте уже 64 метки');
+  atlas.placingPin=false;refreshPinPanel();atlas.dirty=true;return;
+ }
+ const pin=g.mapPins.find(p=>Math.hypot(bounds.width/2+(p.x-atlas.x)*scale-px,bounds.height/2+(p.y-atlas.y)*scale-py)<14);
+ if(pin){g.activePin=pin.id;save();refreshPinPanel();atlas.dirty=true;return;}
+ const marker=atlasAbyssMarkers(atlas.x,atlas.y,bounds.width,bounds.height,scale).find(m=>Math.hypot(m.x-px,m.y-py)<Math.max(12,m.r));
+ if(marker)atlasFocusHoles(marker.bodies);
+}
+function drawMapPins(c,w,h,scale){
+ for(const pin of g.mapPins){
+  const x=w/2+(pin.x-atlas.x)*scale,y=h/2+(pin.y-atlas.y)*scale;
+  if(x<0||y<0||x>w||y>h)continue;
+  c.save();c.strokeStyle=pin.id===g.activePin?'#e7dfb4':'#93b6c2';c.fillStyle='#111c28';c.lineWidth=1.5;
+  c.beginPath();c.moveTo(x,y-6);c.lineTo(x+5,y);c.lineTo(x,y+6);c.lineTo(x-5,y);c.closePath();c.fill();c.stroke();
+  c.fillStyle=pin.id===g.activePin?'#e7dfb4':'#afc6d1';c.font='11px Inter,sans-serif';c.textAlign=x>w-150?'right':'left';
+  c.fillText(pin.name,x+(x>w-150?-10:10),clamp(y-9,13,h-13));c.restore();
+ }
+}
+function renderWaypoint(){
+ const pin=g.mapPins.find(p=>p.id===g.activePin);if(!pin)return;
+ const p=project(pin.x,pin.y),angle=Math.atan2(p.y-H/2,p.x-W/2);
+ const outside=p.x<40||p.y<110||p.x>W-40||p.y>H-130;
+ const x=outside?W/2+Math.cos(angle)*W*.38:p.x,y=outside?H/2+Math.sin(angle)*H*.32:p.y;
+ ctx.save();ctx.strokeStyle='#d2c99b';ctx.fillStyle='#d2c99b';ctx.lineWidth=1.5;
+ ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+4,y);ctx.lineTo(x,y+5);ctx.lineTo(x-4,y);ctx.closePath();ctx.stroke();
+ ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(pin.name+' · '+atlasNumber(Math.hypot(pin.x-player.x,pin.y-player.y)/CHUNK)+' сект.',x,y+19);ctx.restore();
+}
 function drawAtlas(){
  const surface=$('atlas-canvas');if(!surface)return;
  const bounds=surface.getBoundingClientRect();if(bounds.width<10)return;
@@ -1841,15 +1956,25 @@ function drawAtlas(){
   for(const e of cosmicAbsorptions)if(!e.dead)plotBody(e,e.captureOpacity);
  }
  c.globalAlpha=1;
- for(const h0 of abyssCandidates(atlas.x,atlas.y,Math.hypot(w,h)/scale,3/scale)){
-  const p=projectMap(h0.x,h0.y),r=h0.r*scale;
-  paintAbyss(c,p.x,p.y,r,w,h);
-  if(p.x+r<0||p.y+r<0||p.x-r>w||p.y-r>h)continue;
-  // Keep the label on the visible part of even a screen-sized horizon.
-  const tx=clamp(p.x,100,w-160),ty=clamp(p.y-r-25,22,h-80);
-  c.font='600 11px Inter,sans-serif';c.fillStyle='#dce6ee';c.fillText(h0.name,tx,ty);
-  c.font='10px Inter,sans-serif';c.fillStyle='#ab8588';
-  c.fillText(`ГОРИЗОНТ ${atlasNumber(h0.r*2/CHUNK)} сект. · СМЕРТЕЛЬНО`,tx,ty+15);
+ const mapPlayer=projectMap(player.x,player.y),labelRects=[{x:mapPlayer.x-8,y:mapPlayer.y-21,w:65,h:26}];
+ for(const marker of atlasAbyssMarkers(atlas.x,atlas.y,w,h,scale)){
+  const {x,y,r,bodies}=marker,h0=bodies[0];
+  if(r>=4)paintAbyss(c,x,y,r,w,h);
+  else {c.fillStyle='#010205';c.strokeStyle='#a2b3c4';c.lineWidth=1;c.beginPath();c.arc(x,y,3,0,TAU);c.fill();c.stroke();}
+  const label=bodies.length>1?`ДЫРЫ: ${bodies.length} · ПРИБЛИЗИТЬ`:h0.name;
+  c.font='600 10px Inter,sans-serif';
+  const detail=bodies.length===1&&r>=8,ww=Math.max(c.measureText(label).width,detail?165:0)+8,hh=detail?29:16;
+  let placement=null;
+  for(const offset of [-Math.max(4,r)-23,Math.max(4,r)+18,-Math.max(4,r)-44,Math.max(4,r)+40]){
+   for(const dx of [8,-ww-8]){
+    const candidate={x:clamp(x+dx,10,w-ww-10),y:clamp(y+offset,17,h-80),w:ww,h:hh};
+    if(labelRects.every(q=>candidate.x>q.x+q.w||candidate.x+ww<q.x||candidate.y>q.y+q.h||candidate.y+hh<q.y)){placement=candidate;break;}
+   }
+   if(placement)break;
+  }
+  if(placement){const {x:tx,y:ty}=placement;labelRects.push(placement);c.fillStyle='#dce6ee';c.fillText(label,tx,ty);
+   if(detail){c.font='9px Inter,sans-serif';c.fillStyle='#ab8588';c.fillText(`ГОРИЗОНТ ${atlasNumber(h0.r*2/CHUNK)} сект.`,tx,ty+13);}
+  }
  }
  const playerPoint=projectMap(player.x,player.y);
  // Both the event horizon and gravity field are drawn at their TRUE map size.
@@ -1875,6 +2000,7 @@ function drawAtlas(){
   c.strokeStyle='#9caebf';c.beginPath();c.arc(origin.x,origin.y,4,0,TAU);c.stroke();
   c.fillStyle='#91a5b9';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
  }
+ drawMapPins(c,w,h,scale);
  // Always-readable scale bar, in real sectors (not invented light-years).
  const barSectors=atlasNiceDistance(Math.min(150,w*.28)/sectorPx),barPx=barSectors*sectorPx;
  c.fillStyle='rgba(4,11,23,.94)';c.fillRect(12,h-59,Math.max(172,barPx+32),47);
@@ -1893,20 +2019,27 @@ function showMap(){
  show(`<div class="atlas-top"><div><div class="eyebrow">ГАЛАКТИЧЕСКАЯ НАВИГАЦИЯ</div><div class="overlay-title">МАСШТАБ ВСЕЛЕННОЙ</div></div><span class="atlas-north">N ↑</span></div>
  <div class="atlas-measures"><div><small>${g.endless?'ДИАМЕТР ГОРИЗОНТА':'ТВОЙ ДИАМЕТР'}</small><strong id="atlas-diameter"></strong></div><div><small>ШИРИНА ИГРОВОГО ЭКРАНА</small><strong id="atlas-viewport"></strong></div><div><small>ШИРИНА КАРТЫ</small><strong id="atlas-span"></strong></div></div>
  <div class="atlas-danger-bar"><span id="atlas-threat"></span><button id="atlas-abyss" class="secondary-button">ОБЗОР ГИГАНТОВ ↗</button></div>
+ <div class="atlas-pins"><button id="atlas-pin-add" class="secondary-button" aria-pressed="false">＋ МЕТКА</button><select id="atlas-pin-list" aria-label="Метки на карте"></select><input id="atlas-pin-name" aria-label="Название метки" maxlength="32" placeholder="Название метки"><button id="atlas-pin-go" class="secondary-button">К МЕТКЕ</button><button id="atlas-pin-delete" class="secondary-button" aria-label="Удалить выбранную метку">УДАЛИТЬ</button></div><div id="atlas-pin-hint" class="atlas-pin-hint" aria-live="polite"></div>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">−</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">⌖</button></div></div>
- <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ СМЕРТЕЛЬНЫЙ ГОРИЗОНТ</span></div>
+ <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ СМЕРТЕЛЬНЫЙ ГОРИЗОНТ · ◦ ДАЛЁКИЕ ДЫРЫ</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Все расстояния — в секторах мира.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
- cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
- cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
- cv.addEventListener('pointerup',()=>atlas.drag=false);cv.addEventListener('pointercancel',()=>atlas.drag=false);
+ cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
+ cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;if(Math.hypot(ev.clientX-atlas.downX,ev.clientY-atlas.downY)>6)atlas.moved=true;if(atlas.placingPin||!atlas.moved)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
+ cv.addEventListener('pointerup',ev=>{if(atlas.drag&&!atlas.moved){const box=cv.getBoundingClientRect();atlasMapClick(ev.clientX-box.left,ev.clientY-box.top);}atlas.drag=false;});cv.addEventListener('pointercancel',()=>atlas.drag=false);
  cv.addEventListener('wheel',ev=>{ev.preventDefault();const box=cv.getBoundingClientRect();changeAtlasZoom(Math.exp(-clamp(ev.deltaY,-300,300)*.002),ev.clientX-box.left,ev.clientY-box.top);},{passive:false});
  $('atlas-zoom-in').onclick=()=>changeAtlasZoom(1.4);
  $('atlas-zoom-out').onclick=()=>changeAtlasZoom(1/1.4);
  $('atlas-center').onclick=atlasFitPlayer;
  $('atlas-abyss').onclick=atlasShowAbyss;
+ $('atlas-pin-add').onclick=()=>{atlas.placingPin=!atlas.placingPin;refreshPinPanel();};
+ $('atlas-pin-list').onchange=ev=>{g.activePin=Number(ev.target.value)||null;save();refreshPinPanel();atlas.dirty=true;};
+ $('atlas-pin-name').onchange=ev=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){p.name=ev.target.value.trim().slice(0,32)||`Метка ${p.id}`;save();refreshPinPanel();atlas.dirty=true;}};
+ $('atlas-pin-delete').onclick=()=>{removeMapPin(g.activePin);refreshPinPanel();atlas.dirty=true;};
+ $('atlas-pin-go').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){atlas.x=p.x;atlas.y=p.y;atlas.zoom=p.zoom;atlas.dirty=true;}};
+ refreshPinPanel();
  const giant=nearestAbyss();
  $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${atlasNumber(giant.r*2/CHUNK)} сект. · в ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. За горизонтом весь прогресс теряется.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
  requestAnimationFrame(drawAtlas);
