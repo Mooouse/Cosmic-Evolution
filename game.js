@@ -1207,6 +1207,15 @@ function getAccretionTexture(type=2){
 }
 // The GPU samples the completed world buffer directly. There is no per-frame
 // getImageData/readback or million-pixel JavaScript loop on the normal path.
+const EINSTEIN_RING_SCALE=2.05;
+// Signed inverse lens equation: a source behind the centre becomes a ring,
+// with a reversed secondary image between that ring and the opaque horizon.
+// This warps the actual scene; it never paints an artificial luminous torus.
+function lensSourceRadius(d,R,outer){
+ const core=R*BLACK_HOLE_CORE_FRACTION,einstein=core*EINSTEIN_RING_SCALE;
+ const border=clamp((outer-d)/Math.max(1,R*.50),0,1);
+ return d-einstein*einstein/Math.max(core*.99,d)*border*border*(3-2*border);
+}
 let gpuLens=null,gpuLensUnavailable=false,lensBackend='pending';
 function initGpuLens(){
  if(gpuLensUnavailable)return null;
@@ -1230,15 +1239,13 @@ function initGpuLens(){
  void main(){
   vec2 pixel=vec2(uv.x,1.-uv.y)*viewport;
   vec2 delta=pixel-center;
-  float d=length(delta),core=radius*0.245;
+  float d=length(delta),core=radius*${BLACK_HOLE_CORE_FRACTION};
   vec4 original=texture2D(scene,uv);
   if(d<core*.99||d>=outerRadius){gl_FragColor=original;return;}
-  float u=max(0.,(d-core)/(radius*.76));
   float border=clamp((outerRadius-d)/max(1.,radius*.50),0.,1.);
-  float strength=exp(-pow(u,1.65))*border*border*(3.-2.*border);
-  float bend=radius*.34*strength,twist=.040*strength;
-  vec2 rotated=vec2(delta.x*cos(twist)-delta.y*sin(twist),delta.x*sin(twist)+delta.y*cos(twist));
-  vec2 source=(center+rotated*((d+bend)/max(.000001,d)))/viewport;
+  float einstein=core*${EINSTEIN_RING_SCALE};
+  float sourceRadius=d-einstein*einstein/max(core*.99,d)*border*border*(3.-2.*border);
+  vec2 source=(center+delta*(sourceRadius/max(.000001,d)))/viewport;
   if(source.x<0.||source.y<0.||source.x>1.||source.y>1.){gl_FragColor=original;return;}
   float outerStart=max(core+radius*.35,outerRadius-radius*.50);
   float f=clamp((outerRadius-d)/max(1.,outerRadius-outerStart),0.,1.);
@@ -1287,11 +1294,11 @@ function renderGpuLens(p,R,outer){
 // True gravitational lensing of the existing stars/galaxies. No gas or disk.
 let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
 let blackHoleLensRetryAt=0,lensPixels=null;
-const LUT=4096,ratioLut=new Float32Array(LUT+1),cosLut=new Float32Array(LUT+1),sinLut=new Float32Array(LUT+1),opacityLut=new Float32Array(LUT+1);
+const LUT=4096,ratioLut=new Float32Array(LUT+1),opacityLut=new Float32Array(LUT+1);
 function renderBlackHoleLensing(){
  if(g.tier!==TA.length-1)return;
  const p=project(player.x,player.y),R=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
- // A compact lens, not a giant vortex of stretched galaxies.
+ // The Einstein ring stays proportional to the actual black horizon.
  const outer=Math.min(R*2.30,Math.max(W,H)*.85);
  if(renderGpuLens(p,R,outer))return;
  lensBackend='cpu';
@@ -1323,29 +1330,22 @@ function renderBlackHoleLensing(){
  const sampleX=sw/width,sampleY=sh/height,core=R*BLACK_HOLE_CORE_FRACTION;
  const outerStart=Math.max(core+R*.35,outer-R*.50),outerLength=Math.max(1,outer-outerStart);
  // Precompute the radial lens once per frame. At native HD resolutions,
- // recomputing exp/pow/sin/cos for *every pixel* was prohibitively slow.
+ // recomputing the radial mapping for every pixel is needlessly expensive.
  const lutStep=outer/LUT;
  for(let k=0;k<=LUT;k++){
-  const d=k*lutStep,u=Math.max(0,(d-core)/(R*.76));
-  const strength=Math.exp(-Math.pow(u,1.65));
-  const border=clamp((outer-d)/Math.max(1,R*.50),0,1);
-  const feather=border*border*(3-2*border);
-  const bend=R*.34*strength*feather;
-  const twist=.040*strength*feather;
+  const d=k*lutStep;
   const f=clamp((outer-d)/outerLength,0,1);
-  ratioLut[k]=(d+bend)/Math.max(1e-6,d);
-  cosLut[k]=Math.cos(twist);
-  sinLut[k]=Math.sin(twist);
+  ratioLut[k]=lensSourceRadius(d,R,outer)/Math.max(1e-6,d);
   opacityLut[k]=f*f*(3-2*f);
  }
  for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
   const dx=left+(ix+.5)/sampleX-p.x,dy=top+(iy+.5)/sampleY-p.y;
   const d=Math.sqrt(dx*dx+dy*dy),idx=(iy*sw+ix)*4;
   if(d<core*.99||d>=outer)continue;
-  const k=Math.min(LUT,Math.floor(d/lutStep));
-  const rr=ratioLut[k],cosine=cosLut[k],sine=sinLut[k];
-  const sx=(p.x+(dx*cosine-dy*sine)*rr-left)*sampleX-.5;
-  const sy=(p.y+(dx*sine+dy*cosine)*rr-top)*sampleY-.5;
+  const lookup=d/lutStep,k=Math.min(LUT-1,Math.floor(lookup)),t=lookup-k;
+  const rr=ratioLut[k]+(ratioLut[k+1]-ratioLut[k])*t;
+  const sx=(p.x+dx*rr-left)*sampleX-.5;
+  const sy=(p.y+dy*rr-top)*sampleY-.5;
   if(sx<0||sy<0||sx>=sw-1||sy>=sh-1)continue;
   const x=Math.floor(sx),y=Math.floor(sy),fx=sx-x,fy=sy-y;
   const p00=(y*sw+x)*4,p01=p00+4,p10=p00+sw*4,p11=p10+4;

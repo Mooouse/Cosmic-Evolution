@@ -280,3 +280,26 @@ console.log('PASS: map fits real viewport and horizon; readable scale at four ex
  assert.equal(new Set(entities.map(e=>`${e.chunk}:${e.index}`)).size,count);
 }
 console.log('PASS: distant dust becomes physical without duplicate sector slots');
+
+// The real inverse lens equation must form an Einstein ring, rather than
+// simply shifting all samples outwards (which never produces a donut).
+const lensStart=game.indexOf('const EINSTEIN_RING_SCALE=');
+const lensStop=game.indexOf('let gpuLens=',lensStart);
+const lensBox={BLACK_HOLE_CORE_FRACTION:.245,clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+vm.createContext(lensBox);
+vm.runInContext(game.slice(lensStart,lensStop),lensBox);
+for(const R of [8,80,300,1000]){
+ const outer=R*2.3,ring=R*.245*2.05;
+ const sample=d=>lensBox.lensSourceRadius(d,R,outer);
+ assert.ok(Math.abs(sample(ring))<1e-9,'Aligned source must map to a ring outside the horizon');
+ assert.ok(sample(ring*.85)<0&&sample(ring*1.15)>0,'Lens must have inner reversed and outer primary images');
+ assert.ok(Math.abs(sample(outer)-outer)<1e-9,'Lens outer edge must join the unwarped scene');
+ for(let i=0;i<100;i++)assert.ok(Number.isFinite(sample(R*.245+i*outer/100)));
+ // A small aligned disk appears all around the ring: its angular extent is
+ // magnified while the radial width remains finite, at every player size.
+ assert.ok(Math.abs(sample(ring+R*.01))<R*.025);
+ assert.ok(Math.abs(sample(ring-R*.01))<R*.025);
+ const derivative=(sample(outer)-sample(outer-R*1e-5))/(R*1e-5);
+ assert.ok(Math.abs(derivative-1)<.001,'No seam at lens boundary');
+}
+console.log('PASS: Einstein ring, reversed inner image, scale invariance and seamless outer edge');
