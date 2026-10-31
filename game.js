@@ -75,7 +75,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -141,6 +141,19 @@ let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false
 let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
 let pickupSoundAt=-1e9,pickupCount=0,pickupValue=0,pickupDisplayAt=-1e9;
 let absorptionTokens=0;
+let harvestChain=0,harvestChainTime=0;
+function chainMultiplier(){return g.tier<13?1+Math.min(1,Math.floor(harvestChain/4)*.25):1;}
+function advanceHarvestChain(){
+ if(g.tier>=13)return 1;
+ harvestChain=harvestChainTime>0?harvestChain+1:1;harvestChainTime=5;
+ if(harvestChain%4===0){
+  const color=harvestChain>=12?'#ffd6a0':'#86eaff';
+  shockwaves.push({x:player.x,y:player.y,r:player.r,life:.7,max:.7,color,range:110});
+  sound(330+Math.min(12,harvestChain)*22,'sine',.18,.012);
+ }
+ return chainMultiplier();
+}
+function ordinaryGravityRadius(){return Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20));}
 function pickupFeedback(value,rare=false){
  pickupCount++;pickupValue+=value;
  const now=performance.now();
@@ -237,7 +250,7 @@ function renderUI(force=false){
  $('matter-value').textContent=fmt(g.total);$('credit-value').textContent=fmt(g.credits);$('time-value').textContent=timeFmt(g.time);
  const t=TA[g.tier],next=TA[g.tier+1],progress=clamp(g.matter/t.required,0,1);
  $('tier-number').innerHTML=`${String(g.tier+1).padStart(2,'0')} <span>/ ${TA.length}</span>`;
- $('epoch-name').textContent=t.epoch.toUpperCase();$('tier-title').textContent=t.name;$('tier-desc').textContent=t.desc;
+ $('epoch-name').textContent=t.epoch.toUpperCase();$('tier-title').textContent=t.name;$('tier-desc').textContent=g.tier<13?(harvestChainTime>0?`ЦЕПОЧКА: ${harvestChain} · ${harvestChainTime.toFixed(1)} с`:t.desc+' Собирай цепочки и закручивай потоки материи.'):t.desc;
  $('current-form').textContent=t.name;$('next-form').textContent=g.endless?'ГОРИЗОНТ СОБЫТИЙ РАСТЁТ ∞':next?.name??'БЕСКОНЕЧНОСТЬ';
  if(g.endless){
   const rank=Math.log2(1+Math.max(0,g.matter)/t.required),sub=(rank%1)*100;
@@ -279,6 +292,21 @@ function spawn(x,y,forced,rng=Math.random){
 function seedHash(a,b){let x=Math.imul(a,374761393)^Math.imul(b,668265263)^WORLD_SEED;x=Math.imul(x^(x>>>13),1274126177);return (x^(x>>>16))>>>0;}
 function chunkRandom(seed){return ()=>{seed+=0x6D2B79F5;let t=seed;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 function chunkKey(x,y){return `${x},${y}`;}
+// Slow, deterministic orbital drift. Shared by map, sprites and physics;
+// saved game time reproduces the same positions after reload. Captured bodies
+// leave this path and keep their actual gravitational trajectory.
+function driftBody(e){
+ if(e.gravityBound||e.absorbing||e.gathering)return e;
+ const seed=seedHash((e.index||0)+((e.style||0)*31),(e.grade||0)+(e.level||0)*73);
+ const phase=(seed%6283)/1000,omega=.035+(seed%17)*.001;
+ const amplitude=e.macro||e.cosmic?e.r*.42:Math.max(110,e.r*9);
+ const t=g.time*omega,originX=e.originX??e.x,originY=e.originY??e.y;
+ return {...e,originX,originY,
+  x:originX+(Math.sin(phase+t)-Math.sin(phase))*amplitude,
+  y:originY+(Math.cos(phase+t*.73)-Math.cos(phase))*amplitude*.7,
+  motionVX:Math.cos(phase+t)*amplitude*omega,
+  motionVY:-Math.sin(phase+t*.73)*amplitude*.7*omega*.73};
+}
 const BIOME_NAMES={normal:'ПОЯС АСТЕРОИДОВ',rich:'КРИСТАЛЬНЫЙ ПОЯС',nebula:'ГАЗОВАЯ ТУМАННОСТЬ',void:'ЛЕДЯНОЙ ПОТОК',relic:'ЗВЁЗДНЫЙ ФРОНТ',anomaly:'ТЁМНАЯ МАТЕРИЯ'};
 function chunkInfo(cx,cy){
  const seed=seedHash(cx,cy),region=seedHash(Math.floor(cx/6),Math.floor(cy/6)),h=region%100;
@@ -379,14 +407,14 @@ function makeChunk(cx,cy){
   if(e.material==='plasma')e.hue=18;
   if(e.material==='ice')e.hue=195;
   if(e.material==='crystal')e.hue=252;
-  entities.push(e);
+  entities.push(driftBody(e));
  }
 }
 // Cosmic-scale deposits live on their own immutable coordinate grid. A depleted
 // world is never recreated, even after a save/load or zoom transition.
 function macroKey(cx,cy){return `${cx}:${cy}`;}
 function macroNodes(cx,cy){
- const key=macroKey(cx,cy);let saved=macroCache.get(key);if(saved)return saved;
+ const key=macroKey(cx,cy);let saved=macroCache.get(key);if(saved)return saved.map(driftBody);
  const rng=chunkRandom(seedHash(cx*31+731,cy*37-419)^0x9f4e8b21),biome=chunkInfo(cx*6,cy*6).biome;
  saved=[];
  for(let i=0;i<MACRO_COUNT;i++){
@@ -416,7 +444,7 @@ function macroNodes(cx,cy){
  if(macroCache.size>=850){
   const stale=macroCache.keys();for(let i=0;i<96;i++)macroCache.delete(stale.next().value);
  }
- macroCache.set(key,saved);return saved;
+ macroCache.set(key,saved);return saved.map(driftBody);
 }
 function streamMacroBodies(){
  if(g.tier<13||MACRO_SIZE*camera.zoom<2||!Number.isSafeInteger(Math.floor(player.x/MACRO_SIZE))||!Number.isSafeInteger(Math.floor(player.y/MACRO_SIZE))){macroEntities=macroEntities.filter(e=>(e.absorbing||e.gravityBound)&&!e.dead);macroLoaded.clear();return;}
@@ -510,7 +538,7 @@ function drawMacro(e,time,zoom,opacity=1){
  if(x<-radius*1.6-10||x>W+radius*1.6+10||y<-radius*1.6-10||y>H+radius*1.6+10)return false;
  const drawR=clamp(radius*1.15,1.8,112)*(e.absorbScale??1);
  // LOD fades must never turn a whole class of galaxies black.
- const fade=1; // The opaque horizon occludes the body; do not fade it out at contact.
+ const fade=absorptionLight(e); // Preserve the previous ring image; fade only after full entry.
  ctx.save();ctx.globalAlpha=clamp(.67+radius*.018,.66,.97)*clamp(opacity,0,1)*fade;
  if(e.kind==='blackhole'){
   if(drawR<3){ctx.fillStyle=['#69c9ed','#cda1f9','#ffcc8e'][e.holeType||0];ctx.fillRect(x-1,y-1,2,2);}
@@ -529,7 +557,7 @@ function absorptionKey(e){return `${e.level||0}:${e.chunk??(e.level?`${e.level}:
 const macroLODCache=new Map();let cosmicHarvestTimer=0,cosmicSceneDirty=false,cosmicNextRedraw=0;
 function macroLODNodes(gx,gy,level){
  const key=level+':'+gx+':'+gy;
- let nodes=macroLODCache.get(key);if(nodes)return nodes;
+ let nodes=macroLODCache.get(key);if(nodes)return nodes.map(driftBody);
  const stride=2**level;
  // Hash local cell indices, never enormous world coordinates. At scale
  // 10^60+ hashing gx as a float collapses many distinct galaxies to one seed.
@@ -550,7 +578,7 @@ function macroLODNodes(gx,gy,level){
  if(macroLODCache.size>=1400){
   const stale=macroLODCache.keys();for(let i=0;i<220;i++)macroLODCache.delete(stale.next().value);
  }
- macroLODCache.set(key,nodes);return nodes;
+ macroLODCache.set(key,nodes);return nodes.map(driftBody);
 }
 // Cosmic LOD objects are interactable, even when their sprites come from the
 // cached far-field. Harvested identities persist; no giant per-frame physics.
@@ -724,73 +752,13 @@ function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
 // physical bodies are drawn every frame. This avoids thousands of drawImage
 // operations per frame on giant black holes and high-DPI screens.
 let macroBackdrop=null,macroBackdropOld=null,macroFadeStart=0,macroBlend=null;
-function clipPlayerHorizon(){
- if(!g.endless)return;
- const p=project(player.x,player.y),r=blackHoleCoreWorldRadius()*camera.zoom;
- ctx.beginPath();ctx.rect(0,0,W,H);ctx.moveTo(p.x+r,p.y);ctx.arc(p.x,p.y,r,0,TAU);ctx.clip('evenodd');
-}
 function renderMacroField(time){
- macroVisibleCount=0;
- if(g.tier<13)return;
- // Final-tier galaxies are interactive: draw their cached sprites directly so
- // a captured object cannot leave a frozen duplicate in a backdrop crossfade.
- if(g.tier===TA.length-1){
-  renderMacroBackground(time);
-  ctx.save();clipPlayerHorizon();
-  for(const e of macroEntities)if(drawMacro(e,time,camera.zoom,1))macroVisibleCount++;
-  for(const e of cosmicAbsorptions)if(!e.dead)drawMacro(e,time,camera.zoom,e.captureOpacity);
-  ctx.restore();return;
- }
- const worldZoom=Math.max(1e-155,camera.zoom),nearCenter=macroKey(Math.floor(player.x/MACRO_SIZE),Math.floor(player.y/MACRO_SIZE));
- const ratio=macroBackdrop?worldZoom/macroBackdrop.zoom:1;
- let x=0,y=0,ww=0,hh=0;
- if(macroBackdrop){
-  ww=macroBackdrop.canvas.width*ratio;hh=macroBackdrop.canvas.height*ratio;
-  x=W/2+(macroBackdrop.x-camera.x)*worldZoom-ww/2;
-  y=H/2+(macroBackdrop.y-camera.y)*worldZoom-hh/2;
- }
- const refresh=(cosmicSceneDirty&&time>=cosmicNextRedraw)||!macroBackdrop||macroBackdrop.tier!==g.tier||macroBackdrop.width!==W||macroBackdrop.height!==H||
-   ratio<.91||ratio>1.12||x>0||y>0||x+ww<W||y+hh<H||
-   (macroBackdrop.nearCenter!==nearCenter&&macroBackdrop.level===0);
- if(refresh){
-  const realCtx=ctx,realW=W,realH=H;
-  // Recycle the retired backing store instead of allocating a multi-megabyte
-  // canvas at every refresh (which used to trigger periodic garbage collection).
-  const buffer=macroBackdropOld?macroBackdropOld.canvas:document.createElement('canvas');
-  const bw=Math.ceil(W*1.62),bh=Math.ceil(H*1.62);
-  if(buffer.width!==bw||buffer.height!==bh){buffer.width=bw;buffer.height=bh;}
-  try{
-   ctx=buffer.getContext('2d',{alpha:true});
-   W=bw;H=bh;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,W,H);
-   renderMacroBackground(time,realW,realH);
-  }finally{ctx=realCtx;W=realW;H=realH;}
-  macroBackdropOld=macroBackdrop;macroFadeStart=time;
-  cosmicSceneDirty=false;cosmicNextRedraw=time+.65;
-  macroBackdrop={canvas:buffer,x:camera.x,y:camera.y,zoom:worldZoom,width:W,height:H,tier:g.tier,
-   nearCenter,level:cosmicVisibleLOD().low};
-  x=(W-buffer.width)/2;y=(H-buffer.height)/2;ww=buffer.width;hh=buffer.height;
- }
- const blend=clamp((time-macroFadeStart)/.40,0,1);
- if(macroBackdropOld&&blend<1){
-  if(!macroBlend)macroBlend=document.createElement('canvas');
-  if(macroBlend.width!==W||macroBlend.height!==H){macroBlend.width=W;macroBlend.height=H;}
-  const mix=macroBlend.getContext('2d');
-  mix.clearRect(0,0,W,H);
-  const old=macroBackdropOld,r=worldZoom/old.zoom;
-  const ow=old.canvas.width*r,oh=old.canvas.height*r;
-  const ox=W*.5+(old.x-camera.x)*worldZoom-ow*.5;
-  const oy=H*.5+(old.y-camera.y)*worldZoom-oh*.5;
-  // Interpolate premultiplied colour AND alpha in an isolated transparent
-  // buffer. Source-over on the main scene doubled semi-transparent galaxies
-  // before dropping the old layer, creating a flash every .65 seconds.
-  mix.globalCompositeOperation='source-over';mix.globalAlpha=1-blend;
-  mix.drawImage(old.canvas,ox,oy,ow,oh);
-  mix.globalCompositeOperation='lighter';mix.globalAlpha=blend;
-  mix.drawImage(macroBackdrop.canvas,x,y,ww,hh);
-  mix.globalAlpha=1;mix.globalCompositeOperation='source-over';
-  ctx.drawImage(macroBlend,0,0,W,H);
- }else ctx.drawImage(macroBackdrop.canvas,x,y,ww,hh);
- for(const e of macroEntities)if(drawMacro(e,time,worldZoom,1))macroVisibleCount++;
+ macroVisibleCount=0;if(g.tier<13)return;
+ // Reuse cached sprites, but project live positions every frame. A cached
+ // backdrop would freeze their orbital motion until the next camera change.
+ renderMacroBackground(time);
+ for(const e of macroEntities)if(!e.dead&&drawMacro(e,time,camera.zoom,1))macroVisibleCount++;
+ for(const e of cosmicAbsorptions)if(!e.dead)drawMacro(e,time,camera.zoom,e.captureOpacity);
 }
 
 function streamField(){
@@ -819,7 +787,7 @@ function streamField(){
 // A harvested body never reappears, even in this low-detail distant view.
 function distantSamples(cx,cy){
  const key=chunkKey(cx,cy);
- let result=distantChunkCache.get(key);if(result)return result;
+ let result=distantChunkCache.get(key);if(result)return result.map(driftBody);
  const info=chunkInfo(cx,cy),rng=chunkRandom(info.seed);result=[];
  for(let i=0;i<32;i++){
   const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK;
@@ -832,7 +800,7 @@ function distantSamples(cx,cy){
   result.push({...e,x:px,y:py,index:i,chunk:key,kind,material,r:radius,value,grade});
  }
  if(distantChunkCache.size>1250)distantChunkCache.clear();
- distantChunkCache.set(key,result);return result;
+ distantChunkCache.set(key,result);return result.map(driftBody);
 }
 // One world-anchored dust layer across the whole viewport. Its coverage never
 // depends on the square physics streaming bubble. Sampling is bounded in 4K.
@@ -951,7 +919,7 @@ function renderDistantBodies(){
  }
  ctx.restore();
 }
-function respawn(e){markHarvested(e);e.dead=true;if(e.macro)cosmicSceneDirty=true;}
+function respawn(e){markHarvested(e);absorbingMacroKeys.delete(absorptionKey(e));e.dead=true;if(e.macro)cosmicSceneDirty=true;}
 // Contact starts continuous inward motion. Removal and reward happen only
 // after the ENTIRE rendered body is behind the opaque event horizon.
 function startAbsorption(e){
@@ -959,6 +927,10 @@ function startAbsorption(e){
  e.absorbing=.000001;e.absorbScale=1;e.absorbOriginX=e.x;e.absorbOriginY=e.y;
  e.absorbDuration=clamp(.85+Math.hypot(e.x-player.x,e.y-player.y)*camera.zoom/420,.85,1.6);
  if(e.chunk!==undefined||e.cosmic)absorbingMacroKeys.add(absorptionKey(e));
+}
+function absorptionLight(e){
+ const t=clamp((e.lensFade||0)/.28,0,1);
+ return 1-t*t*(3-2*t);
 }
 function animateAbsorption(e,dt){
  if(!e.absorbing||e.dead)return false;
@@ -970,7 +942,10 @@ function animateAbsorption(e,dt){
  const zoom=Math.max(1e-155,camera.zoom),core=blackHoleCoreWorldRadius()*zoom;
  const fullRadius=(e.macro||e.cosmic?clamp(e.r*zoom*1.15,1.8,112)*(e.kind==='blackhole'?2:1.4):Math.max(2,e.r*zoom*2))*e.absorbScale;
  const fullyInside=Math.hypot(e.x-player.x,e.y-player.y)*zoom+fullRadius<=core*.96;
- if(fullyInside){
+ // Keep the old, complete source image for the Einstein ring. Once the whole
+ // body is hidden, let its lensed light die smoothly before deleting it.
+ if(fullyInside)e.lensFade=(e.lensFade||0)+dt;
+ if(fullyInside&&e.lensFade>=.28){
   if(e.captureBag)finishCosmicAbsorption(e);else absorb(e);
   if(e.chunk!==undefined||e.cosmic)absorbingMacroKeys.delete(absorptionKey(e));
  }
@@ -1003,19 +978,50 @@ function buildAbyssCatalogue(){
  return Object.freeze(catalogue);
 }
 const ABYSS_CATALOGUE=buildAbyssCatalogue();
+g.abyssConsumed=Object.fromEntries(ABYSS_CATALOGUE.filter(h=>g.abyssConsumed?.[h.id]===true).map(h=>[h.id,true]));
+g.abyssPositions=Object.fromEntries(ABYSS_CATALOGUE.filter(h=>!g.abyssConsumed[h.id]&&Array.isArray(g.abyssPositions?.[h.id])&&g.abyssPositions[h.id].length===2&&g.abyssPositions[h.id].every(Number.isFinite)).map(h=>[h.id,g.abyssPositions[h.id]]));
+function livingAbysses(){
+ return ABYSS_CATALOGUE.filter(h=>!g.abyssConsumed[h.id]).map(h=>{
+  const p=g.abyssPositions[h.id];return p?{...h,x:p[0],y:p[1]}:h;
+ });
+}
+function canEatAbyss(h){return g.endless&&h.r<blackHoleCoreWorldRadius();}
+function finishAbyssAbsorption(h){
+ if(g.abyssConsumed[h.id])return;
+ const ratio=clamp(h.r/blackHoleCoreWorldRadius(),0,1);
+ const amount=Math.min(1e280,Math.max(100,(g.matter+TA[g.tier].required)*Math.expm1(Math.log1p(ratio*ratio)/(2*.38))));
+ g.abyssConsumed[h.id]=true;delete g.abyssPositions[h.id];
+ g.matter=Math.min(1e290,g.matter+amount);g.total=Math.min(1e290,g.total+amount);
+ g.stageCollects=Math.min(1e290,g.stageCollects+amount);g.credits=Math.min(1e290,g.credits+amount*.4);
+ g.collects++;g.materials.exotic+=10;player.targetR=currentRadius();
+ abyssVisual=abyssVisual.filter(b=>b.id!==h.id);abyssTimer=0;atlas.dirty=true;
+ toast(`◉ ПОГЛОЩЕНА ${h.name} · +${fmt(amount)} МАТЕРИИ`);save();
+}
+function attractSmallerAbyss(h,dt){
+ const saved=g.abyssPositions[h.id];if(saved)h={...h,x:saved[0],y:saved[1]};
+ const core=blackHoleCoreWorldRadius(),dx=player.x-h.x,dy=player.y-h.y,d=Math.hypot(dx,dy);
+ const range=blackHoleGravityRadius()+h.r;if(d>range)return;
+ // Exact world radius: no minimum sprite size, no vanishing at first contact.
+ const speed=Math.max(core*.55,160/Math.max(1e-155,camera.zoom))*(.3+.7*(1-clamp(d/range,0,1)));
+ const travel=Math.min(d,speed*dt),fraction=d>0?travel/d:0;
+ h={...h,x:h.x+dx*fraction,y:h.y+dy*fraction};
+ g.abyssPositions[h.id]=[h.x,h.y];
+ const visual=abyssVisual.findIndex(b=>b.id===h.id);if(visual>=0)abyssVisual[visual]=h;
+ if(Math.hypot(h.x-player.x,h.y-player.y)+h.r<=core)finishAbyssAbsorption(h);
+}
 function abyssCandidates(x,y,extent=0,minRadius=0){
  // No size cutoff: even subpixel landmarks keep their identity on the atlas.
  // World rendering can cull pixels; neither zoom nor LOD creates new holes.
- return ABYSS_CATALOGUE.filter(h=>Math.hypot(h.x-x,h.y-y)<=extent+h.r*7);
+ return livingAbysses().filter(h=>Math.hypot(h.x-x,h.y-y)<=extent+h.r*7);
 }
 function nearestAbyss(){
  let nearest=null,distance=Infinity;
- for(const h of ABYSS_CATALOGUE){
+ for(const h of livingAbysses()){
   if(h.r<player.r*18)continue;
   const d=Math.hypot(h.x-player.x,h.y-player.y)-h.r;
   if(d<distance){nearest=h;distance=d;}
  }
- return nearest||ABYSS_CATALOGUE[ABYSS_CATALOGUE.length-1];
+ return nearest;
 }
 function abyssPull(h,x,y,speed){
  const dx=h.x-x,dy=h.y-y,d=Math.hypot(dx,dy),q=d/h.r;
@@ -1031,7 +1037,7 @@ function crossesAbyss(h,x0,y0,x1,y1){
  return Math.hypot(ax+dx*t,ay+dy*t)<=1;
 }
 function refreshAbysses(){
- abyssPhysical=abyssCandidates(player.x,player.y,Math.max(player.r,Math.hypot(player.vx,player.vy)*.4));
+ abyssPhysical=abyssCandidates(player.x,player.y,Math.max(g.endless?blackHoleGravityRadius():player.r,Math.hypot(player.vx,player.vy)*.4));
  const zoom=Math.max(1e-155,camera.zoom);
  abyssVisual=abyssCandidates(camera.x,camera.y,Math.hypot(W,H)/zoom,2/zoom);
 }
@@ -1039,12 +1045,14 @@ function updateAbysses(dt,speed,oldX,oldY){
  abyssTimer-=dt;if(abyssTimer<=0){abyssTimer=.18;refreshAbysses();}
  let strongest=null,strongestPull=0;
  for(const h of abyssPhysical){
+  if(g.abyssConsumed[h.id])continue;
+  if(canEatAbyss(h)){attractSmallerAbyss(h,dt);continue;}
   const pull=abyssPull(h,player.x,player.y,speed),force=Math.hypot(pull.x,pull.y);
   player.x+=pull.x*dt;player.y+=pull.y*dt;
   if(force>strongestPull){strongest=h;strongestPull=force;}
   if(crossesAbyss(h,oldX,oldY,player.x,player.y)){dieInAbyss(h);return false;}
  }
- const ahead=strongest||abyssPhysical.slice().sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
+ const ahead=strongest||abyssPhysical.filter(h=>!g.abyssConsumed[h.id]&&!canEatAbyss(h)).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
  const warning=$('abyss-warning');
  const notice=strongest?`⚠ ${strongest.name} · ГРАВИТАЦИОННЫЙ ЗАХВАТ · До горизонта ${atlasNumber(Math.max(0,Math.hypot(strongest.x-player.x,strongest.y-player.y)-strongest.r)/CHUNK)} сект. · Вход = потеря всего прогресса`:ahead?`⚠ ВПЕРЕДИ ${ahead.name} · До горизонта ${atlasNumber(Math.max(0,Math.hypot(ahead.x-player.x,ahead.y-player.y)-ahead.r)/CHUNK)} сект. · Смертельная чёрная дыра`:'';
  if(notice!==abyssNotice){abyssNotice=notice;warning.textContent=notice;warning.hidden=!notice;}
@@ -1053,6 +1061,7 @@ function updateAbysses(dt,speed,oldX,oldY){
 function pullBodyIntoAbyss(e,dt){
  if(e.dead)return true;
  for(const h of abyssPhysical){
+  if(g.abyssConsumed[h.id]||canEatAbyss(h))continue;
   const d=Math.hypot(h.x-e.x,h.y-e.y);if(d>h.r*5)continue;
   const zoom=Math.max(1e-155,camera.zoom),pull=abyssPull(h,e.x,e.y,180/zoom);
   const x=e.x,y=e.y;e.x+=pull.x*dt;e.y+=pull.y*dt;
@@ -1094,8 +1103,17 @@ function paintAbyss(c,x,y,r,w,h){
 }
 function renderAbysses(){
  const zoom=Math.max(1e-155,camera.zoom);
- for(const h of abyssVisual){const p=project(h.x,h.y);paintAbyss(ctx,p.x,p.y,h.r*zoom,W,H);}
- const h=abyssPhysical.slice().sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
+ for(const h of abyssVisual){
+  if(g.abyssConsumed[h.id])continue;
+  const p=project(h.x,h.y);ctx.save();
+  // Our opaque horizon hides the swallowed portion continuously.
+  if(canEatAbyss(h)){
+   const me=project(player.x,player.y),core=blackHoleCoreWorldRadius()*zoom;
+   ctx.beginPath();ctx.rect(0,0,W,H);ctx.moveTo(me.x+core,me.y);ctx.arc(me.x,me.y,core,0,TAU);ctx.clip('evenodd');
+  }
+  paintAbyss(ctx,p.x,p.y,h.r*zoom,W,H);ctx.restore();
+ }
+ const h=abyssPhysical.filter(b=>!g.abyssConsumed[b.id]&&!canEatAbyss(b)).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
  if(h){
   const p=project(h.x,h.y);
   if(p.x<30||p.y<100||p.x>W-30||p.y>H-130){
@@ -1124,7 +1142,7 @@ function testerVisitAbyss(){
 
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
-function absorb(e){const mat=resourceOf(e);const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
+function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const val=Math.max(1,Math.round(e.value*(1+g.upgrade.harvest*.075)*tester.loot));g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
  g.materials[mat]=(g.materials[mat]||0)+gain;
  if(!g.endless&&(mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
@@ -1163,7 +1181,18 @@ function evolve(){
 }
 function activatePulse(){if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;const range=270+g.upgrade.gravity*7;shockwaves.push({x:player.x,y:player.y,r:10,max:1.2,life:1.2,color:'#84dfff',range});for(let e of entities){let dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy);if(d<range){if(e.material==='plasma'||e.material==='exotic'){e.primed=true;burst(e.x,e.y,8,MATERIALS[e.material].color,.6);}if(e.kind==='hazard'){e.kind='matter';e.material='crystal';}else{e.vx+=(player.x-e.x)/(d||1)*Math.max(110,650-d*1.5);e.vy+=(player.y-e.y)/(d||1)*Math.max(110,650-d*1.5);}}}shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();}
 function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=1.15;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
+function gatherBody(e,dt){
+ if(!e.gathering)return false;
+ e.gathering+=dt;
+ const t=clamp(e.gathering/.55,0,1),ease=t*t*(3-2*t);
+ const dx=e.gatherX-player.x,dy=e.gatherY-player.y,angle=t*Math.PI*.85;
+ const x=dx*Math.cos(angle)-dy*Math.sin(angle),y=dx*Math.sin(angle)+dy*Math.cos(angle);
+ e.x=player.x+x*(1-ease);e.y=player.y+y*(1-ease);e.absorbScale=1-ease*.98;
+ if(t>=1)absorb(e);
+ return true;
+}
 function update(dt){
+ harvestChainTime=Math.max(0,harvestChainTime-dt);if(harvestChainTime===0)harvestChain=0;
  g.time+=dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
  let ax=0,ay=0;
  if(keys.has('w')||keys.has('arrowup'))ay-=1;if(keys.has('s')||keys.has('arrowdown'))ay+=1;
@@ -1195,7 +1224,7 @@ function update(dt){
  visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
- let gravRange=Math.max((97+g.upgrade.gravity*7)*tester.gravity,Math.min(player.r*2.8,MACRO_SIZE*20)),collectR=g.endless?blackHoleCoreWorldRadius():Math.min(player.r,MACRO_SIZE*20)+4;
+ let gravRange=ordinaryGravityRadius(),collectR=g.endless?blackHoleCoreWorldRadius():Math.min(player.r,MACRO_SIZE*20)+4;
  const giantMode=g.endless&&player.r>CHUNK*5;
  // Fixed collection rate, independent of render FPS or the number of bodies
  // touched by the enormous horizon. This prevents a thousand simultaneous
@@ -1209,6 +1238,8 @@ function update(dt){
  // simulated; objects jumped when their turn in the queue arrived.
  for(const e of nearbyObjects){
   if(e.dead)continue;
+  if(gatherBody(e,dt))continue;
+  if(!e.gravityBound&&!e.absorbing)Object.assign(e,driftBody(e));
   if(pullBodyIntoAbyss(e,dt))continue;
   if(animateAbsorption(e,dt))continue;
   if(g.endless){applyBlackHoleGravity(e,dt);continue;}
@@ -1216,14 +1247,19 @@ function update(dt){
   // Broad phase: no sqrt, movement or sound for distant objects.
   const dist2=dx*dx+dy*dy;
   const reach=giantMode?Math.max(nearReach+e.r+20,blackHoleTouchDistance(e,captureRadius)):nearReach+e.r+20;
-   if(dist2>reach*reach)continue;
+   if(dist2>reach*reach&&!e.gravityBound)continue;
   const dist=Math.sqrt(dist2)||1;
   if((e.kind!=='hazard'||g.tier===TA.length-1)&&
     (e.r<=player.r*.82||(g.tier===TA.length-1&&e.kind==='hazard'))&&
-    dist<gravRange*(e.material==='gas'?1.4:1)){
-   const pull=(gravRange-dist)/gravRange;
-   e.vx+=dx/dist*(150+pull*520)*dt;
-   e.vy+=dy/dist*(150+pull*520)*dt;
+    (dist<gravRange*(e.material==='gas'?1.4:1)||e.gravityBound)){
+   const pull=clamp((gravRange-dist)/gravRange,0,1);
+   if(!e.gravityBound){e.vx=e.motionVX||0;e.vy=e.motionVY||0;e.gravityBound=true;absorbingMacroKeys.add(absorptionKey(e));}
+   const chase=Math.hypot(player.vx,player.vy)*.85;
+   e.vx+=dx/dist*(150+pull*520+chase)*dt;
+   e.vy+=dy/dist*(150+pull*520+chase)*dt;
+   // Tangential flow bends the approach into a visible accretion spiral.
+   const swirl=70*pull*(e.index%2?1:-1);
+   e.vx-=dy/dist*swirl*dt;e.vy+=dx/dist*swirl*dt;
   }
   e.vx*=Math.exp(-dt*.62);e.vy*=Math.exp(-dt*.62);
   e.x+=e.vx*dt;e.y+=e.vy*dt;e.spin+=dt*.6;e.twinkle+=dt*2.5;
@@ -1231,7 +1267,7 @@ function update(dt){
    if(g.endless){startAbsorption(e);continue;}
    if(e.kind==='hazard'){e.kind='matter';e.material='crystal';absorb(e);}
    else if(!g.endless&&e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
-   else absorb(e);
+   else {e.gathering=.000001;e.gatherX=e.x;e.gatherY=e.y;e.gravityBound=true;}
   }
  }
  entities=entities.filter(e=>!e.dead);macroEntities=macroEntities.filter(e=>!e.dead);
@@ -1668,6 +1704,18 @@ function paintEvolutionDetails(x,y,r,time,tier){
 // Three LOD levels: a cheap pixel at distance, plain discs in the middle,
 // detailed shapes close to the player. The object itself is never deleted by LOD.
 function renderEntity(e,time,staticDust=false){
+ ctx.save();ctx.globalAlpha*=absorptionLight(e);
+ if(!g.endless&&!staticDust&&(e.gravityBound||e.index%3===0)){
+  const p=project(e.x,e.y),vx=(e.gravityBound?e.vx:e.motionVX)||0,vy=(e.gravityBound?e.vy:e.motionVY)||0,speed=Math.hypot(vx,vy);
+  if(speed>1&&p.x>-60&&p.x<W+60&&p.y>-60&&p.y<H+60){
+   const length=clamp(speed*camera.zoom*.20,7,e.gravityBound?56:24),color=MATERIALS[e.material]?.color||'#9edfff';
+   ctx.save();ctx.globalAlpha*=e.gravityBound?.55:.28;ctx.strokeStyle=color;ctx.lineWidth=clamp(e.r*camera.zoom*.3,1,3);
+   ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.quadraticCurveTo(p.x-vx/speed*length*.5-vy/speed*length*.12,p.y-vy/speed*length*.5+vx/speed*length*.12,p.x-vx/speed*length,p.y-vy/speed*length);ctx.stroke();ctx.restore();
+  }
+ }
+ paintEntity(e,time,staticDust);ctx.restore();
+}
+function paintEntity(e,time,staticDust=false){
  const px=(e.x-camera.x)*camera.zoom+W/2,py=(e.y-camera.y)*camera.zoom+H/2;
  const r=e.r*camera.zoom*(e.absorbScale??1);
  if(px<-r-12||px>W+r+12||py<-r-12||py>H+r+12)return;
@@ -1681,7 +1729,7 @@ function renderEntity(e,time,staticDust=false){
     ctx.save();ctx.translate(px,py);ctx.rotate(e.spin*.25);
     const color=MATERIALS[mat].color;ctx.strokeStyle=color;ctx.fillStyle=color;
     if(mat==='gas'){
-      ctx.globalAlpha=.37;for(let i=0;i<4;i++){const x=Math.cos(i*TAU/4)*r*.45,y=Math.sin(i*TAU/4)*r*.45;
+      ctx.globalAlpha*=.37;for(let i=0;i<4;i++){const x=Math.cos(i*TAU/4)*r*.45,y=Math.sin(i*TAU/4)*r*.45;
       ctx.beginPath();ctx.arc(x,y,r*.55,0,TAU);ctx.fill();}
     }else if(mat==='plasma'){
       ctx.lineWidth=Math.max(1,r*.13);for(let i=0;i<6;i++){const a=i*TAU/6+e.spin*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.25,Math.sin(a)*r*.25);ctx.lineTo(Math.cos(a+.14)*r*1.25,Math.sin(a+.14)*r*1.25);ctx.stroke();}
@@ -1724,6 +1772,26 @@ function renderPlayer(time){
  if(player.shield>0&&!g.endless){ctx.strokeStyle=`rgba(132,236,255,${.2+.35*Math.sin(time*16)**2})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,r*1.35,0,TAU);ctx.stroke();}
  if(boostTime>0&&!g.endless){ctx.strokeStyle='rgba(187,143,255,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,r*1.55+Math.sin(time*12)*3,0,TAU);ctx.stroke();}
  ctx.restore();}
+function renderGatherFlow(time){
+ if(g.endless||g.tier>=13)return;
+ const bound=entities.filter(e=>e.gravityBound&&!e.dead&&Math.hypot(e.x-player.x,e.y-player.y)<ordinaryGravityRadius()*1.3).length;
+ if(!bound&&harvestChainTime===0)return;
+ const p=project(player.x,player.y),r=player.r*camera.zoom;
+ const strength=clamp(bound/5+harvestChain/18,.15,1)*Math.min(1,Math.max(bound?1:0,harvestChainTime));
+ ctx.save();ctx.translate(p.x,p.y);ctx.globalCompositeOperation='lighter';
+ const color=harvestChain>=12?'#ffd4a0':'#8be4ff';
+ for(let arm=0;arm<4;arm++){
+  const start=time*.85+arm*TAU/4;
+  ctx.strokeStyle=color;ctx.globalAlpha=strength*.25;ctx.lineWidth=1;ctx.beginPath();
+  for(let i=0;i<=20;i++){
+   const t=i/20,a=start+t*1.7,rr=r*(1.1+t*2.2),x=Math.cos(a)*rr,y=Math.sin(a)*rr*.78;
+   if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }ctx.stroke();
+  const a=start+1.7,rr=r*3.3;ctx.globalAlpha=strength*.75;
+  glowDot(Math.cos(a)*rr,Math.sin(a)*rr*.78,1.8,color,.3);
+ }
+ ctx.restore();
+}
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
 function render(time){
@@ -1735,10 +1803,10 @@ function render(time){
  // effect can accidentally carry semi-transparency onto the next frame.
  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
  sky(time);
- ctx.save();clipPlayerHorizon();renderDistantBodies();renderMacroField(time);ctx.restore();
+ ctx.save();renderDistantBodies();renderMacroField(time);ctx.restore();
  ctx.save();
  if(shake>0)ctx.translate(rand(-shake,shake),rand(-shake,shake));
- ctx.save();clipPlayerHorizon();
+ ctx.save();
  for(const e of entities)renderEntity(e,time);
  ctx.restore();
  // A temporary Canvas readback failure must not abort this frame before
@@ -1747,7 +1815,7 @@ function render(time){
   try{renderBlackHoleLensing();}
   catch(_){blackHoleLensRetryAt=time+2;}
  }
- renderPlayer(time);renderParticles();
+ renderGatherFlow(time);renderPlayer(time);renderParticles();
  ctx.restore();
  if(screenFlash>0&&!g.endless){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
  // Compositing invariant: the event horizon is drawn after every distortion,
@@ -1937,7 +2005,7 @@ function drawAtlas(){
   const sprite=e.kind==='blackhole'?blackHoleSprite(e.holeType||0):cosmicSprite(e.material,e.shape,e.style||0,5);
   c.drawImage(sprite,p.x-r*1.8,p.y-r*1.8,r*3.6,r*3.6);
  }
- if(g.tier>=13){
+ { // Atlas visibility depends on map scale, never on the evolution stage.
   const view=cosmicViewAt(atlas.x,atlas.y,w,h,scale);
   for(const level of view.levels){
    const opacity=level===view.low?1-view.fraction:view.fraction;if(opacity<.025)continue;
@@ -1961,7 +2029,7 @@ function drawAtlas(){
   const {x,y,r,bodies}=marker,h0=bodies[0];
   if(r>=4)paintAbyss(c,x,y,r,w,h);
   else {c.fillStyle='#010205';c.strokeStyle='#a2b3c4';c.lineWidth=1;c.beginPath();c.arc(x,y,3,0,TAU);c.fill();c.stroke();}
-  const label=bodies.length>1?`ДЫРЫ: ${bodies.length} · ПРИБЛИЗИТЬ`:h0.name;
+  const label=bodies.length>1?`ДЫРЫ: ${bodies.length} · ПРИБЛИЗИТЬ`:h0.name+(canEatAbyss(h0)?' · МОЖНО ПОГЛОТИТЬ':'');
   c.font='600 10px Inter,sans-serif';
   const detail=bodies.length===1&&r>=8,ww=Math.max(c.measureText(label).width,detail?165:0)+8,hh=detail?29:16;
   let placement=null;
@@ -1979,7 +2047,7 @@ function drawAtlas(){
  const playerPoint=projectMap(player.x,player.y);
  // Both the event horizon and gravity field are drawn at their TRUE map size.
  const bodyRadius=(g.endless?blackHoleCoreWorldRadius():player.r)*scale;
- const gravityRadius=(g.endless?blackHoleGravityRadius():(97+g.upgrade.gravity*7)*tester.gravity)*scale;
+ const gravityRadius=(g.endless?blackHoleGravityRadius():ordinaryGravityRadius())*scale;
  if(gravityRadius<Math.max(w,h)*20){
   c.strokeStyle='rgba(173,145,255,.65)';c.lineWidth=1;c.setLineDash([5,6]);
   c.beginPath();c.arc(playerPoint.x,playerPoint.y,gravityRadius,0,TAU);c.stroke();c.setLineDash([]);
@@ -2022,7 +2090,7 @@ function showMap(){
  <div class="atlas-pins"><button id="atlas-pin-add" class="secondary-button" aria-pressed="false">＋ МЕТКА</button><select id="atlas-pin-list" aria-label="Метки на карте"></select><input id="atlas-pin-name" aria-label="Название метки" maxlength="32" placeholder="Название метки"><button id="atlas-pin-go" class="secondary-button">К МЕТКЕ</button><button id="atlas-pin-delete" class="secondary-button" aria-label="Удалить выбранную метку">УДАЛИТЬ</button></div><div id="atlas-pin-hint" class="atlas-pin-hint" aria-live="polite"></div>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">−</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">⌖</button></div></div>
- <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ СМЕРТЕЛЬНЫЙ ГОРИЗОНТ · ◦ ДАЛЁКИЕ ДЫРЫ</span></div>
+ <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ МЕНЬШЕ ТЕБЯ — ДОБЫЧА · БОЛЬШЕ — ОПАСНОСТЬ</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Все расстояния — в секторах мира.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
@@ -2054,7 +2122,7 @@ function resetCampaignState(resetModifiers=false){
  if(resetModifiers&&TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
  player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);lastReveal={x:Infinity,y:Infinity,r:-Infinity};
  player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
- screenFlash=0;morph=null;running=false;abyssTimer=0;abyssPhysical=[];abyssVisual=[];abyssNotice='';$('abyss-warning').hidden=true;clearFlightInput();pulseCd=boostCd=boostTime=0;visitPosition();streamField();save();renderUI(true);testerRefresh();testerToggle(false);
+ harvestChain=0;harvestChainTime=0;screenFlash=0;morph=null;running=false;abyssTimer=0;abyssPhysical=[];abyssVisual=[];abyssNotice='';$('abyss-warning').hidden=true;clearFlightInput();pulseCd=boostCd=boostTime=0;visitPosition();streamField();save();renderUI(true);testerRefresh();testerToggle(false);
 }
 function dieInAbyss(h){
  const mass=fmt(g.total),duration=timeFmt(g.time);

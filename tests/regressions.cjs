@@ -12,7 +12,7 @@ has('ratioLut[k]', 'Lens must sample a precomputed warp');
 lacks('const scale=Math.min(1,300/', 'Never shrink lens to 300 px');
 has('const outer=Math.min(R*2.30', 'Broad lensing effect was lost');
 has('const fade=', 'Non-lens fades should stay controlled');
-has("mix.globalCompositeOperation='lighter';mix.globalAlpha=blend", 'Backdrop interpolation must sum weighted premultiplied pixels offscreen');
+has("renderMacroBackground(time);", "Moving galaxies must be rendered from current positions");
 has('0,496', 'LOD must support astronomical world sizes');
 has('low<496', 'LOD interpolation must also support astronomical sizes');
 has('Math.max(1e-155,camera.zoom)', 'Camera must support extremely small zoom');
@@ -116,7 +116,7 @@ function traceFrame(lensFails=false){
   sky(){calls.push("sky")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
   renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
-  clipPlayerHorizon(){calls.push("occlusion")},renderWaypoint(){},renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
+  clipPlayerHorizon(){calls.push("occlusion")},renderWaypoint(){},renderGatherFlow(){},renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
   paintBlackHole(){calls.push("blackhole")},project(){return{x:960,y:540}},
   player:{x:0,y:0,r:200},camera:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
   screenFlash:0,shake:0,entities:[{}],blackHoleLensRetryAt:0,renderTicks:0,
@@ -132,39 +132,27 @@ function traceFrame(lensFails=false){
  assert.equal(screenCtx.globalCompositeOperation,"source-over","Front context state must be restored");
  return calls;
 }
-const occludedFrame=traceFrame(false);
-assert.ok(occludedFrame.indexOf('occlusion')>occludedFrame.indexOf('sky'));
-assert.ok(occludedFrame.indexOf('occlusion')<occludedFrame.indexOf('distant'));
-assert.ok(occludedFrame.lastIndexOf('occlusion')<occludedFrame.indexOf('lens'));
+const restoredFrame=traceFrame(false);
+assert.ok(restoredFrame.indexOf('distant')<restoredFrame.indexOf('lens'));
+assert.ok(!restoredFrame.includes('occlusion'),'Previous ring must sample the complete scene');
 traceFrame(true);
 console.log("PASS: complete atomic screen frames and lens-readback failure isolation");
 
 console.log('PASS: lens resolution, fast lens lookup, stable backdrop, 4 astronomical zoom levels, LOD, galaxy collision and movement');
 
-// Execute the real backdrop lifecycle. Missing `tier` metadata previously
-// invalidated it on EVERY frame; text-presence tests did not catch that.
+// Orbital galaxies need their current positions on every frame, without
+// allocating large backdrop canvases or restarting a crossfade.
 const cacheStart=game.indexOf('let macroBackdrop=null');
 const cacheEnd=game.indexOf('\nfunction streamField()',cacheStart);
 let backdropBuilds=0,canvasAllocations=0;
-const paintContext=()=>({globalAlpha:1,globalCompositeOperation:'source-over',
- setTransform(){},clearRect(){},drawImage(){}});
-const cacheSandbox={W:1920,H:1080,g:{tier:25},TA:Array(28),camera:{x:0,y:0,zoom:.001},player:{x:0,y:0},
- ctx:paintContext(),macroVisibleCount:0,macroEntities:[],MACRO_SIZE:3200,
- cosmicSceneDirty:false,cosmicNextRedraw:0,macroKey:(x,y)=>`${x}:${y}`,
- cosmicVisibleLOD:()=>({low:2}),renderMacroBackground(){backdropBuilds++},drawMacro:()=>true,
- clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),document:{createElement(){canvasAllocations++;const ctx=paintContext();return{width:0,height:0,getContext:()=>ctx}}}};
+const cacheSandbox={g:{tier:25},camera:{zoom:.1},macroEntities:[],cosmicAbsorptions:[],
+ renderMacroBackground(){backdropBuilds++},drawMacro:()=>true,
+ document:{createElement(){canvasAllocations++;throw Error('No per-frame canvases')}}};
 vm.createContext(cacheSandbox);vm.runInContext(game.slice(cacheStart,cacheEnd),cacheSandbox);
-for(let i=0;i<180;i++)vm.runInContext(`renderMacroField(${i/60})`,cacheSandbox,{timeout:100});
-assert.equal(backdropBuilds,1,'A stationary scene must build its backdrop once, not every frame');
-cacheSandbox.cosmicSceneDirty=true;vm.runInContext('renderMacroField(3)',cacheSandbox);
-assert.equal(backdropBuilds,2,'Harvesting must invalidate the backdrop');
-for(let i=0;i<10;i++){
- cacheSandbox.cosmicSceneDirty=true;vm.runInContext(`renderMacroField(${4+i})`,cacheSandbox);
-}
-assert.equal(canvasAllocations,3,'Two backdrop buffers plus one blend buffer must be reused');
-cacheSandbox.g.tier=26;vm.runInContext('renderMacroField(15)',cacheSandbox);
-assert.equal(backdropBuilds,13,'Changing tier must refresh the backdrop once');
-console.log('PASS: 180 stationary frames reuse one backdrop; refreshed buffers recycle');
+for(let i=0;i<180;i++)cacheSandbox.renderMacroField(i/60);
+assert.equal(backdropBuilds,180,'Free galaxies must keep moving with a stationary camera');
+assert.equal(canvasAllocations,0,'Reuse sprite textures; allocate no backdrop canvases');
+console.log('PASS: moving galaxy field redraws with cached sprites, without backdrop allocations');
 
 // A real world index above 2^53 cannot be incremented by one. These used to
 // lock the main thread forever even though the microscopic bodies are invisible.
@@ -331,7 +319,7 @@ console.log('PASS: viewport-wide resources also render through the 3x-size zoom 
 const abyssStart=game.indexOf('const ABYSS_BASE=');
 const abyssStop=game.indexOf('function refreshAbysses()',abyssStart);
 const seedStart=game.indexOf('function seedHash('),seedStop=game.indexOf('\nfunction chunkInfo(',seedStart);
-const abyssBox={CHUNK:480,TAU:Math.PI*2,WORLD_SEED:0x17aba37,player:{x:0,y:0,r:300},
+const abyssBox={g:{abyssConsumed:{},abyssPositions:{}},CHUNK:480,TAU:Math.PI*2,WORLD_SEED:0x17aba37,player:{x:0,y:0,r:300},
  clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
 vm.createContext(abyssBox);
 vm.runInContext(game.slice(seedStart,seedStop)+game.slice(abyssStart,abyssStop),abyssBox);
@@ -379,7 +367,7 @@ console.log('PASS: death resets and saves all progression, retains preferences a
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
 let rivalMarks=0;
-const rivalBox={abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
+const rivalBox={g:{abyssConsumed:{}},canEatAbyss:()=>false,abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
  abyssPull:abyssBox.abyssPull,crossesAbyss:abyssBox.crossesAbyss,absorptionKey:e=>e.index,
  markHarvested(){rivalMarks++},cosmicSceneDirty:false};
 vm.createContext(rivalBox);vm.runInContext(game.slice(rivalStart,rivalStop),rivalBox);
@@ -460,3 +448,70 @@ for(const step of [1,2,4,8,16])for(const gx of [-8*step,0,12*step]){
 }
 assert.ok(!game.slice(game.indexOf('function visitPosition('),game.indexOf('function markHarvested(')).includes('toast('));
 console.log('PASS: no dust-field reroll at zoom boundaries; exploration notifications removed');
+
+// Returning the v3.17 ring must not reintroduce a step in source brightness.
+const fadeBox={clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};vm.createContext(fadeBox);
+vm.runInContext(game.slice(game.indexOf('function absorptionLight('),game.indexOf('function animateAbsorption(')),fadeBox);
+let previous=1;
+for(let i=0;i<=28;i++){
+ const brightness=fadeBox.absorptionLight({lensFade:i/100});
+ assert.ok(brightness<=previous&&brightness>=0);
+ assert.ok(previous-brightness<.06,'Hidden source light must not blink off');previous=brightness;
+}
+assert.equal(fadeBox.absorptionLight({}),1,'Contact alone must retain the former lens image');
+assert.equal(fadeBox.absorptionLight({lensFade:.28}),0,'Delete only after lensed light is zero');
+console.log('PASS: restored ring source fades continuously to zero after full entry');
+
+// Smaller holes are real consumable bodies. Their location survives reload,
+// and their permanent ID leaves both map and world after a single reward.
+const prey=catalogue[0],core=prey.r*2;
+let holeSaves=0;
+Object.assign(abyssBox,{g:{endless:true,abyssConsumed:{},abyssPositions:{},matter:10000,total:10000,stageCollects:0,credits:0,collects:0,materials:{exotic:0},tier:27},
+ player:{x:prey.x+core*1.6,y:prey.y,r:core/.245},camera:{zoom:60/core},
+ blackHoleCoreWorldRadius:()=>core,blackHoleGravityRadius:()=>core*4,
+ TA:Array.from({length:28},()=>({required:10000})),currentRadius:()=>12345,
+ atlas:{dirty:false},toast(){},save(){holeSaves++},fmt:String});
+assert.equal(abyssBox.canEatAbyss(prey),true);
+assert.equal(abyssBox.canEatAbyss({...prey,r:core}),false,'Equal-size holes remain dangerous');
+abyssBox.attractSmallerAbyss(prey,.1);
+const pos1=abyssBox.g.abyssPositions[prey.id][0];
+abyssBox.attractSmallerAbyss(prey,.1);
+const pos2=abyssBox.g.abyssPositions[prey.id][0];
+assert.ok(pos2>pos1&&pos1>prey.x,'Do not reset movement to the stale catalogue coordinate');
+assert.equal(abyssBox.g.collects,0,'First contact must not reward or remove');
+const restoredHoleState=JSON.parse(JSON.stringify(abyssBox.g));abyssBox.g=restoredHoleState;
+const restored=abyssBox.abyssCandidates(prey.x,prey.y,core*10).find(h=>h.id===prey.id);
+assert.equal(restored.x,pos2,'Moved hole position must survive saved-state reload');
+for(let i=0;i<300&&!abyssBox.g.abyssConsumed[prey.id];i++)abyssBox.attractSmallerAbyss(prey,1/60);
+assert.equal(abyssBox.g.abyssConsumed[prey.id],true);
+assert.equal(abyssBox.g.collects,1);assert.ok(abyssBox.g.matter>10000);assert.equal(holeSaves,1);
+abyssBox.finishAbyssAbsorption(prey);assert.equal(abyssBox.g.collects,1);
+assert.ok(!abyssBox.abyssCandidates(prey.x,prey.y,core*10).some(h=>h.id===prey.id));
+console.log('PASS: smaller holes move, persist and disappear only after full absorption; single reward');
+
+// One time-based path shared by generation and active physics at any scale.
+const driftCode=game.slice(game.indexOf('function driftBody('),game.indexOf('const BIOME_NAMES='));
+const driftBox={g:{time:0},seedHash:abyssBox.seedHash};vm.createContext(driftBox);vm.runInContext(driftCode,driftBox);
+for(const r of [6,300,1e100]){
+ const source={x:r*10,y:-r*3,r,index:7,cosmic:r>1e3};
+ const p0=driftBox.driftBody(source);driftBox.g.time=7;
+ const p1=driftBox.driftBody(source),p2=driftBox.driftBody(p0);
+ assert.equal(p1.x,p2.x);assert.equal(p1.y,p2.y);
+ assert.ok(Math.hypot(p1.x-p0.x,p1.y-p0.y)>0);
+ driftBox.g.time=7+1/60;const p3=driftBox.driftBody(p1);
+ assert.ok(Math.hypot(p3.x-p1.x,p3.y-p1.y)<Math.max(r*.01,1),'No frame-to-frame jumps');
+ const caught={...p1,gravityBound:true};assert.equal(driftBox.driftBody(caught),caught);
+ driftBox.g.time=0;
+}
+const mapCode=game.slice(game.indexOf('function drawAtlas(){'),game.indexOf('function showMap(){'));
+assert.ok(!mapCode.includes('g.tier>=13'),'Galaxies must be on the map from the first form');
+console.log('PASS: moving bodies agree across map/physics/reload; captured bodies leave orbital paths');
+
+// The visual opening changes may not accelerate evolution or award extra mass.
+const reqBox={};vm.createContext(reqBox);
+vm.runInContext(game.slice(game.indexOf('const TA = ['),game.indexOf('const upgrades = ['))+'globalThis.forms=TA',reqBox);
+for(let tier=0;tier<28;tier++)assert.equal(reqBox.forms[tier].required,Math.round(180+100*Math.pow(tier+1,1.47)));
+const absorbCode=game.slice(game.indexOf('function absorb(e){'),game.indexOf('// Bodies larger than you'));
+assert.ok(!absorbCode.includes('*advanceHarvestChain()'));
+assert.ok(!absorbCode.includes('*chainMultiplier()'));
+console.log('PASS: visual chains preserve the existing evolution costs and material rewards');
