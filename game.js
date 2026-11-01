@@ -2257,6 +2257,10 @@ function testerSetTier(tier){
  g.tier=next;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  morph={from,time:0,duration:1.5};player.targetR=currentRadius();
  player.r=player.targetR;screenFlash=.5;
+ // Test jumps must not finish a previous form's in-flight digestion with the
+ // new form's rewards. Restore unconsumed identities to their world layer.
+ for(const e of [...entities,...macroEntities,...cosmicAbsorptions])if(e.absorbing||e.gathering)delete g.freeFlights[flightKey(e)];
+ cosmicAbsorptions.length=0;absorbingMacroKeys.clear();for(const key of Object.keys(g.freeFlights))absorbingMacroKeys.add(key);
  camera.zoom=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+player.r/100))/Math.max(1,player.r),1e-155,2.5):campaignZoom(player.r);
  testerRemakeNearby();
  burst(player.x,player.y,35,TA[next].color);

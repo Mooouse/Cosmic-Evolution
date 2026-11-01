@@ -638,3 +638,11 @@ const beforePixel=output[(8*side+6)*4];input[(8*side+6)*4]=beforePixel>127?0:255
 pixelBox.warpLensPixels(input,output,side,side,0,0,1,1,12,12,2,20,20/4096,identity,opaque,1,8,cachedPixels);
 assert.notEqual(output[(8*side+6)*4],beforePixel,'Cached geometry must still sample the current moving scene');
 console.log('PASS: cached lens geometry reuses storage without freezing scene pixels');
+const jumpBox={g:{tier:27,freeFlights:{old:{},fly:{}}},TA:reqBox.forms,player:{x:0,y:0,r:1e20},camera:{zoom:1e-20},tester:{zoom:1},
+ entities:[{id:'old',absorbing:1}],macroEntities:[],cosmicAbsorptions:[{id:'capture',gathering:.2}],absorbingMacroKeys:new Set(['old','fly','capture']),
+ clamp:scaleBox.clamp,currentRadius:()=>2000,campaignZoom:()=>.06,flightKey:e=>e.id,burst(){},renderUI(){},testerRefresh(){}};
+jumpBox.testerRemakeNearby=()=>{jumpBox.remade=true};
+vm.createContext(jumpBox);vm.runInContext(game.slice(game.indexOf('function testerSetTier('),game.indexOf('function testerRemakeNearby(')),jumpBox);
+jumpBox.testerSetTier(10);assert.equal(jumpBox.cosmicAbsorptions.length,0);assert.equal(jumpBox.camera.zoom,.06);
+assert.equal(jumpBox.g.freeFlights.old,undefined);assert.ok(jumpBox.g.freeFlights.fly);assert.equal(jumpBox.absorbingMacroKeys.has('capture'),false);
+assert.equal(jumpBox.remade,true);console.log('PASS: tester stage jumps reframe immediately and clear old digestion, preserving free flight');

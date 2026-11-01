@@ -130,3 +130,7 @@
 - Cache lens pixel coordinates/weights in reusable typed arrays with half-pixel geometry keys. Each frame samples the newly rendered scene, retaining moving light and absorption; no cached screenshot or frozen lens. Rebuild on size/position/ring changes. Adaptive quality reacts every 1.5 seconds; native front-buffer resolution remains stable.
 - Tester form jumps now immediately choose the corresponding camera scale and stream that view instead of spending seconds sweeping through unrelated LODs. Ordinary evolution still uses smooth continuous camera changes.
 - Verified cached bilinear output updates when scene pixels change; original horizon and lens regressions still pass.
+
+### v3.21.2 — tester transition isolation
+
+- Switching forms in the tester clears unfinished digestion from the previous form before rebuilding the nearby field. Prevents a previous black hole's large captured bodies from finishing inside a newly selected planet and awarding incorrect mass. Unconsumed world identities and independent free-flight records are retained. Added a direct transition regression.
