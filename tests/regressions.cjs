@@ -10,7 +10,7 @@ has('const qualityTarget=Math.round(clamp(', 'High-resolution adaptive lens targ
 has('const LUT=4096', 'Fast radial lens lookup table missing');
 has('ratioLut[k]', 'Lens must sample a precomputed warp');
 lacks('const scale=Math.min(1,300/', 'Never shrink lens to 300 px');
-has('const outer=Math.min(R*2.30', 'Broad lensing effect was lost');
+has('Math.min(R*2.30', 'Broad lensing effect was lost');
 has('const fade=', 'Non-lens fades should stay controlled');
 has("renderMacroBackground(time);", "Moving galaxies must be rendered from current positions");
 has('0,496', 'LOD must support astronomical world sizes');
@@ -113,9 +113,9 @@ function traceFrame(lensFails=false){
  const universe={
   ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},
   dpr:1,W:1920,H:1080,g:{tier:27},TA:Array(28),
-  sky(){calls.push("sky")},renderDistantBodies(){calls.push("distant")},
+  sky(){calls.push("sky")},renderBackgroundComets(){calls.push("comet")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
-  renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
+  renderRivalLensing(){calls.push("rivalLens")},rivalLensMaps:new Map(),rivalLensRetryAt:0,renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
   clipPlayerHorizon(){calls.push("occlusion")},renderWaypoint(){},renderGatherFlow(){},renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
   paintBlackHole(){calls.push("blackhole")},project(){return{x:960,y:540}},
   player:{x:0,y:0,r:200},camera:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
@@ -371,7 +371,7 @@ const rivalBox={g:{abyssConsumed:{},freeFlights:{}},flightKey:e=>e.index,canEatA
  abyssPull:abyssBox.abyssPull,crossesAbyss:abyssBox.crossesAbyss,absorptionKey:e=>e.index,
  markHarvested(){rivalMarks++},cosmicSceneDirty:false};
 vm.createContext(rivalBox);vm.runInContext(game.slice(rivalStart,rivalStop),rivalBox);
-const matter={x:1100,y:0,index:1};assert.ok(rivalBox.pullBodyIntoAbyss(matter,.05));
+const matter={x:1100,y:0,index:1};assert.ok(rivalBox.pullBodyIntoAbyss(matter,.01));
 assert.ok(matter.x<1100&&!matter.dead,'Rival attracts before contact');
 assert.ok(rivalBox.pullBodyIntoAbyss(matter,.5));assert.equal(matter.dead,true);assert.equal(rivalMarks,1);
 rivalBox.pullBodyIntoAbyss(matter,.5);assert.equal(rivalMarks,1);
@@ -425,7 +425,7 @@ console.log('PASS: map pins persist exact world coordinates across reload; inval
 const activeLoopStart=game.indexOf(' for(let i=cosmicAbsorptions.length-1;i>=0;i--)',game.indexOf('function update(dt){'));
 const activeLoopStop=game.indexOf('\n harvestCosmicLOD(',activeLoopStart);
 const moving={x:1100,y:0,index:8};
-const rivalLoop={g:{endless:true},cosmicAbsorptions:[moving],dt:.05,pullBodyIntoAbyss:rivalBox.pullBodyIntoAbyss,
+const rivalLoop={g:{endless:true},cosmicAbsorptions:[moving],dt:.01,pullBodyIntoAbyss:rivalBox.pullBodyIntoAbyss,
  animateAbsorption(){throw new Error('Rival owns this body')},applyBlackHoleGravity(){throw new Error('Rival owns this body')}};
 vm.createContext(rivalLoop);vm.runInContext(game.slice(activeLoopStart,activeLoopStop),rivalLoop);
 assert.equal(rivalLoop.cosmicAbsorptions.length,1);assert.ok(moving.x<1100&&!moving.dead);
@@ -473,9 +473,9 @@ Object.assign(abyssBox,{g:{endless:true,abyssConsumed:{},abyssPositions:{},matte
  atlas:{dirty:false},toast(){},save(){holeSaves++},fmt:String});
 assert.equal(abyssBox.canEatAbyss(prey),true);
 assert.equal(abyssBox.canEatAbyss({...prey,r:core}),false,'Equal-size holes remain dangerous');
-abyssBox.attractSmallerAbyss(prey,.1);
+abyssBox.attractSmallerAbyss(prey,.025);
 const pos1=abyssBox.g.abyssPositions[prey.id][0];
-abyssBox.attractSmallerAbyss(prey,.1);
+abyssBox.attractSmallerAbyss(prey,.025);
 const pos2=abyssBox.g.abyssPositions[prey.id][0];
 assert.ok(pos2>pos1&&pos1>prey.x,'Do not reset movement to the stale catalogue coordinate');
 assert.equal(abyssBox.g.collects,0,'First contact must not reward or remove');
@@ -525,7 +525,7 @@ vm.runInContext(game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf(
  game.slice(game.indexOf('function deflectResource('),game.indexOf('function gatherBody(')),flightBox);
 function flyby(fps){
  flightBox.g={time:0,freeFlights:{}};
- let e={x:-200,y:78,r:5,index:0,chunk:'test',vx:100,vy:0,motionVX:100,motionVY:0,flightTime:0,freeFlight:true};
+ let e={x:-200,y:94,r:5,index:0,chunk:'test',vx:100,vy:0,motionVX:100,motionVY:0,flightTime:0,freeFlight:true};
  flightBox.g.freeFlights['test:0']={...e};
  let seenField=false,lastVelocity;
  for(let i=0;i<fps*6;i++){
@@ -534,7 +534,7 @@ function flyby(fps){
   if(i===fps*5-1)lastVelocity=[e.motionVX,e.motionVY];
  }
  assert.ok(seenField,'Fixture must enter the gravity field');
- assert.ok(e.x>200&&e.y<78&&!e.gravityBound,'Grazing body must bend and escape');
+ assert.ok(e.x>200&&e.y<94&&!e.gravityBound,'Grazing body must bend and escape');
  assert.deepEqual([e.motionVX,e.motionVY],lastVelocity,'No drag or attraction after escape');
  const saved=JSON.parse(JSON.stringify(flightBox.g));flightBox.g=saved;
  const restored=flightBox.freeFlightAt(saved.freeFlights['test:0']);
@@ -563,7 +563,7 @@ for(const zoom of [1,1e-60]){
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'grazing',
   startAbsorption(){throw Error('Grazing body must not be auto-captured')}};
  vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
- const grazingY=(sim.blackHoleGravityRadius()+sim.blackHoleTouchDistance({r:6/zoom,cosmic:true})-sim.blackHoleCoreWorldRadius())*zoom*.94;
+ const grazingY=(sim.blackHoleGravityRadius()+sim.blackHoleTouchDistance({r:6/zoom,cosmic:true})-sim.blackHoleCoreWorldRadius())*zoom*.985;
  const e={x:-500/zoom,y:grazingY/zoom,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
  sim.g.freeFlights.grazing={...e};let exitSpeed;
  for(let i=0;i<480;i++){
@@ -694,3 +694,54 @@ assert.ok(uiCode.includes('lightYears(blackHoleCoreWorldRadius())'),'Displayed h
 assert.ok(!uiCode.includes(' секторов')&&!uiCode.includes('СЕКТОР ${'));
 assert.ok(!game.includes("+' сект.'")&&!game.includes('} сект.'));
 console.log('PASS: suffixes through 1e308, rounding boundaries, signed light-years, consistent physical HUD/map units');
+
+// v3.27: the requested stronger field, while tangential escape remains tested above.
+flightBox.g={time:0,freeFlights:{}};
+const forceProbe={x:50,y:0,r:5,index:99,chunk:'probe',motionVX:0,motionVY:0};
+flightBox.deflectResource(forceProbe,.01,100);
+assert.ok(Math.abs(forceProbe.motionVX+5.04)<1e-9,'Ordinary pull must be four times the previous 1.26 impulse');
+const rivalProbe=abyssBox.abyssPull({x:0,y:0,r:1000},2000,0,100);
+assert.ok(Math.abs(rivalProbe.x+1417.5)<1e-8,'Rival holes must receive the same fourfold increase');
+
+// Fractional rewards must accumulate, not round small catches back up to old yields.
+const lootBox={g:{endless:false,complete:false,tier:0,matter:0,total:0,stageCollects:0,collects:0,credits:0,materials:{ore:0},upgrade:{harvest:0},particles:false},
+ player:{x:0,y:0,r:13},tester:{loot:1},CHUNK:480,TA:[{required:1e9}],
+ advanceHarvestChain(){},resourceOf:()=> 'ore',radiusAt:()=>1000,ordinaryBodyValue:()=>100,blackHoleBodyValue:()=>100,
+ currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
+vm.createContext(lootBox);vm.runInContext(absorbCode,lootBox);
+for(let i=0;i<100;i++)lootBox.absorb({value:1,kind:'matter'});
+assert.ok(Math.abs(lootBox.g.matter-10)<1e-8);
+assert.ok(Math.abs(lootBox.g.credits-7.5)<1e-8);
+assert.ok(Math.abs(lootBox.g.materials.ore-10)<1e-8);
+lootBox.g.endless=true;const beforeLoot=lootBox.g.matter;lootBox.absorb({kind:'matter'});
+assert.ok(Math.abs(lootBox.g.matter-beforeLoot-10)<1e-8,'Black-hole catches also yield one tenth');
+
+// Comets are sparse decorative effects driven by game time, with one cached sprite.
+let cometAllocations=0;
+const cometGradient={addColorStop(){}};
+const cometCtx=new Proxy({createLinearGradient:()=>cometGradient,createRadialGradient:()=>cometGradient},{get:(o,k)=>k in o?o[k]:()=>{}});
+const cometBox={g:{time:0},W:1920,H:1080,ctx:cometCtx,document:{createElement(){cometAllocations++;return {getContext:()=>cometCtx}}}};
+vm.createContext(cometBox);
+vm.runInContext(game.match(/function chunkRandom\([^]*?\n\}/)[0]+game.slice(game.indexOf('let backgroundComets='),game.indexOf('\nlet skyCameraX=')),cometBox);
+cometBox.renderBackgroundComets();assert.equal(cometAllocations,0);
+cometBox.g.time=12;cometBox.renderBackgroundComets();assert.equal(cometAllocations,1);
+assert.equal(vm.runInContext('backgroundComets.length',cometBox),1);
+const nextComet=vm.runInContext('nextBackgroundComet',cometBox);assert.ok(nextComet>=37&&nextComet<=67);
+cometBox.g.time=24;cometBox.renderBackgroundComets();assert.equal(vm.runInContext('backgroundComets.length',cometBox),0);
+cometBox.g.time=nextComet;cometBox.renderBackgroundComets();assert.equal(cometAllocations,1);
+cometBox.g.time=0;cometBox.renderBackgroundComets();assert.equal(vm.runInContext('backgroundComets.length',cometBox),0);
+console.log('PASS: fourfold gravity, fractional one-tenth loot, rare cached comets and restart cleanup');
+
+// Catalogue holes use their true horizon radius with the player's lens equation.
+const rivalLensBox={W:1920,H:1080,BLACK_HOLE_CORE_FRACTION:.245,camera:{zoom:.5},g:{abyssConsumed:{}},
+ abyssVisual:[{id:'near',x:1100,y:500,r:160},{id:'far',x:1e8,y:1e8,r:10},{id:'tiny',x:200,y:200,r:1}],
+ project:(x,y)=>({x,y}),lensPixelMap:{player:true},lensPixelMapKey:'player',calls:[],
+ renderBlackHoleLensing(target){rivalLensBox.calls.push(target);rivalLensBox.lensPixelMap={rival:true};rivalLensBox.lensPixelMapKey='rival'}};
+vm.createContext(rivalLensBox);
+vm.runInContext(game.slice(game.indexOf('const rivalLensMaps='),game.indexOf('function paintBlackHole(')),rivalLensBox);
+const targets=rivalLensBox.rivalLensTargets();assert.equal(targets.length,1);
+assert.equal(targets[0].R*.245,80,'Other holes must distort relative to their actual visible horizon');
+rivalLensBox.renderRivalLensing();assert.equal(rivalLensBox.calls.length,1);
+assert.equal(rivalLensBox.lensPixelMapKey,'player');assert.ok(rivalLensBox.lensPixelMap.player);
+rivalLensBox.g.abyssConsumed.near=true;assert.equal(rivalLensBox.rivalLensTargets().length,0);
+console.log('PASS: rival holes reuse player lens with true radius, visibility culling and isolated geometry caches');
