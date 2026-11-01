@@ -234,7 +234,15 @@ function startMusic(){initAudio();setMusicVolume();}
 function save(){g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAVE_KEY,JSON.stringify(g));}catch(_){toastStorageWarning();}}
 let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Cosmic Evolution: сохранение мира не помещается в localStorage');}}
 
-function makeSky(){skyLayer=null;stars=Array.from({length:Math.min(410,Math.max(180,Math.floor(W*H/3800)))},()=>({x:Math.random()*W,y:Math.random()*H,r:rand(.3,1.75),alpha:rand(.2,1),depth:rand(.08,.48),phase:rand(0,TAU)}));nebula=Array.from({length:7},()=>({x:rand(0,W),y:rand(0,H),r:rand(190,380),h:choose([212,240,265,288,194]),a:rand(.045,.095),depth:rand(.02,.12)}));}
+function makeSky(){
+ skyLayer=null;
+ const rng=chunkRandom(0x73a9f),colors=['#eaf1ff','#c6d9ff','#fff0d4','#fff9ef'];
+ stars=Array.from({length:Math.min(520,Math.max(140,Math.floor(W*H/4100)))},()=>{
+  const bright=rng();return {x:rng()*W,y:rng()*H,r:bright>.965?1.5+rng()*.55:.45+rng()*.65,
+   alpha:.3+rng()*.65,depth:.08+rng()*.4,color:colors[Math.floor(rng()*colors.length)]};
+ });
+ nebula=Array.from({length:8},()=>({x:rng()*W,y:H*(.72-.45*rng()),r:180+rng()*Math.min(W,H)*.4,h:210+rng()*35,a:.018+rng()*.025}));
+}
 let performanceScale=1,frameFps=60,perfSample=0,perfFrames=0,skyLayer=null,skyLayerEpoch=-1;
 function applyResolution(){
  const base=Math.min(devicePixelRatio||1,W*H>=2200000?.87:1.25);
@@ -513,7 +521,7 @@ function cosmicSprite(material,shape,style=0,palette=0){
  const rng=chunkRandom(seedHash(shape*101+style,style*163+palette*37));
  const halo=c.createRadialGradient(80,80,0,80,80,78);
  halo.addColorStop(0,colors[2]+'dd');halo.addColorStop(.12,colors[0]+'af');
- halo.addColorStop(.45,colors[1]+'31');halo.addColorStop(1,'#00000000');
+ halo.addColorStop(.45,colors[1]+'5c');halo.addColorStop(1,'#00000000');
  c.fillStyle=halo;c.globalAlpha=.82;c.fillRect(0,0,160,160);c.globalAlpha=1;
  c.save();c.translate(80,80);c.rotate(shape*.35+style*.42);
  // Distinct silhouettes: grand-design spiral, barred, irregular, elliptical,
@@ -531,16 +539,19 @@ function cosmicSprite(material,shape,style=0,palette=0){
   else if(style===5){x=(rng()-.5)*125;y=(rng()-.5)*36;}
   else if(style===6){const a=rng()*TAU,r=Math.sqrt(rng())*29;x=Math.cos(a)*r;y=Math.sin(a)*r*.74;}
   else {const a=rng()*TAU,r=Math.sqrt(rng())*67;x=Math.cos(a)*r;y=Math.sin(a)*r*(style===3?.55:1);}
-  const radius=(i%11===0?1.8:.5)+rng()*(style===6?1.0:1.5);
-  c.globalAlpha=.68+rng()*.32;c.fillStyle=colors[(i+Math.floor(rng()*4))%3];
+  // Bake soft overlapping arm light into the sprite once, not per frame.
+  c.globalAlpha=.11;c.fillStyle=colors[0];c.beginPath();c.arc(x,y,4.5,0,TAU);c.fill();
+  c.globalAlpha=.16;c.fillStyle=colors[1];c.beginPath();c.arc(x,y,2.8,0,TAU);c.fill();
+  const radius=(i%11===0?1.8:.7)+rng()*(style===6?1.0:1.5);
+  c.globalAlpha=.85+rng()*.15;c.fillStyle=colors[(i+Math.floor(rng()*4))%3];
   c.beginPath();c.arc(x,y,radius,0,TAU);c.fill();
  }
  // Galactic bar, central bulge and luminous star clusters.
  if(style===1||style===5){c.globalAlpha=.3;c.strokeStyle=colors[1];c.lineWidth=4;
   c.beginPath();c.moveTo(-30,0);c.lineTo(30,0);c.stroke();}
  const nucleus=c.createRadialGradient(0,0,0,0,0,style===6?15:23);
- nucleus.addColorStop(0,'#fffef5');nucleus.addColorStop(.26,colors[2]+'ed');nucleus.addColorStop(1,colors[1]+'00');
- c.globalAlpha=.91;c.fillStyle=nucleus;c.beginPath();c.arc(0,0,style===6?15:23,0,TAU);c.fill();
+ nucleus.addColorStop(0,'#fffef5');nucleus.addColorStop(.26,'#fff9ed');nucleus.addColorStop(.55,colors[2]+'b0');nucleus.addColorStop(1,colors[1]+'00');
+ c.globalAlpha=1;c.fillStyle=nucleus;c.beginPath();c.arc(0,0,style===6?15:23,0,TAU);c.fill();
  for(let i=0;i<165;i++){
   const angle=rng()*TAU,rr=Math.sqrt(rng())*67;
   const px=Math.cos(angle)*rr,py=Math.sin(angle)*rr*.72;
@@ -1408,25 +1419,34 @@ function glowDot(x,y,r,color,intensity=1){
   c.fillStyle=grad;c.fillRect(0,0,48,48);sprite=cv;dotCache.set(key,sprite);}
  const sr=Math.min(90,r*(1.7+intensity*.25));ctx.drawImage(sprite,x-sr,y-sr,sr*2,sr*2);
 }
-// Nebula gradients are expensive on large displays. Paint them once per era/resize.
+// Deep stars and faint galactic haze are painted once per resize/era.
+// Keep fine stars at display resolution: downsampled pinpoints look like fog.
 function ensureSkyLayer(){
  if(skyLayer&&skyLayerEpoch===g.tier)return;
  skyLayer=document.createElement('canvas');
- // Low resolution is sufficient for blurred gas clouds.
- skyLayer.width=Math.max(1,Math.round(W*.50));skyLayer.height=Math.max(1,Math.round(H*.50));
- const c=skyLayer.getContext('2d');c.scale(skyLayer.width/W,skyLayer.height/H);
- let epoch=g.tier,bg=c.createLinearGradient(0,0,W,H);
- bg.addColorStop(0,epoch>=22?'#09071b':'#040b1c');
- bg.addColorStop(.55,epoch>=19?'#0e0a29':'#090c24');bg.addColorStop(1,'#02040d');
+ skyLayer.width=Math.max(1,Math.round(W));skyLayer.height=Math.max(1,Math.round(H));
+ const c=skyLayer.getContext('2d'),rng=chunkRandom(0x41c078);
+ const bg=c.createLinearGradient(0,0,W,H);
+ bg.addColorStop(0,'#02040a');bg.addColorStop(.55,'#050812');bg.addColorStop(1,'#010207');
  c.fillStyle=bg;c.fillRect(0,0,W,H);
  for(const n of nebula){
   const grad=c.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r);
-  grad.addColorStop(0,`hsla(${n.h+(epoch%6)*7},95%,56%,${n.a})`);
-  grad.addColorStop(.55,`hsla(${n.h},88%,43%,${n.a*.35})`);
-  grad.addColorStop(1,`hsla(${n.h},88%,43%,0)`);
+  grad.addColorStop(0,`hsla(${n.h},30%,55%,${n.a})`);
+  grad.addColorStop(.55,`hsla(${n.h},25%,40%,${n.a*.35})`);
+  grad.addColorStop(1,`hsla(${n.h},25%,40%,0)`);
   c.fillStyle=grad;c.beginPath();c.arc(n.x,n.y,n.r,0,TAU);c.fill();
  }
- skyLayerEpoch=epoch;
+ // Irregular, faint Milky Way-like concentration, with mostly tiny stars.
+ const count=Math.min(6500,Math.max(800,Math.floor(W*H/420)));
+ const colors=['#b9cbed','#e0e7f3','#f3e4cd','#c9d8f7'];
+ for(let i=0;i<count;i++){
+  const x=rng()*W,band=i%3===0;
+  const y=band?H*(.78-.52*x/W+(rng()+rng()+rng()-1.5)*.16):rng()*H;
+  const size=.35+Math.pow(rng(),4)*.85;
+  c.globalAlpha=.12+Math.pow(rng(),2)*.5;c.fillStyle=colors[i%colors.length];
+  c.fillRect(x,y,size,size);
+ }
+ c.globalAlpha=1;skyLayerEpoch=g.tier;
 }
 let skyCameraX=camera.x,skyCameraY=camera.y;
 function sky(t){
@@ -1438,10 +1458,12 @@ function sky(t){
  ensureSkyLayer();ctx.drawImage(skyLayer,0,0,W,H);
  for(const s of stars){
   const x=s.x=((s.x-skyDX*s.depth*.25)%W+W)%W,y=s.y=((s.y-skyDY*s.depth*.25)%H+H)%H;
-  const alpha=s.alpha*(g.endless?.8:(.68+.32*Math.sin(t*.65+s.phase)));
-  ctx.fillStyle=`rgba(183,210,255,${alpha})`;
-  if(s.r<1.1)ctx.fillRect(x,y,1.4,1.4);else{ctx.beginPath();ctx.arc(x,y,s.r,0,TAU);ctx.fill();}
+  // Stars in vacuum shine steadily; no synchronized twinkling or stage dimming.
+  ctx.globalAlpha=s.alpha;ctx.fillStyle=s.color;
+  if(s.r>1.5){glowDot(x,y,s.r*1.8,s.color,.35);ctx.fillStyle='#fffaf0';}
+  if(s.r<1.1)ctx.fillRect(x,y,s.r,s.r);else{ctx.beginPath();ctx.arc(x,y,s.r*.7,0,TAU);ctx.fill();}
  }
+ ctx.globalAlpha=1;
 }
 function paintRock(x,y,r,color,spin=0,craters=5){ctx.save();ctx.translate(x,y);ctx.rotate(spin);ctx.beginPath();for(let k=0;k<11;k++){let a=k/11*TAU,R=r*(.85+.09*Math.sin(k*4.17+spin));if(k===0)ctx.moveTo(Math.cos(a)*R,Math.sin(a)*R);else ctx.lineTo(Math.cos(a)*R,Math.sin(a)*R);}ctx.closePath();let grad=ctx.createRadialGradient(-r*.4,-r*.5,1,0,0,r*1.1);grad.addColorStop(0,'#dce8fa');grad.addColorStop(.25,color);grad.addColorStop(1,'#384058');ctx.fillStyle=grad;ctx.fill();ctx.strokeStyle='rgba(188,211,238,.48)';ctx.lineWidth=1.2;ctx.stroke();for(let j=0;j<craters;j++){const a=j*2.4+spin*.1,R=r*(.15+.38*((j*7)%5)/5),cr=r*(.07+(j%3)*.03);ctx.fillStyle='rgba(27,35,64,.27)';ctx.beginPath();ctx.arc(Math.cos(a)*R,Math.sin(a)*R,cr,0,TAU);ctx.fill();}ctx.restore();}
 function paintPlanet(x,y,r,color,gas=false){ctx.save();const gr=ctx.createRadialGradient(x-r*.38,y-r*.45,1,x,y,r*1.1);gr.addColorStop(0,'#edfbff');gr.addColorStop(.23,color);gr.addColorStop(.75,color);gr.addColorStop(1,'#1b2a59');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.clip();for(let k=0;k<5;k++){ctx.beginPath();ctx.ellipse(x+Math.sin(k*3.2)*r*.45,y-r*.75+k*r*.37,r*1.2,r*(gas?.12:.10),-.12,0,TAU);ctx.fillStyle=gas?'rgba(241,218,194,.20)':'rgba(120,239,220,.2)';ctx.fill();}ctx.restore();}

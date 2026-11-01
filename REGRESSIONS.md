@@ -148,3 +148,9 @@
 - Adopted a fixed game-world distance conversion: 480 world units = 1 light-year. All map scale bars, visible spans, diameters, coordinates, waypoints, rival-hole distances and tester jumps use it; physical coordinates, saves and generation stay unchanged. Explored area uses square light-years. The HUD now reports diameter, and the final-stage radius panel uses the actual visible event horizon.
 - Wheel camera offset widened from 80–125% to 40–250%, including save normalization and first-stage camera limits. Map zoom remains independent.
 - Validation: screenshot-reported magnitude, every suffix through the finite Number range, rounding promotion, signed/subpixel light-year formatting, consistent HUD/map units, zoom bounds at multiple stages, complete regression suite, native Canvas render/absorption/death smoke at normal and astronomical scales.
+
+## v3.24 — звёздный фон и светящиеся галактики
+- Фон: тёмное пространство, тысячи мелких звёзд с неоднородной плотностью, слабая звёздная полоса, тёплые и холодные яркие светила. Убрано периодическое мерцание фоновых звёзд и их затемнение на стадии чёрной дыры.
+- Дальний звёздный слой кэшируется в разрешении экрана; в кадре остаются один drawImage и ограниченный слой звёзд с параллаксом. Координаты интегрируются в экранных единицах и не скачут при огромных мировых значениях.
+- У галактик усилены ядра, звёздные скопления и рассеянное свечение рукавов. Свечение записывается в существующий кэш спрайтов, без дополнительных фильтров и градиентов на каждом кадре. Плавные переходы LOD и исчезновение после полного поглощения сохранены.
+- Проверка: синтаксис, полный набор регрессий и реальный Canvas-рендер начальной стадии и чёрных дыр при материи 1e8/1e200; просмотр изображений. Непрозрачный горизонт, линза и сброс после гибели проходят проверки.
