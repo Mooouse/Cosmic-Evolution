@@ -563,13 +563,14 @@ for(const zoom of [1,1e-60]){
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'grazing',
   startAbsorption(){throw Error('Grazing body must not be auto-captured')}};
  vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
- const e={x:-500/zoom,y:335/zoom,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
+ const grazingY=(sim.blackHoleGravityRadius()+sim.blackHoleTouchDistance({r:6/zoom,cosmic:true})-sim.blackHoleCoreWorldRadius())*zoom*.94;
+ const e={x:-500/zoom,y:grazingY/zoom,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
  sim.g.freeFlights.grazing={...e};let exitSpeed;
  for(let i=0;i<480;i++){
   sim.g.time=(i+1)/60;sim.applyBlackHoleGravity(e,1/60);
   if(i===419)exitSpeed=[e.motionVX,e.motionVY];
  }
- assert.ok(e.x*zoom>900&&e.y*zoom<335&&!e.gravityBound);
+ assert.ok(e.x*zoom>900&&e.y*zoom<grazingY&&!e.gravityBound);
  assert.deepEqual([e.motionVX,e.motionVY],exitSpeed,'Black-hole pull must end outside its field');
 }
 console.log('PASS: fast grazing bodies escape black-hole fields at ordinary and astronomical scales');
@@ -646,3 +647,31 @@ vm.createContext(jumpBox);vm.runInContext(game.slice(game.indexOf('function test
 jumpBox.testerSetTier(10);assert.equal(jumpBox.cosmicAbsorptions.length,0);assert.equal(jumpBox.camera.zoom,.06);
 assert.equal(jumpBox.g.freeFlights.old,undefined);assert.ok(jumpBox.g.freeFlights.fly);assert.equal(jumpBox.absorbingMacroKeys.has('capture'),false);
 assert.equal(jumpBox.remade,true);console.log('PASS: tester stage jumps reframe immediately and clear old digestion, preserving free flight');
+
+// Manual zoom is a small, persistent offset from auto framing, not a world reset.
+const wheelBox={g:{viewZoom:1},running:true,atlasVisible:false,H:1080,clamp:scaleBox.clamp};
+vm.createContext(wheelBox);vm.runInContext(game.slice(game.indexOf('function onWorldWheel('),game.indexOf("canvas.addEventListener('wheel',onWorldWheel")),wheelBox);
+let prevented=0;
+const wheel=(deltaY,deltaMode=0,ctrlKey=false)=>wheelBox.onWorldWheel({deltaY,deltaMode,ctrlKey,preventDefault(){prevented++}});
+wheel(-100);assert.ok(wheelBox.g.viewZoom>1&&wheelBox.g.viewZoom<1.25);
+for(let i=0;i<20;i++)wheel(-100);assert.equal(wheelBox.g.viewZoom,1.25);
+for(let i=0;i<20;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.8);
+wheelBox.g.viewZoom=1;wheel(-5,1);const lineZoom=wheelBox.g.viewZoom;
+wheelBox.g.viewZoom=1;wheel(-80);assert.equal(wheelBox.g.viewZoom,lineZoom,'Line/pixel wheels agree');
+for(const mode of ['paused','map','browser']){
+ wheelBox.g.viewZoom=1;wheelBox.running=mode!=='paused';wheelBox.atlasVisible=mode==='map';const before=prevented;
+ wheel(-100,0,mode==='browser');assert.equal(wheelBox.g.viewZoom,1);assert.equal(prevented,before);
+}
+for(const tier of [0,10,22]){
+ scaleBox.g.viewZoom=1;const normal=scaleBox.campaignZoom(scaleBox.radiusAt(tier,0));
+ scaleBox.g.viewZoom=1.25;assert.ok(Math.abs(scaleBox.campaignZoom(scaleBox.radiusAt(tier,0))/normal-1.25)<1e-10);
+}
+scaleBox.g.viewZoom=1;
+vm.runInContext(game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback(')),scaleBox);
+scaleBox.g.upgrade={gravity:0};scaleBox.tester.gravity=1;
+for(const radius of [13,500,1e8]){scaleBox.player.r=radius;assert.ok(Math.abs(scaleBox.ordinaryGravityRadius()/(Math.max(97,radius*2.8))-1.2)<1e-10);}
+const brightBox={g:{endless:true},player:{r:1e8},clamp:scaleBox.clamp};vm.createContext(brightBox);
+vm.runInContext(game.slice(game.indexOf('function macroOpacity('),game.indexOf('function drawMacro(')),brightBox);
+assert.equal(brightBox.macroOpacity({r:3e6},20,1),1,'A visible galaxy must not become translucent relative to a giant hole');
+assert.ok(brightBox.macroOpacity({r:3e6},20,.5)>.7);assert.equal(brightBox.macroOpacity({r:3e6},20,0),0,'LOD endpoints stay seamless');
+console.log('PASS: wheel range/unit normalization/UI isolation, wider base fields, bright giant-hole galaxies');

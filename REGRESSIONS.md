@@ -134,3 +134,10 @@
 ### v3.21.2 — tester transition isolation
 
 - Switching forms in the tester clears unfinished digestion from the previous form before rebuilding the nearby field. Prevents a previous black hole's large captured bodies from finishing inside a newly selected planet and awarding incorrect mass. Unconsumed world identities and independent free-flight records are retained. Added a direct transition regression.
+
+## v3.22 — stronger gravity, wheel framing, bright galaxies
+
+- Player attraction acceleration increased by 40% at ordinary and black-hole scales; base field reach increased by 20% outside the horizon. Rival black-hole pull and smaller-hole attraction are also stronger. Gravity still ends at the field boundary; fast grazing trajectories can escape.
+- Wheel over the game canvas smoothly adjusts the automatic camera by 80–125%. Offset is saved with the run, applied on load/evolution/tester jumps, and shown as ОБЗОР in the HUD. Normalize pixel/line/page wheel units. UI panel scrolling, atlas wheel controls, pause screens and Ctrl-wheel browser zoom remain independent; no synchronous save per wheel event.
+- Visible galaxies no longer dim in proportion to the final hole's radius. Increased cached galaxy core/arm/star brightness and used smooth square-root LOD blending. Full absorption still fades only after entry; opaque horizon and cached lens remain unchanged.
+- Validation: base field ratios, manual zoom bounds/unit normalization/UI isolation, camera offset at multiple stages, final-hole galaxy opacity/LOD endpoints, grazing escape at normal/astronomical scales, complete regression suite and native Canvas smoke including 1e200 mass.

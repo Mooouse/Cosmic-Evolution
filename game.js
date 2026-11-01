@@ -75,7 +75,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -103,6 +103,7 @@ function normaliseMapPins(value){
   .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32)}));
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
+g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.8,1.25):1;
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
@@ -111,7 +112,7 @@ let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTime
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
 function radiusAt(tier,fraction){return 13*Math.pow(1.65,tier+clamp(fraction,0,1));}
-function campaignZoom(radius){return clamp(tester.zoom*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,2.5);}
+function campaignZoom(radius){return clamp(tester.zoom*(g.viewZoom||1)*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,3.2);}
 function currentRadius(){
  const base=radiusAt(g.tier,stageFraction());
  if(g.tier===TA.length-1){
@@ -126,7 +127,7 @@ const initialRadius=currentRadius();
 let player={x:Number.isFinite(g.worldX)?g.worldX:0,y:Number.isFinite(g.worldY)?g.worldY:0,vx:0,vy:0,r:initialRadius,targetR:initialRadius,rotation:0,shield:0,trail:[]};
 // Loading a saved giant black hole must start at its correct camera scale.
 // Animating from 1x to microscopic zoom would rebuild hundreds of LOD levels.
-const savedZoom=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+initialRadius/100))/Math.max(1,initialRadius),1e-155,2.5):campaignZoom(initialRadius);
+const savedZoom=g.endless?clamp(tester.zoom*(g.viewZoom||1)*(83+27*Math.log2(1+initialRadius/100))/Math.max(1,initialRadius),1e-155,2.5):campaignZoom(initialRadius);
 let camera={x:player.x,y:player.y,zoom:savedZoom};
 let entities=[],particles=[],shockwaves=[],texts=[],stars=[],nebula=[],energyArcs=[];let morph=null,screenFlash=0,streamTimer=0;const CHUNK=480;const loadedChunks=new Set();const visitedChunks=new Set(Array.isArray(g.visited)?g.visited:[]);if(!g.depleted||typeof g.depleted!=='object')g.depleted={};const WORLD_SEED=0x17aba37;const distantChunkCache=new Map();const MACRO_SIZE=3200,MACRO_COUNT=9;const macroCache=new Map(),macroSpriteCache=new Map(),macroLoaded=new Set();let macroEntities=[];let macroVisibleCount=0;if(!g.depletedMacro||typeof g.depletedMacro!=='object')g.depletedMacro={};
 // Manual flight: the cursor must NOT steer the ship until the user holds click.
@@ -156,7 +157,7 @@ function advanceHarvestChain(){
  }
  return chainMultiplier();
 }
-function ordinaryGravityRadius(){return Math.max(97+g.upgrade.gravity*7,player.r*2.8)*tester.gravity;}
+function ordinaryGravityRadius(){return Math.max(116.4+g.upgrade.gravity*7,player.r*3.36)*tester.gravity;}
 function pickupFeedback(value,rare=false){
  pickupCount++;pickupValue+=value;
  const now=performance.now();
@@ -277,7 +278,7 @@ function renderUI(force=false){
  for(const u of upgrades){let b=$('upgrades').querySelector(`[data-upgrade="${u.id}"]`),lvl=g.upgrade[u.id],c=upgradeCost(u);b.querySelector('.upgrade-level').textContent=`ур. ${lvl}/${u.max}`;b.querySelector('.upgrade-price').textContent=lvl>=u.max?'MAX':fmt(c);b.disabled=g.credits<c||lvl>=u.max;}
  $('pulse-cooldown').textContent=pulseCd>0?pulseCd.toFixed(1)+'с':'E · ГОТОВ';$('boost-cooldown').textContent=boostCd>0?boostCd.toFixed(1)+'с':'SHIFT · ГОТОВ';
  $('pulse-fill').style.transform=`scaleX(${clamp(1-pulseCd/13,0,1)})`;$('boost-fill').style.transform=`scaleX(${clamp(1-boostCd/6,0,1)})`;
- $('zoom-label').textContent=`РАЗМЕР ${player.r.toFixed(1)} · КАМЕРА ${camera.zoom<.01?camera.zoom.toExponential(2):camera.zoom.toFixed(2)}×`;
+ $('zoom-label').textContent=`РАЗМЕР ${player.r.toFixed(1)} · КАМЕРА ${camera.zoom<.01?camera.zoom.toExponential(2):camera.zoom.toFixed(2)}× · ОБЗОР ${Math.round((g.viewZoom||1)*100)}%`;
  $('btn-music').textContent=g.music?'♫':'♪̸';$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`СЕКТОР ${sx} : ${sy}  ·  ${BIOME_NAMES[chunkInfo(sx,sy).biome]}  ·  ОТКРЫТО ${fmt(exploredCount())}`;
  const stats=$('tester-stats');
  if(stats)stats.textContent=`${Math.round(frameFps)} FPS · ${lensBackend.toUpperCase()} · ${entities.length} объектов · ${loadedChunks.size} секторов · ${Math.floor(player.x/CHUNK)}:${Math.floor(player.y/CHUNK)}`;
@@ -499,7 +500,7 @@ function cosmicSprite(material,shape,style=0,palette=0){
  const halo=c.createRadialGradient(80,80,0,80,80,78);
  halo.addColorStop(0,colors[2]+'dd');halo.addColorStop(.12,colors[0]+'af');
  halo.addColorStop(.45,colors[1]+'31');halo.addColorStop(1,'#00000000');
- c.fillStyle=halo;c.globalAlpha=.52;c.fillRect(0,0,160,160);c.globalAlpha=1;
+ c.fillStyle=halo;c.globalAlpha=.82;c.fillRect(0,0,160,160);c.globalAlpha=1;
  c.save();c.translate(80,80);c.rotate(shape*.35+style*.42);
  // Distinct silhouettes: grand-design spiral, barred, irregular, elliptical,
  // ring, lenticular, dwarf, and interacting double galaxy.
@@ -517,7 +518,7 @@ function cosmicSprite(material,shape,style=0,palette=0){
   else if(style===6){const a=rng()*TAU,r=Math.sqrt(rng())*29;x=Math.cos(a)*r;y=Math.sin(a)*r*.74;}
   else {const a=rng()*TAU,r=Math.sqrt(rng())*67;x=Math.cos(a)*r;y=Math.sin(a)*r*(style===3?.55:1);}
   const radius=(i%11===0?1.8:.5)+rng()*(style===6?1.0:1.5);
-  c.globalAlpha=.40+rng()*.55;c.fillStyle=colors[(i+Math.floor(rng()*4))%3];
+  c.globalAlpha=.68+rng()*.32;c.fillStyle=colors[(i+Math.floor(rng()*4))%3];
   c.beginPath();c.arc(x,y,radius,0,TAU);c.fill();
  }
  // Galactic bar, central bulge and luminous star clusters.
@@ -529,7 +530,7 @@ function cosmicSprite(material,shape,style=0,palette=0){
  for(let i=0;i<165;i++){
   const angle=rng()*TAU,rr=Math.sqrt(rng())*67;
   const px=Math.cos(angle)*rr,py=Math.sin(angle)*rr*.72;
-  const flicker=rng();c.globalAlpha=.22+flicker*.75;
+  const flicker=rng();c.globalAlpha=.5+flicker*.5;
   c.fillStyle=flicker>.78?'#fffaf0':colors[i%3];
   c.fillRect(px,py,.45+rng()*1.15,.45+rng()*1.15);
  }
@@ -600,6 +601,12 @@ function bodySprite(e){
  bodySpriteCache.set(key,cv);return cv;
 }
 
+function macroOpacity(e,radius,opacity){
+ // Size-relative culling is for microscopic debris, not a dimmer for galaxies.
+ // Keep LOD transitions smooth; full absorption still fades via absorptionLight.
+ const scaleFade=g.endless?1:clamp((e.r/player.r-.025)/.025,0,1);
+ return (g.endless?1:clamp(.67+radius*.018,.66,.97))*Math.sqrt(clamp(opacity,0,1))*scaleFade;
+}
 function drawMacro(e,time,zoom,opacity=1){
  const x=(e.x-camera.x)*zoom+W*.5,y=(e.y-camera.y)*zoom+H*.5;
  const radius=e.r*zoom;
@@ -608,7 +615,7 @@ function drawMacro(e,time,zoom,opacity=1){
  const drawR=Math.min(radius,Math.max(W,H)*2)*(e.absorbScale??1);
  // LOD fades must never turn a whole class of galaxies black.
  const fade=absorptionLight(e); // Preserve the previous ring image; fade only after full entry.
- ctx.save();ctx.globalAlpha=clamp(.67+radius*.018,.66,.97)*clamp(opacity,0,1)*fade*clamp((e.r/player.r-.025)/.025,0,1);
+ ctx.save();ctx.globalAlpha=macroOpacity(e,radius,opacity)*fade;
  if(e.kind==='blackhole'){
   if(drawR<3){ctx.fillStyle=['#69c9ed','#cda1f9','#ffcc8e'][e.holeType||0];ctx.fillRect(x-1,y-1,2,2);}
   else {const cv=blackHoleSprite(e.holeType||0);ctx.drawImage(cv,x-drawR*2,y-drawR*2,drawR*4,drawR*4);}
@@ -677,7 +684,7 @@ function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
 }
 function blackHoleGravityRadius(){
  const zoom=Math.max(1e-155,camera.zoom),core=blackHoleCoreWorldRadius();
- return core+Math.max(180,core*zoom*2.2)*(1+g.upgrade.gravity*.012)*tester.gravity/zoom;
+ return core+Math.max(216,core*zoom*2.64)*(1+g.upgrade.gravity*.012)*tester.gravity/zoom;
 }
 function applyBlackHoleGravity(e,dt){
  if(e.freeFlight&&g.freeFlights[flightKey(e)])Object.assign(e,freeFlightAt(g.freeFlights[flightKey(e)]));
@@ -685,7 +692,7 @@ function applyBlackHoleGravity(e,dt){
  const core=blackHoleCoreWorldRadius(),touch=blackHoleTouchDistance(e,core)*zoom;
  const range=blackHoleGravityRadius()*zoom+touch-core*zoom;
  if(d>range){e.gravityBound=false;return !!e.freeFlight;}
- const strength=clamp(1-d/Math.max(1,range),0,1),acceleration=220*strength+1000*strength*strength;
+ const strength=clamp(1-d/Math.max(1,range),0,1),acceleration=308*strength+1400*strength*strength;
  const ax=dx/Math.max(d,.001)*acceleration/zoom,ay=dy/Math.max(d,.001)*acceleration/zoom;
  e.vx=(e.motionVX||0)+ax*dt;e.vy=(e.motionVY||0)+ay*dt;
  e.x+=ax*dt*dt*.5;e.y+=ay*dt*dt*.5;e.motionVX=e.vx;e.motionVY=e.vy;
@@ -1046,7 +1053,7 @@ function attractSmallerAbyss(h,dt){
  const core=blackHoleCoreWorldRadius(),dx=player.x-h.x,dy=player.y-h.y,d=Math.hypot(dx,dy);
  const range=blackHoleGravityRadius()+h.r;if(d>range)return;
  // Exact world radius: no minimum sprite size, no vanishing at first contact.
- const speed=Math.max(core*.55,160/Math.max(1e-155,camera.zoom))*(.3+.7*(1-clamp(d/range,0,1)));
+ const speed=Math.max(core*.77,224/Math.max(1e-155,camera.zoom))*(.3+.7*(1-clamp(d/range,0,1)));
  const travel=Math.min(d,speed*dt),fraction=d>0?travel/d:0;
  h={...h,x:h.x+dx*fraction,y:h.y+dy*fraction};
  g.abyssPositions[h.id]=[h.x,h.y];
@@ -1070,7 +1077,7 @@ function nearestAbyss(){
 function abyssPull(h,x,y,speed){
  const dx=h.x-x,dy=h.y-y,d=Math.hypot(dx,dy),q=d/h.r;
  if(q>=5||d===0)return {x:0,y:0};
- const influence=clamp((5-q)/4,0,1),v=speed*4.5*influence*influence;
+ const influence=clamp((5-q)/4,0,1),v=speed*6.3*influence*influence;
  return {x:dx/d*v,y:dy/d*v};
 }
 function crossesAbyss(h,x0,y0,x1,y1){
@@ -1245,7 +1252,7 @@ function deflectResource(e,dt,range){
  const inside=d<range&&d>0;
  e.gravityBound=inside;
  if(!inside)return false;
- const q=clamp(1-d/range,0,1),acceleration=360/Math.min(1,Math.max(1e-155,camera.zoom))*q*q*Math.min(1,(player.r/e.r)**2);
+ const q=clamp(1-d/range,0,1),acceleration=504/Math.min(1,Math.max(1e-155,camera.zoom))*q*q*Math.min(1,(player.r/e.r)**2);
  const ax=dx/d*acceleration,ay=dy/d*acceleration;
  e.vx=(e.motionVX||0)+ax*dt;e.vy=(e.motionVY||0)+ay*dt;
  e.x+=ax*dt*dt*.5;e.y+=ay*dt*dt*.5;
@@ -1346,7 +1353,7 @@ function update(dt){
  // Early stages keep the familiar camera. The endless black hole zooms out
  // only as needed to keep its horizon visible, with no hard size ceiling.
  const horizonRadius=Math.max(player.r,player.targetR);
- const zTarget=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-155,2.5):campaignZoom(horizonRadius);
+ const zTarget=g.endless?clamp(tester.zoom*(g.viewZoom||1)*(83+27*Math.log2(1+horizonRadius/100))/Math.max(1,horizonRadius),1e-155,2.5):campaignZoom(horizonRadius);
  const zoomResponse=g.endless?2.4:2;
  const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-155),1e-10,1e10);
  camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
@@ -2261,7 +2268,7 @@ function testerSetTier(tier){
  // new form's rewards. Restore unconsumed identities to their world layer.
  for(const e of [...entities,...macroEntities,...cosmicAbsorptions])if(e.absorbing||e.gathering)delete g.freeFlights[flightKey(e)];
  cosmicAbsorptions.length=0;absorbingMacroKeys.clear();for(const key of Object.keys(g.freeFlights))absorbingMacroKeys.add(key);
- camera.zoom=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+player.r/100))/Math.max(1,player.r),1e-155,2.5):campaignZoom(player.r);
+ camera.zoom=g.endless?clamp(tester.zoom*(g.viewZoom||1)*(83+27*Math.log2(1+player.r/100))/Math.max(1,player.r),1e-155,2.5):campaignZoom(player.r);
  testerRemakeNearby();
  burst(player.x,player.y,35,TA[next].color);
  renderUI(true);testerRefresh();
@@ -2325,6 +2332,14 @@ $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
 $('btn-sidebar').onclick=()=>{if(W<=800){$('sidebar').classList.remove('mobile-open')}else $('sidebar').classList.add('collapsed');$('btn-show-sidebar').classList.remove('hidden');};
 $('btn-show-sidebar').onclick=()=>{if(W<=800)$('sidebar').classList.add('mobile-open');else $('sidebar').classList.remove('collapsed');$('btn-show-sidebar').classList.add('hidden');};
 if(W<=800)$('btn-show-sidebar').classList.remove('hidden');
+function onWorldWheel(ev){
+ if(!running||atlasVisible||ev.ctrlKey||!Number.isFinite(ev.deltaY))return;
+ ev.preventDefault();
+ const pixels=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?H:1);
+ g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.0015),.8,1.25);
+ // The normal camera follows this target smoothly; autosave/pagehide persist it.
+}
+canvas.addEventListener('wheel',onWorldWheel,{passive:false});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('pointermove',e=>{
  if(e.pointerType!=='mouse')return;
