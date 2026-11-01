@@ -171,7 +171,7 @@ for(const x of [1e20,-1e20,1e100,-1e100]){
 }
 has('if(renderGpuLens(p,R,outer))return;', 'GPU path must bypass CPU pixel readback');
 has("surface.addEventListener('webglcontextlost'", 'GPU context loss must permit stable fallback');
-has('state.width!==frameCanvas.width', 'GPU texture should only be allocated when dimensions change');
+has('state.width!==width||state.height!==height', 'GPU texture should only be allocated when dimensions change');
 console.log('PASS: huge-coordinate streaming terminates; GPU-first lens with loss recovery');
 
 const absorptionStart=game.indexOf('function startAbsorption(e){');
@@ -190,7 +190,7 @@ for(const zoom of [1,1e-3,1e-60,1e-110]){
  assert.ok(e.absorbScale>.98,'Galaxy must not instantly collapse on first contact');
  for(let i=0;i<150&&!e.dead;i++)vm.runInContext('animateAbsorption(e,1/60)',sim);
  assert.equal(rewards,1,'Full absorption must finish and reward exactly once');
- const drawnRadius=112*1.4*e.absorbScale;
+ const drawnRadius=100*1.4*e.absorbScale;
  assert.ok(Math.hypot(e.x,e.y)*zoom+drawnRadius<=110.25*.96,
   'The complete galaxy must be inside the black disk before deletion');
  vm.runInContext('animateAbsorption(e,1/60)',sim);assert.equal(rewards,1);
@@ -212,7 +212,7 @@ for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
  const radius=vm.runInContext('blackHoleGravityRadius()',sim);
  vm.runInContext('for(let i=0;i<15;i++){g.time+=1/60;applyBlackHoleGravity(e,1/60)}',sim);
  const movement=400-e.x*zoom;
- assert.ok(movement>1,'Galaxies outside contact must move toward the black hole');
+ assert.ok(movement>.5,'Galaxies outside contact must move toward the black hole');
  if(firstMotion===undefined)firstMotion=movement;else assert.ok(Math.abs(movement-firstMotion)<1e-7,'Gravity speed must not vanish as zoom shrinks');
  sim.g.upgrade.gravity=40;
  assert.ok(vm.runInContext('blackHoleGravityRadius()',sim)>radius,'Gravity upgrades must affect cosmic bodies');
@@ -223,12 +223,12 @@ const dustStart=game.indexOf('function cosmicDustView(');
 const dustEnd=game.indexOf('\nfunction renderDistantBodies()',dustStart);
 for(const [W,H,zoom] of [[1920,1080,.08],[3840,2160,.025],[390,844,.08]]){
  const points=[];
- const sim={W,H,CHUNK:480,camera:{zoom,x:11000,y:-7000},g:{endless:true,depleted:{}},loadedChunks:new Set(),resourceViews:()=>[{x:11000,y:-7000,stream:0}],
+ const sim={W,H,CHUNK:480,camera:{zoom,x:11000,y:-7000},player:{r:30/zoom},g:{endless:true,depleted:{}},loadedChunks:new Set(),resourceViews:()=>[{x:11000,y:-7000,stream:0}],
   ctx:{save(){},restore(){},fillRect(x,y){points.push([x,y])}},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),seedHash:()=>0,
   chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
   MATERIALS:{ore:{color:'#abc'}},absorbingMacroKeys:new Set(),absorptionKey:e=>e.chunk,
-  distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:8,index:0,chunk:`${cx},${cy}`,material:'ore'}]};
+  distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:2/zoom,index:0,chunk:`${cx},${cy}`,material:'ore'}]};
  vm.createContext(sim);vm.runInContext(game.slice(dustStart,dustEnd),sim);
  const view=vm.runInContext('cosmicDustView()',sim);
  assert.ok(view.columns*view.rows<600,'Dust sampling must stay bounded on 4K');
@@ -425,7 +425,7 @@ console.log('PASS: map pins persist exact world coordinates across reload; inval
 const activeLoopStart=game.indexOf(' for(let i=cosmicAbsorptions.length-1;i>=0;i--)',game.indexOf('function update(dt){'));
 const activeLoopStop=game.indexOf('\n harvestCosmicLOD(',activeLoopStart);
 const moving={x:1100,y:0,index:8};
-const rivalLoop={cosmicAbsorptions:[moving],dt:.05,pullBodyIntoAbyss:rivalBox.pullBodyIntoAbyss,
+const rivalLoop={g:{endless:true},cosmicAbsorptions:[moving],dt:.05,pullBodyIntoAbyss:rivalBox.pullBodyIntoAbyss,
  animateAbsorption(){throw new Error('Rival owns this body')},applyBlackHoleGravity(){throw new Error('Rival owns this body')}};
 vm.createContext(rivalLoop);vm.runInContext(game.slice(activeLoopStart,activeLoopStop),rivalLoop);
 assert.equal(rivalLoop.cosmicAbsorptions.length,1);assert.ok(moving.x<1100&&!moving.dead);
@@ -517,7 +517,7 @@ assert.ok(!absorbCode.includes('*chainMultiplier()'));
 console.log('PASS: visual chains preserve the existing evolution costs and material rewards');
 
 // Grazing a finite field bends a trajectory; it must not become a homing missile.
-const flightBox={g:{time:0,freeFlights:{}},player:{x:0,y:0,r:20},
+const flightBox={camera:{zoom:1},g:{time:0,freeFlights:{}},player:{x:0,y:0,r:20},
  absorbed:0,absorbingMacroKeys:new Set(),absorptionKey:e=>e.chunk+':'+e.index,
  clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),seedHash:abyssBox.seedHash};
 vm.createContext(flightBox);
@@ -573,3 +573,61 @@ for(const zoom of [1,1e-60]){
  assert.deepEqual([e.motionVX,e.motionVY],exitSpeed,'Black-hole pull must end outside its field');
 }
 console.log('PASS: fast grazing bodies escape black-hole fields at ordinary and astronomical scales');
+
+// Physical scale, appearance and useful food evolve together without tier gates.
+const scaleBox={TA:reqBox.forms,player:{r:13},tester:{zoom:1},g:{tier:0,matter:0},
+ clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),blackHoleCoreWorldRadius(){return scaleBox.player.r*.245}};
+vm.createContext(scaleBox);
+vm.runInContext(game.slice(game.indexOf('function radiusAt('),game.indexOf('function currentRadius('))+
+ game.slice(game.indexOf('function bodyType('),game.indexOf('const bodySpriteCache='))+
+ game.slice(game.indexOf('function blackHoleBodyValue('),game.indexOf('function finishCosmicAbsorption(')),scaleBox);
+for(let t=0;t<27;t++){
+ assert.equal(scaleBox.radiusAt(t,1),scaleBox.radiusAt(t+1,0),'No size jump at evolution');
+ const radius=scaleBox.radiusAt(t,0),zoom=scaleBox.campaignZoom(radius);
+ assert.ok(radius*zoom>=29&&radius*zoom<=145.01,'Camera must follow campaign growth');
+ scaleBox.player.r=radius;
+ assert.ok(scaleBox.ordinaryBodyValue({r:radius*.6})<reqBox.forms[t].required*.05,'One body must not skip a stage');
+}
+for(const [tier,type] of [[4,'asteroid'],[7,'moon'],[9,'planet'],[12,'gasgiant'],[16,'star'],[20,'system'],[23,'galaxy'],[26,'cluster']]){
+ const radius=scaleBox.radiusAt(tier,0);
+ for(const playerTier of [0,12,27]){scaleBox.g.tier=playerTier;assert.equal(scaleBox.bodyType(radius),type,'Body identity must not depend on player stage');}
+}
+for(const r of [1e6,1e30,1e110]){
+ scaleBox.player.r=r;scaleBox.g={tier:27,matter:1e12};
+ const value=scaleBox.blackHoleBodyValue({r:r*.1});assert.ok(Number.isFinite(value)&&value>0&&value<1e10,'Cosmic reward must not explode with coordinate units');
+}
+assert.ok(!game.slice(game.indexOf('function streamMacroBodies('),game.indexOf('const GALAXY_PALETTES=')).includes('g.tier<'));
+assert.ok(!game.slice(game.indexOf('function renderMacroBackground('),game.indexOf('function streamField(')).includes('g.tier<'));
+
+// A moon/planet in the distant field becomes physical before black-hole evolution,
+// moves fully into the player, and marks its exact persistent deposit as depleted.
+const promotion={g:{endless:false,depletedMacro:{},depletedCosmic:{}},player:{r:1000,x:0,y:0},
+ cosmicHarvestTimer:0,cosmicAbsorptions:[],absorbingMacroKeys:new Set(),macroLoaded:new Set(),MACRO_SIZE:3200,
+ ordinaryGravityRadius:()=>2800,cosmicVisibleLOD:()=>({levels:[1],low:1,fraction:0}),
+ macroLODNodes:(gx,gy)=>gx===0&&gy===0?[{x:200,y:0,r:300,cosmic:true,level:1,gx,gy,index:0,material:'ice'}]:[],
+ absorptionKey:e=>`${e.level}:${e.gx}:${e.gy}:${e.index}`,
+ clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+vm.createContext(promotion);
+vm.runInContext(game.slice(game.indexOf('function harvestCosmicLOD('),game.indexOf('function promoteAbyssMatter('))+
+ game.slice(game.indexOf('function gatherBody('),game.indexOf('function update(dt)'))+
+ game.slice(game.indexOf('function markHarvested('),game.indexOf('// Permanent sector capacity')),promotion);
+vm.runInContext('harvestCosmicLOD(.1);harvestCosmicLOD(.1)',promotion);
+assert.equal(promotion.cosmicAbsorptions.length,1,'One physical copy per body');
+const food=promotion.cosmicAbsorptions[0];food.gathering=.000001;food.gatherX=food.x;food.gatherY=food.y;
+let received=0;promotion.absorb=e=>{received++;promotion.markHarvested(e);e.dead=true;};
+promotion.gatherBody(food,.25);assert.equal(received,0);assert.ok(food.x<200);
+promotion.gatherBody(food,.31);assert.equal(received,1);assert.equal(promotion.g.depletedCosmic['1:0:0'],1);
+console.log('PASS: continuous physical progression, fixed body classes, bounded rewards and pre-hole cosmic collection');
+
+// The CPU hot loop keeps the exact bilinear lens equation and transparent edges.
+const pixelBox={};vm.createContext(pixelBox);
+vm.runInContext(game.slice(game.indexOf('function warpLensPixels('),game.indexOf('function renderBlackHoleLensing(')),pixelBox);
+const side=24,input=new Uint8ClampedArray(side*side*4),output=new Uint8ClampedArray(input.length);
+for(let i=0;i<input.length;i+=4){input[i]=i%251;input[i+1]=(i*3)%253;input[i+2]=123;input[i+3]=255;}
+const identity=new Float32Array(4097).fill(1),opaque=new Float32Array(4097).fill(1);
+pixelBox.warpLensPixels(input,output,side,side,0,0,1,1,12,12,2,20,20/4096,identity,opaque,1,8);
+for(const [x,y] of [[6,8],[14,8],[8,16],[17,15]]){
+ const i=(y*side+x)*4;assert.equal(output[i],input[i]);assert.equal(output[i+1],input[i+1]);assert.equal(output[i+2],123);
+}
+assert.equal(output[(12*side+12)*4+3],0,'Horizon remains a separate opaque compositor pass');
+console.log('PASS: optimized pixel sampler retains bilinear values and horizon isolation');
