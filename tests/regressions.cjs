@@ -161,7 +161,7 @@ const streamEnd=game.indexOf('\n// Render world-anchored',streamStart);
 const macroStart=game.indexOf('function streamMacroBodies(){');
 const macroEnd=game.indexOf('\nconst GALAXY_PALETTES',macroStart);
 for(const x of [1e20,-1e20,1e100,-1e100]){
- const sim={player:{x,y:x},camera:{zoom:1e-30},g:{tier:27},CHUNK:480,MACRO_SIZE:3200,
+ const sim={player:{x,y:x},camera:{zoom:1e-30},g:{tier:27,freeFlights:{}},W:1920,H:1080,cosmicAbsorptions:[],flightKey:()=>"unused",CHUNK:480,MACRO_SIZE:3200,
   entities:[{}],macroEntities:[{}],loadedChunks:new Set(['old']),macroLoaded:new Set(['old'])};
  vm.createContext(sim);
  vm.runInContext(game.slice(macroStart,macroEnd)+'\n'+game.slice(streamStart,streamEnd),sim);
@@ -205,12 +205,12 @@ let firstMotion;
 for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
  const e={x:400/zoom,y:0,r:80/zoom,cosmic:true,index:0,level:2,gx:0,gy:0};
  const sim={e,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
-  BLACK_HOLE_CORE_FRACTION:.245,g:{upgrade:{gravity:0}},tester:{gravity:1},
+  BLACK_HOLE_CORE_FRACTION:.245,g:{time:0,freeFlights:{},upgrade:{gravity:0}},tester:{gravity:1},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'fixture',
   startAbsorption(){throw Error('Gravity test body is still outside the event horizon')}};
- vm.createContext(sim);vm.runInContext(snippet+'\n'+gravityCode,sim);
+ vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
  const radius=vm.runInContext('blackHoleGravityRadius()',sim);
- vm.runInContext('for(let i=0;i<15;i++)applyBlackHoleGravity(e,1/60)',sim);
+ vm.runInContext('for(let i=0;i<15;i++){g.time+=1/60;applyBlackHoleGravity(e,1/60)}',sim);
  const movement=400-e.x*zoom;
  assert.ok(movement>1,'Galaxies outside contact must move toward the black hole');
  if(firstMotion===undefined)firstMotion=movement;else assert.ok(Math.abs(movement-firstMotion)<1e-7,'Gravity speed must not vanish as zoom shrinks');
@@ -219,11 +219,11 @@ for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
 }
 console.log('PASS: pre-contact gravity and upgrades work at five zoom scales');
 
-const dustStart=game.indexOf('function cosmicDustView(){');
+const dustStart=game.indexOf('function cosmicDustView(');
 const dustEnd=game.indexOf('\nfunction renderDistantBodies()',dustStart);
 for(const [W,H,zoom] of [[1920,1080,.08],[3840,2160,.025],[390,844,.08]]){
  const points=[];
- const sim={W,H,CHUNK:480,camera:{zoom,x:11000,y:-7000},g:{depleted:{}},
+ const sim={W,H,CHUNK:480,camera:{zoom,x:11000,y:-7000},g:{endless:true,depleted:{}},loadedChunks:new Set(),resourceViews:()=>[{x:11000,y:-7000,stream:0}],
   ctx:{save(){},restore(){},fillRect(x,y){points.push([x,y])}},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),seedHash:()=>0,
   chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
@@ -258,7 +258,7 @@ console.log('PASS: map fits real viewport and horizon; readable scale at four ex
 {
  const active=new Set(),entities=[];
  const sim={W:1920,H:1080,CHUNK:480,camera:{zoom:.08,x:0,y:0},player:{x:0,y:0},
-  g:{endless:true,depleted:{}},abyssPhysical:[],loadedChunks:new Set(),absorbingMacroKeys:active,entities,
+  resourceViews:()=>[{x:0,y:0,stream:0}],g:{endless:true,depleted:{}},abyssPhysical:[],loadedChunks:new Set(),absorbingMacroKeys:active,entities,
   seedHash:()=>0,chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
   blackHoleGravityRadius:()=>1e8,absorptionKey:e=>`${e.chunk}:${e.index}`,
   distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:8,index:0,chunk:`${cx},${cy}`,material:'ore',value:10}]};
@@ -367,7 +367,7 @@ console.log('PASS: death resets and saves all progression, retains preferences a
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
 let rivalMarks=0;
-const rivalBox={g:{abyssConsumed:{}},canEatAbyss:()=>false,abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
+const rivalBox={g:{abyssConsumed:{},freeFlights:{}},flightKey:e=>e.index,canEatAbyss:()=>false,abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
  abyssPull:abyssBox.abyssPull,crossesAbyss:abyssBox.crossesAbyss,absorptionKey:e=>e.index,
  markHarvested(){rivalMarks++},cosmicSceneDirty:false};
 vm.createContext(rivalBox);vm.runInContext(game.slice(rivalStart,rivalStop),rivalBox);
@@ -422,7 +422,7 @@ console.log('PASS: map pins persist exact world coordinates across reload; inval
 
 // Reproduce the v3.17 bug: rival attraction returned true for a LIVE body,
 // and the outer update loop mistakenly removed it from the active collection.
-const activeLoopStart=game.indexOf(' for(let i=cosmicAbsorptions.length-1;i>=0;i--)');
+const activeLoopStart=game.indexOf(' for(let i=cosmicAbsorptions.length-1;i>=0;i--)',game.indexOf('function update(dt){'));
 const activeLoopStop=game.indexOf('\n harvestCosmicLOD(',activeLoopStart);
 const moving={x:1100,y:0,index:8};
 const rivalLoop={cosmicAbsorptions:[moving],dt:.05,pullBodyIntoAbyss:rivalBox.pullBodyIntoAbyss,
@@ -490,8 +490,8 @@ assert.ok(!abyssBox.abyssCandidates(prey.x,prey.y,core*10).some(h=>h.id===prey.i
 console.log('PASS: smaller holes move, persist and disappear only after full absorption; single reward');
 
 // One time-based path shared by generation and active physics at any scale.
-const driftCode=game.slice(game.indexOf('function driftBody('),game.indexOf('const BIOME_NAMES='));
-const driftBox={g:{time:0},seedHash:abyssBox.seedHash};vm.createContext(driftBox);vm.runInContext(driftCode,driftBox);
+const driftCode=game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='));
+const driftBox={g:{time:0,freeFlights:{}},absorptionKey:e=>String(e.index),seedHash:abyssBox.seedHash};vm.createContext(driftBox);vm.runInContext(driftCode,driftBox);
 for(const r of [6,300,1e100]){
  const source={x:r*10,y:-r*3,r,index:7,cosmic:r>1e3};
  const p0=driftBox.driftBody(source);driftBox.g.time=7;
@@ -499,7 +499,7 @@ for(const r of [6,300,1e100]){
  assert.equal(p1.x,p2.x);assert.equal(p1.y,p2.y);
  assert.ok(Math.hypot(p1.x-p0.x,p1.y-p0.y)>0);
  driftBox.g.time=7+1/60;const p3=driftBox.driftBody(p1);
- assert.ok(Math.hypot(p3.x-p1.x,p3.y-p1.y)<Math.max(r*.01,1),'No frame-to-frame jumps');
+ assert.ok(Math.hypot(p3.x-p1.x,p3.y-p1.y)<Math.max(r*.01,3),'No frame-to-frame jumps');
  const caught={...p1,gravityBound:true};assert.equal(driftBox.driftBody(caught),caught);
  driftBox.g.time=0;
 }
@@ -515,3 +515,61 @@ const absorbCode=game.slice(game.indexOf('function absorb(e){'),game.indexOf('//
 assert.ok(!absorbCode.includes('*advanceHarvestChain()'));
 assert.ok(!absorbCode.includes('*chainMultiplier()'));
 console.log('PASS: visual chains preserve the existing evolution costs and material rewards');
+
+// Grazing a finite field bends a trajectory; it must not become a homing missile.
+const flightBox={g:{time:0,freeFlights:{}},player:{x:0,y:0,r:20},
+ absorbed:0,absorbingMacroKeys:new Set(),absorptionKey:e=>e.chunk+':'+e.index,
+ clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),seedHash:abyssBox.seedHash};
+vm.createContext(flightBox);
+vm.runInContext(game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+
+ game.slice(game.indexOf('function deflectResource('),game.indexOf('function gatherBody(')),flightBox);
+function flyby(fps){
+ flightBox.g={time:0,freeFlights:{}};
+ let e={x:-200,y:78,r:5,index:0,chunk:'test',vx:100,vy:0,motionVX:100,motionVY:0,flightTime:0,freeFlight:true};
+ flightBox.g.freeFlights['test:0']={...e};
+ let seenField=false,lastVelocity;
+ for(let i=0;i<fps*6;i++){
+  flightBox.g.time=(i+1)/fps;e=flightBox.freeFlightAt(flightBox.g.freeFlights['test:0']);
+  seenField=flightBox.deflectResource(e,1/fps,100)||seenField;
+  if(i===fps*5-1)lastVelocity=[e.motionVX,e.motionVY];
+ }
+ assert.ok(seenField,'Fixture must enter the gravity field');
+ assert.ok(e.x>200&&e.y<78&&!e.gravityBound,'Grazing body must bend and escape');
+ assert.deepEqual([e.motionVX,e.motionVY],lastVelocity,'No drag or attraction after escape');
+ const saved=JSON.parse(JSON.stringify(flightBox.g));flightBox.g=saved;
+ const restored=flightBox.freeFlightAt(saved.freeFlights['test:0']);
+ assert.equal(restored.x,e.x);assert.equal(restored.y,e.y);
+ return e;
+}
+const path30=flyby(30),path120=flyby(120);
+assert.ok(Math.hypot(path30.x-path120.x,path30.y-path120.y)<3,'Trajectory must remain close across frame rates');
+flightBox.g={time:0,freeFlights:{}};
+for(let i=0;i<4;i++){
+ const original={x:200,y:300,index:i,r:5};
+ const a=flightBox.driftBody(original);flightBox.g.time=10;const b=flightBox.driftBody(original);
+ const speed=Math.hypot(b.x-a.x,b.y-a.y)/10;
+ assert.ok(speed>=70&&speed<=100,'Initial resources need noticeable flight speed');
+ const source=flightBox.resourceViews(b.x,b.y)[i];
+ assert.equal(source.x,original.x);assert.equal(source.y,original.y);
+ flightBox.g.time=0;
+}
+const entityPainter=game.slice(game.indexOf('function renderEntity('),game.indexOf('function paintEntity('));
+assert.ok(!entityPainter.includes('stroke'),'No motion lines attached to small resources');
+console.log('PASS: fast free flight, grazing deflection, inertial escape, save/reload and 30/120 Hz agreement');
+
+for(const zoom of [1,1e-60]){
+ const sim={camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
+  BLACK_HOLE_CORE_FRACTION:.245,g:{time:0,freeFlights:{},upgrade:{gravity:0}},tester:{gravity:1},
+  clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'grazing',
+  startAbsorption(){throw Error('Grazing body must not be auto-captured')}};
+ vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
+ const e={x:-500/zoom,y:335/zoom,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
+ sim.g.freeFlights.grazing={...e};let exitSpeed;
+ for(let i=0;i<480;i++){
+  sim.g.time=(i+1)/60;sim.applyBlackHoleGravity(e,1/60);
+  if(i===419)exitSpeed=[e.motionVX,e.motionVY];
+ }
+ assert.ok(e.x*zoom>900&&e.y*zoom<335&&!e.gravityBound);
+ assert.deepEqual([e.motionVX,e.motionVY],exitSpeed,'Black-hole pull must end outside its field');
+}
+console.log('PASS: fast grazing bodies escape black-hole fields at ordinary and astronomical scales');
