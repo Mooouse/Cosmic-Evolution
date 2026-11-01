@@ -116,3 +116,10 @@
 
 .atlas-pins{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:9px 0 5px}.atlas-pins .secondary-button{min-height:32px;padding:6px 11px;font-size:10px;white-space:nowrap}.atlas-pins select,.atlas-pins input{min-width:100px;max-width:190px;flex:1;height:32px;padding:5px 9px;background:#0b1723;border:1px solid #35505e;border-radius:4px;color:#c8dce7;font-size:11px}.atlas-pins button[aria-pressed=true]{border-color:#d4ca9a;color:#ece3b4;background:#333022}.atlas-pins :disabled{opacity:.4}.atlas-pin-hint{font-size:10px;line-height:1.5;color:#859caa;text-align:left;margin:4px 0 8px}.atlas-card .atlas-wrap{height:clamp(220px,47vh,560px)}
 @media(max-width:650px){.atlas-pins{gap:5px}.atlas-pins input,.atlas-pins select{max-width:none;min-width:110px}.atlas-card .atlas-wrap{height:36vh;min-height:220px}.atlas-pins .secondary-button{font-size:9px;padding:6px 9px}}
+
+/* v3.25: luminous accents, readable HUD; no full-screen post-processing. */
+.ability-icon{color:#62efff}.ability:nth-child(2) .ability-icon{color:#cf94ff}
+.upgrade-icon{color:#72f2ff;background:#123c50;border-color:#5bdfff66}
+.progress-fill{background:linear-gradient(90deg,#22b9ef,#65ffe1);box-shadow:0 0 12px #3bdfff80}
+.primary-button{background:#7ff3ff;border-color:#d4fcff;box-shadow:0 5px 24px #35ccff40}
+.world-label small,.bottom-hint{color:#bfd8ee}
