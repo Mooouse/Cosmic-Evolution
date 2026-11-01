@@ -1440,30 +1440,45 @@ function ensureSkyLayer(){
  // Thousands of bright single-render-pixel stars, baked at the exact frame size.
  // Integer coordinates prevent subpixel coverage from making the stars dim.
  c.setTransform(1,0,0,1,0,0);
- const count=Math.min(28000,Math.max(1800,Math.floor(W*H/140)));
+ const count=Math.min(72000,Math.max(4500,Math.floor(W*H/48)));
  // Each association has a coherent hue, several knots and a curved outline.
  // Most stars belong to associations; sparse field stars leave dark gaps.
- const palettes=[['#b56dff','#cf91ff','#e8c6ff'],['#55b9ff','#84d5ff','#c9efff'],
-  ['#ff76c9','#ff9cdf','#ffd4ed'],['#ffc067','#ffda91','#fff0cb'],
-  ['#8c88ff','#b0a4ff','#d9d3ff']];
+ const palettes=[['#a54dff','#c675ff','#d9a2ff'],['#35aaff','#60c6ff','#8ddbff'],
+  ['#ff53b9','#ff7bd4','#ff9cde'],['#ffac3d','#ffc660','#ffdc8b'],
+  ['#7860ff','#a18aff','#beadff']];
  const groups=Array.from({length:9},(_,i)=>{
   const angle=rng()*TAU,rx=W*(.055+rng()*.095)*1.65,ry=H*(.025+rng()*.045)*1.65;
   return {x:W*(.08+rng()*.84),y:H*(.09+rng()*.82),rx,ry,
    cos:Math.cos(angle),sin:Math.sin(angle),bend:(rng()-.5)*2.3,palette:palettes[i%palettes.length],
    knots:Array.from({length:3},()=>({x:(rng()-.5)*2.3,y:(rng()-.5)*1.1}))};
  });
+ // Soft unresolved starlight follows the same irregular knots, so group hues
+ // remain readable when a monitor or adaptive rendering downsamples the points.
+ c.save();c.scale(skyLayer.width/W,skyLayer.height/H);
+ for(const group of groups){
+  c.save();c.translate(group.x,group.y);c.transform(group.cos,group.sin,-group.sin,group.cos,0,0);
+  for(const knot of group.knots){
+   const x=knot.x*group.rx,y=(knot.y+Math.sin(knot.x*1.9)*group.bend)*group.ry;
+   c.save();c.translate(x,y);c.scale(group.rx*.85,group.ry*1.1);
+   const light=c.createRadialGradient(0,0,0,0,0,1.6);
+   light.addColorStop(0,group.palette[0]+'24');light.addColorStop(.5,group.palette[0]+'0e');light.addColorStop(1,group.palette[0]+'00');
+   c.fillStyle=light;c.fillRect(-1.6,-1.6,3.2,3.2);c.restore();
+  }
+  c.restore();
+ }
+ c.restore();
  const gaussian=()=>Math.sqrt(-2*Math.log(Math.max(1e-8,rng())))*Math.cos(rng()*TAU);
  for(let i=0;i<count;i++){
   let x,y,color;
-  if(rng()<.84){
+  if(rng()<.94){
    const group=groups[Math.floor(rng()*groups.length)],knot=group.knots[Math.floor(rng()*3)];
    const along=knot.x+gaussian()*.55;
    const across=knot.y+gaussian()*.6+Math.sin(along*1.9)*group.bend;
    const u=along*group.rx,v=across*group.ry;
    x=group.x+u*group.cos-v*group.sin;y=group.y+u*group.sin+v*group.cos;
-   color=rng()<.12?'#f5f0ff':group.palette[Math.floor(rng()*group.palette.length)];
+   color=rng()<.025?'#f5f0ff':group.palette[Math.floor(rng()*group.palette.length)];
   }else{x=rng()*W;y=rng()*H;color=['#e4edff','#ffffff','#fff2d9','#d4e7ff'][i%4];}
-  c.globalAlpha=.82+rng()*.18;c.fillStyle=color;
+  c.globalAlpha=.94+rng()*.06;c.fillStyle=color;
   c.fillRect(Math.floor(x*skyLayer.width/W),Math.floor(y*skyLayer.height/H),1,1);
  }
  c.globalAlpha=1;skyLayerEpoch=g.tier;
