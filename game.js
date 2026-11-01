@@ -1441,11 +1441,29 @@ function ensureSkyLayer(){
  // Integer coordinates prevent subpixel coverage from making the stars dim.
  c.setTransform(1,0,0,1,0,0);
  const count=Math.min(28000,Math.max(1800,Math.floor(W*H/140)));
- const colors=['#e4edff','#ffffff','#fff2d9','#d4e7ff'];
+ // Each association has a coherent hue, several knots and a curved outline.
+ // Most stars belong to associations; sparse field stars leave dark gaps.
+ const palettes=[['#b56dff','#cf91ff','#e8c6ff'],['#55b9ff','#84d5ff','#c9efff'],
+  ['#ff76c9','#ff9cdf','#ffd4ed'],['#ffc067','#ffda91','#fff0cb'],
+  ['#8c88ff','#b0a4ff','#d9d3ff']];
+ const groups=Array.from({length:9},(_,i)=>{
+  const angle=rng()*TAU,rx=W*(.055+rng()*.095),ry=H*(.025+rng()*.045);
+  return {x:W*(.08+rng()*.84),y:H*(.09+rng()*.82),rx,ry,
+   cos:Math.cos(angle),sin:Math.sin(angle),bend:(rng()-.5)*2.3,palette:palettes[i%palettes.length],
+   knots:Array.from({length:3},()=>({x:(rng()-.5)*2.3,y:(rng()-.5)*1.1}))};
+ });
+ const gaussian=()=>Math.sqrt(-2*Math.log(Math.max(1e-8,rng())))*Math.cos(rng()*TAU);
  for(let i=0;i<count;i++){
-  const x=rng()*W,band=i%3===0;
-  const y=band?H*(.78-.52*x/W+(rng()+rng()+rng()-1.5)*.16):rng()*H;
-  c.globalAlpha=.78+rng()*.22;c.fillStyle=colors[i%colors.length];
+  let x,y,color;
+  if(rng()<.84){
+   const group=groups[Math.floor(rng()*groups.length)],knot=group.knots[Math.floor(rng()*3)];
+   const along=knot.x+gaussian()*.55;
+   const across=knot.y+gaussian()*.6+Math.sin(along*1.9)*group.bend;
+   const u=along*group.rx,v=across*group.ry;
+   x=group.x+u*group.cos-v*group.sin;y=group.y+u*group.sin+v*group.cos;
+   color=rng()<.12?'#f5f0ff':group.palette[Math.floor(rng()*group.palette.length)];
+  }else{x=rng()*W;y=rng()*H;color=['#e4edff','#ffffff','#fff2d9','#d4e7ff'][i%4];}
+  c.globalAlpha=.82+rng()*.18;c.fillStyle=color;
   c.fillRect(Math.floor(x*skyLayer.width/W),Math.floor(y*skyLayer.height/H),1,1);
  }
  c.globalAlpha=1;skyLayerEpoch=g.tier;
