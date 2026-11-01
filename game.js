@@ -1610,12 +1610,14 @@ function renderGpuLens(p,R,outer){
 let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
 let blackHoleLensRetryAt=0,lensPixels=null;
 const LUT=4096,ratioLut=new Float32Array(LUT+1),opacityLut=new Float32Array(LUT+1);
-function warpLensPixels(a,b,sw,sh,left,top,sampleX,sampleY,px,py,core,outer,lutStep,ratioLut,opacityLut,scale,R){
- const {sqrt,min,max,floor,round}=Math,LUT=ratioLut.length-1;
+function buildLensPixelMap(sw,sh,left,top,sampleX,sampleY,px,py,core,outer,lutStep,ratioLut,opacityLut,scale,R,reuse){
+ const {sqrt,min,max,floor,round}=Math,LUT=ratioLut.length-1,size=sw*sh;
  const clamp=(v,a,b)=>max(a,min(b,v));
+ const map=reuse&&reuse.offset.length===size?reuse:{offset:new Int32Array(size),fx:new Float32Array(size),fy:new Float32Array(size),alpha:new Uint8Array(size)};
+ map.offset.fill(-1);
  for(let iy=0;iy<sh;iy++)for(let ix=0;ix<sw;ix++){
   const dx=left+(ix+.5)/sampleX-px,dy=top+(iy+.5)/sampleY-py;
-  const d=sqrt(dx*dx+dy*dy),idx=(iy*sw+ix)*4;
+  const d=sqrt(dx*dx+dy*dy),idx=iy*sw+ix;
   if(d<core*.99||d>=outer)continue;
   const lookup=d/lutStep,k=min(LUT-1,floor(lookup)),t=lookup-k;
   const rr=ratioLut[k]+(ratioLut[k+1]-ratioLut[k])*t;
@@ -1623,15 +1625,26 @@ function warpLensPixels(a,b,sw,sh,left,top,sampleX,sampleY,px,py,core,outer,lutS
   const sy=(py+dy*rr-top)*sampleY-.5;
   if(sx<0||sy<0||sx>=sw-1||sy>=sh-1)continue;
   const x=floor(sx),y=floor(sy),fx=sx-x,fy=sy-y;
-  const p00=(y*sw+x)*4,p01=p00+4,p10=p00+sw*4,p11=p10+4;
-  const w00=(1-fx)*(1-fy),w01=fx*(1-fy),w10=(1-fx)*fy,w11=fx*fy;
+  map.offset[idx]=(y*sw+x)*4;map.fx[idx]=fx;map.fy[idx]=fy;
+  const edge=clamp(min(sx,sy,sw-1-sx,sh-1-sy)/max(8*scale,R*.12*scale),0,1);
+  map.alpha[idx]=round(255*opacityLut[k]*edge*edge*(3-2*edge));
+ }
+ return map;
+}
+function warpLensPixels(a,b,sw,sh,left,top,sampleX,sampleY,px,py,core,outer,lutStep,ratioLut,opacityLut,scale,R,mapping){
+ const map=mapping||buildLensPixelMap(sw,sh,left,top,sampleX,sampleY,px,py,core,outer,lutStep,ratioLut,opacityLut,scale,R);
+ const {offset,fx,fy,alpha}=map,stride=sw*4;
+ for(let i=0;i<offset.length;i++){
+  const p00=offset[i];if(p00<0)continue;
+  const p01=p00+4,p10=p00+stride,p11=p10+4,idx=i*4,x=fx[i],y=fy[i];
+  const w00=(1-x)*(1-y),w01=x*(1-y),w10=(1-x)*y,w11=x*y;
   b[idx]=a[p00]*w00+a[p01]*w01+a[p10]*w10+a[p11]*w11;
   b[idx+1]=a[p00+1]*w00+a[p01+1]*w01+a[p10+1]*w10+a[p11+1]*w11;
   b[idx+2]=a[p00+2]*w00+a[p01+2]*w01+a[p10+2]*w10+a[p11+2]*w11;
-  const edge=clamp(min(sx,sy,sw-1-sx,sh-1-sy)/max(8*scale,R*.12*scale),0,1);
-  b[idx+3]=round(255*opacityLut[k]*edge*edge*(3-2*edge));
+  b[idx+3]=alpha[i];
  }
 }
+let lensPixelMap=null,lensPixelMapKey='';
 function renderBlackHoleLensing(){
  if(g.tier!==TA.length-1)return;
  const p=project(player.x,player.y),R=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
@@ -1675,7 +1688,13 @@ function renderBlackHoleLensing(){
   ratioLut[k]=lensSourceRadius(d,R,outer)/Math.max(1e-6,d);
   opacityLut[k]=f*f*(3-2*f);
  }
- warpLensPixels(a,b,sw,sh,left,top,sampleX,sampleY,p.x,p.y,core,outer,lutStep,ratioLut,opacityLut,scale,R);
+ // Geometry is independent of the scene. Reuse subpixel-quantized lookup
+ // coordinates, but sample the NEW moving scene every frame (never freeze light).
+ const mapKey=[sw,sh,width,height,Math.round((p.x-left)*2),Math.round((p.y-top)*2),Math.round(R*2),Math.round(outer*2),einsteinRingScale()].join(':');
+ if(mapKey!==lensPixelMapKey){
+  lensPixelMap=buildLensPixelMap(sw,sh,left,top,sampleX,sampleY,p.x,p.y,core,outer,lutStep,ratioLut,opacityLut,scale,R,lensPixelMap);lensPixelMapKey=mapKey;
+ }
+ warpLensPixels(a,b,sw,sh,left,top,sampleX,sampleY,p.x,p.y,core,outer,lutStep,ratioLut,opacityLut,scale,R,lensPixelMap);
  lensOutputCtx.putImageData(warped,0,0);
  ctx.save();ctx.imageSmoothingEnabled=true;
  ctx.drawImage(lensOutput,left,top,width,height);ctx.restore();
@@ -1919,7 +1938,7 @@ function frame(now){
  if(running){
   update(Math.min(elapsed,.05));
   perfSample+=elapsed;perfFrames++;
-  if(perfSample>=4){
+  if(perfSample>=1.5){
    frameFps=perfFrames/perfSample;
    // Recreating the primary Canvas resets all pixels, producing a visible
    // on/off pulse on the largest black hole. Leave its output resolution stable
@@ -2238,6 +2257,8 @@ function testerSetTier(tier){
  g.tier=next;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  morph={from,time:0,duration:1.5};player.targetR=currentRadius();
  player.r=player.targetR;screenFlash=.5;
+ camera.zoom=g.endless?clamp(tester.zoom*(83+27*Math.log2(1+player.r/100))/Math.max(1,player.r),1e-155,2.5):campaignZoom(player.r);
+ testerRemakeNearby();
  burst(player.x,player.y,35,TA[next].color);
  renderUI(true);testerRefresh();
 }

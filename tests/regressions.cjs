@@ -621,7 +621,7 @@ console.log('PASS: continuous physical progression, fixed body classes, bounded 
 
 // The CPU hot loop keeps the exact bilinear lens equation and transparent edges.
 const pixelBox={};vm.createContext(pixelBox);
-vm.runInContext(game.slice(game.indexOf('function warpLensPixels('),game.indexOf('function renderBlackHoleLensing(')),pixelBox);
+vm.runInContext(game.slice(game.indexOf('function buildLensPixelMap('),game.indexOf('function renderBlackHoleLensing(')),pixelBox);
 const side=24,input=new Uint8ClampedArray(side*side*4),output=new Uint8ClampedArray(input.length);
 for(let i=0;i<input.length;i+=4){input[i]=i%251;input[i+1]=(i*3)%253;input[i+2]=123;input[i+3]=255;}
 const identity=new Float32Array(4097).fill(1),opaque=new Float32Array(4097).fill(1);
@@ -631,3 +631,10 @@ for(const [x,y] of [[6,8],[14,8],[8,16],[17,15]]){
 }
 assert.equal(output[(12*side+12)*4+3],0,'Horizon remains a separate opaque compositor pass');
 console.log('PASS: optimized pixel sampler retains bilinear values and horizon isolation');
+const cachedPixels=pixelBox.buildLensPixelMap(side,side,0,0,1,1,12,12,2,20,20/4096,identity,opaque,1,8);
+const sameStorage=pixelBox.buildLensPixelMap(side,side,0,0,1,1,12,12,2,20,20/4096,identity,opaque,1,8,cachedPixels);
+assert.equal(sameStorage,cachedPixels,'Lens geometry arrays must be reused');
+const beforePixel=output[(8*side+6)*4];input[(8*side+6)*4]=beforePixel>127?0:255;
+pixelBox.warpLensPixels(input,output,side,side,0,0,1,1,12,12,2,20,20/4096,identity,opaque,1,8,cachedPixels);
+assert.notEqual(output[(8*side+6)*4],beforePixel,'Cached geometry must still sample the current moving scene');
+console.log('PASS: cached lens geometry reuses storage without freezing scene pixels');

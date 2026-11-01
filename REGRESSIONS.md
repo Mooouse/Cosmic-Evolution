@@ -124,3 +124,9 @@
 - Reduced distant field sampling from 135 to 36 target cells, retained interpolation and fixed identities. Full active capture pools skip redundant neighborhood scans. CPU lens arithmetic uses local bindings in the pixel loop; GPU lens uploads use a reusable adaptive surface rather than always copying a full high-DPI frame. The front buffer remains stable and the opaque horizon is painted last.
 - Regression coverage: 28-stage size continuity/camera framing, fixed body classes, bounded rewards across enormous coordinates, pre-hole LOD promotion/collection/depletion, bilinear CPU sampling, previous lens/viewport/motion/pins/death regressions. Native Canvas smoke rendered stages 0/4/7/10/13/16/19/22/25 plus two astronomical holes with full absorption and lethal reset checks.
 - Local CPU-only 1920×1080 smoke: three giant-hole rendered frames dropped from ~4241 ms to ~417 ms; 120 physics updates from ~505 ms to ~173 ms. These are same-harness measurements, not a guaranteed browser/device FPS result.
+
+### v3.21.1 — CPU fallback follow-up
+
+- Cache lens pixel coordinates/weights in reusable typed arrays with half-pixel geometry keys. Each frame samples the newly rendered scene, retaining moving light and absorption; no cached screenshot or frozen lens. Rebuild on size/position/ring changes. Adaptive quality reacts every 1.5 seconds; native front-buffer resolution remains stable.
+- Tester form jumps now immediately choose the corresponding camera scale and stream that view instead of spending seconds sweeping through unrelated LODs. Ordinary evolution still uses smooth continuous camera changes.
+- Verified cached bilinear output updates when scene pixels change; original horizon and lens regressions still pass.
