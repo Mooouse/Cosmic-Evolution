@@ -15,7 +15,21 @@ const BLACK_HOLE_CORE_FRACTION = .245;
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 const rand = (a,b) => a + Math.random()*(b-a);
 const choose = a => a[Math.floor(Math.random()*a.length)];
-const fmt = n => !Number.isFinite(n)?'0':n>=1e12?(n/1e12).toFixed(2)+'T':n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(2)+'M':n>=10000?(n/1000).toFixed(1)+'K':Math.floor(n).toLocaleString('ru-RU');
+function numberSuffix(group){
+ const names=['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
+ if(group<names.length)return names[group];
+ // Continue through the full finite Number range instead of freezing at T.
+ const index=group-names.length;
+ return String.fromCharCode(97+Math.floor(index/26))+String.fromCharCode(97+index%26);
+}
+function fmt(value){
+ if(!Number.isFinite(value))return '0';
+ const n=Math.abs(value),sign=value<0?'−':'';
+ if(n<10000)return Math.floor(value).toLocaleString('ru-RU');
+ let group=Math.floor(Math.log10(n)/3),scaled=n/10**(group*3);
+ if(Number(scaled.toFixed(2))>=1000){group++;scaled=n/10**(group*3);}
+ return sign+scaled.toFixed(2)+numberSuffix(group);
+}
 const timeFmt = sec => {let h=Math.floor(sec/3600),m=Math.floor(sec/60)%60,s=Math.floor(sec)%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
 const TA = [
  ['Космическая пыль','Рождение материи','Каждый великий мир начинается с одной частицы.','dust','#72d8ff'],
@@ -103,7 +117,7 @@ function normaliseMapPins(value){
   .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32)}));
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
-g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.8,1.25):1;
+g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.4,2.5):1;
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
@@ -112,7 +126,7 @@ let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTime
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
 function radiusAt(tier,fraction){return 13*Math.pow(1.65,tier+clamp(fraction,0,1));}
-function campaignZoom(radius){return clamp(tester.zoom*(g.viewZoom||1)*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,3.2);}
+function campaignZoom(radius){return clamp(tester.zoom*(g.viewZoom||1)*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,8);}
 function currentRadius(){
  const base=radiusAt(g.tier,stageFraction());
  if(g.tier===TA.length-1){
@@ -266,8 +280,8 @@ function renderUI(force=false){
  }
  const m=missionReq(),cs=g.endless?[true,true,true]:[g.stageCollects>=m.collect,recipeDone(),g.stageExplored>=m.explore];
  $('mission-1-label').textContent=g.endless?'Поглощено в чёрную дыру':'Нарасти массу';$('mission-1-val').textContent=g.endless?fmt(g.matter):`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
- $('mission-2-label').textContent=g.endless?'Радиус горизонта событий':'Собери рецепт';$('mission-2-val').textContent=g.endless?fmt(Math.round(player.r)):`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
- $('mission-3-label').textContent=g.endless?'Исследовано секторов':'Исследуй сектора';$('mission-3-val').textContent=g.endless?fmt(exploredCount()):`${g.stageExplored}/${m.explore}`;
+ $('mission-2-label').textContent=g.endless?'Радиус горизонта событий':'Собери рецепт';$('mission-2-val').textContent=g.endless?lightYears(blackHoleCoreWorldRadius()):`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
+ $('mission-3-label').textContent=g.endless?'Исследованная площадь':'Исследуй пространство';$('mission-3-val').textContent=g.endless?fmt(exploredCount())+' св. лет²':`${fmt(g.stageExplored)}/${fmt(m.explore)} св. лет²`;
  const matRoot=$('materials-inventory');if(matRoot){
   const active=g.endless?[]:stageRecipe();matRoot.innerHTML=active.map(({type,amount})=>{
    const v=g.materials[type]||0,d=MATERIALS[type];return `<div class="material-row ${v>=amount?'ready':''}"><span style="color:${d.color}">${d.symbol}</span><span>${d.label}</span><b>${fmt(v)} / ${fmt(amount)}</b></div>`;
@@ -278,10 +292,10 @@ function renderUI(force=false){
  for(const u of upgrades){let b=$('upgrades').querySelector(`[data-upgrade="${u.id}"]`),lvl=g.upgrade[u.id],c=upgradeCost(u);b.querySelector('.upgrade-level').textContent=`ур. ${lvl}/${u.max}`;b.querySelector('.upgrade-price').textContent=lvl>=u.max?'MAX':fmt(c);b.disabled=g.credits<c||lvl>=u.max;}
  $('pulse-cooldown').textContent=pulseCd>0?pulseCd.toFixed(1)+'с':'E · ГОТОВ';$('boost-cooldown').textContent=boostCd>0?boostCd.toFixed(1)+'с':'SHIFT · ГОТОВ';
  $('pulse-fill').style.transform=`scaleX(${clamp(1-pulseCd/13,0,1)})`;$('boost-fill').style.transform=`scaleX(${clamp(1-boostCd/6,0,1)})`;
- $('zoom-label').textContent=`РАЗМЕР ${player.r.toFixed(1)} · КАМЕРА ${camera.zoom<.01?camera.zoom.toExponential(2):camera.zoom.toFixed(2)}× · ОБЗОР ${Math.round((g.viewZoom||1)*100)}%`;
- $('btn-music').textContent=g.music?'♫':'♪̸';$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`СЕКТОР ${sx} : ${sy}  ·  ${BIOME_NAMES[chunkInfo(sx,sy).biome]}  ·  ОТКРЫТО ${fmt(exploredCount())}`;
+ $('zoom-label').textContent=`ДИАМЕТР ${lightYears(2*(g.endless?blackHoleCoreWorldRadius():player.r))} · КАМЕРА ${camera.zoom<.01?camera.zoom.toExponential(2):camera.zoom.toFixed(2)}× · ОБЗОР ${Math.round((g.viewZoom||1)*100)}%`;
+ $('btn-music').textContent=g.music?'♫':'♪̸';$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`X ${lightYears(player.x)} · Y ${lightYears(player.y)} · ${BIOME_NAMES[chunkInfo(sx,sy).biome]} · ИЗУЧЕНО ${fmt(exploredCount())} св. лет²`;
  const stats=$('tester-stats');
- if(stats)stats.textContent=`${Math.round(frameFps)} FPS · ${lensBackend.toUpperCase()} · ${entities.length} объектов · ${loadedChunks.size} секторов · ${Math.floor(player.x/CHUNK)}:${Math.floor(player.y/CHUNK)}`;
+ if(stats)stats.textContent=`${Math.round(frameFps)} FPS · ${lensBackend.toUpperCase()} · ${entities.length} объектов · ${loadedChunks.size} областей · X ${lightYears(player.x)} · Y ${lightYears(player.y)}`;
  if(force)save();
 }
 // World is deterministic: the same sector always has the same matter, even after a restart.
@@ -1105,7 +1119,7 @@ function updateAbysses(dt,speed,oldX,oldY){
  }
  const ahead=strongest||abyssPhysical.filter(h=>!g.abyssConsumed[h.id]&&!canEatAbyss(h)).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
  const warning=$('abyss-warning');
- const notice=strongest?`⚠ ${strongest.name} · ГРАВИТАЦИОННЫЙ ЗАХВАТ · До горизонта ${atlasNumber(Math.max(0,Math.hypot(strongest.x-player.x,strongest.y-player.y)-strongest.r)/CHUNK)} сект. · Вход = потеря всего прогресса`:ahead?`⚠ ВПЕРЕДИ ${ahead.name} · До горизонта ${atlasNumber(Math.max(0,Math.hypot(ahead.x-player.x,ahead.y-player.y)-ahead.r)/CHUNK)} сект. · Смертельная чёрная дыра`:'';
+ const notice=strongest?`⚠ ${strongest.name} · ГРАВИТАЦИОННЫЙ ЗАХВАТ · До горизонта ${lightYears(Math.max(0,Math.hypot(strongest.x-player.x,strongest.y-player.y)-strongest.r))} · Вход = потеря всего прогресса`:ahead?`⚠ ВПЕРЕДИ ${ahead.name} · До горизонта ${lightYears(Math.max(0,Math.hypot(ahead.x-player.x,ahead.y-player.y)-ahead.r))} · Смертельная чёрная дыра`:'';
  if(notice!==abyssNotice){abyssNotice=notice;warning.textContent=notice;warning.hidden=!notice;}
  return true;
 }
@@ -1965,9 +1979,12 @@ function attachContinue(){const b=$('btn-continue');if(b)b.onclick=()=>{clearFli
 // The atlas reads the exact same deterministic sector data as gameplay; it is not an evolution-level menu.
 function popcount32(x){x=x>>>0;x=x-((x>>>1)&0x55555555);x=(x&0x33333333)+((x>>>2)&0x33333333);return (((x+(x>>>4))&0x0F0F0F0F)*0x01010101)>>>24;}
 function atlasScale(){return 27*atlas.zoom/CHUNK;}
+// One navigation cell represents one light-year; world coordinates/save IDs stay unchanged.
+function lightYears(worldDistance){return atlasNumber(worldDistance/CHUNK)+' св. лет';}
 function atlasNumber(value){
  const n=Math.abs(value);
- if(n>=1e7||n>0&&n<.001)return value.toExponential(2).replace('e+',' × 10^').replace('e-',' × 10^-');
+ if(n>=10000)return fmt(value);
+ if(n>0&&n<.001)return value.toExponential(2).replace('e+',' × 10^').replace('e-',' × 10^-');
  return value.toLocaleString('ru-RU',{maximumFractionDigits:n<1?3:n<100?1:0});
 }
 function atlasNiceDistance(value){
@@ -2061,7 +2078,7 @@ function renderWaypoint(){
  const x=outside?W/2+Math.cos(angle)*W*.38:p.x,y=outside?H/2+Math.sin(angle)*H*.32:p.y;
  ctx.save();ctx.strokeStyle='#d2c99b';ctx.fillStyle='#d2c99b';ctx.lineWidth=1.5;
  ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+4,y);ctx.lineTo(x,y+5);ctx.lineTo(x-4,y);ctx.closePath();ctx.stroke();
- ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(pin.name+' · '+atlasNumber(Math.hypot(pin.x-player.x,pin.y-player.y)/CHUNK)+' сект.',x,y+19);ctx.restore();
+ ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(pin.name+' · '+lightYears(Math.hypot(pin.x-player.x,pin.y-player.y)),x,y+19);ctx.restore();
 }
 function drawAtlas(){
  const surface=$('atlas-canvas');if(!surface)return;
@@ -2141,7 +2158,7 @@ function drawAtlas(){
    if(placement)break;
   }
   if(placement){const {x:tx,y:ty}=placement;labelRects.push(placement);c.fillStyle='#dce6ee';c.fillText(label,tx,ty);
-   if(detail){c.font='9px Inter,sans-serif';c.fillStyle='#ab8588';c.fillText(`ГОРИЗОНТ ${atlasNumber(h0.r*2/CHUNK)} сект.`,tx,ty+13);}
+   if(detail){c.font='9px Inter,sans-serif';c.fillStyle='#ab8588';c.fillText(`ГОРИЗОНТ ${lightYears(h0.r*2)}`,tx,ty+13);}
   }
  }
  const playerPoint=projectMap(player.x,player.y);
@@ -2169,17 +2186,17 @@ function drawAtlas(){
   c.fillStyle='#91a5b9';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
  }
  drawMapPins(c,w,h,scale);
- // Always-readable scale bar, in real sectors (not invented light-years).
+ // Scale bar uses the same light-year conversion as coordinates, sizes and waypoints.
  const barSectors=atlasNiceDistance(Math.min(150,w*.28)/sectorPx),barPx=barSectors*sectorPx;
  c.fillStyle='rgba(4,11,23,.94)';c.fillRect(12,h-59,Math.max(172,barPx+32),47);
  c.strokeStyle='#d0eaf5';c.lineWidth=2;c.beginPath();c.moveTo(24,h-24);c.lineTo(24+barPx,h-24);
  c.moveTo(24,h-29);c.lineTo(24,h-19);c.moveTo(24+barPx,h-29);c.lineTo(24+barPx,h-19);c.stroke();
- c.fillStyle='#c6e3f0';c.font='600 11px Inter,sans-serif';c.fillText(`${atlasNumber(barSectors)} сект.`,24,h-38);
- $('atlas-diameter').textContent=atlasNumber((g.endless?blackHoleCoreWorldRadius():player.r)*2/CHUNK)+' сект.';
- $('atlas-viewport').textContent=atlasNumber(W/camera.zoom/CHUNK)+' сект.';
- $('atlas-span').textContent=atlasNumber(w/scale/CHUNK)+' сект.';
- $('atlas-coords').textContent=`X ${atlasNumber(atlas.x/CHUNK)} · Y ${atlasNumber(atlas.y/CHUNK)}`;
- $('atlas-count').textContent=`Исследовано ≈ ${atlasNumber(exploredCount())} секторов`;
+ c.fillStyle='#c6e3f0';c.font='600 11px Inter,sans-serif';c.fillText(`${lightYears(barSectors*CHUNK)}`,24,h-38);
+ $('atlas-diameter').textContent=lightYears((g.endless?blackHoleCoreWorldRadius():player.r)*2);
+ $('atlas-viewport').textContent=lightYears(W/camera.zoom);
+ $('atlas-span').textContent=lightYears(w/scale);
+ $('atlas-coords').textContent=`X ${lightYears(atlas.x)} · Y ${lightYears(atlas.y)}`;
+ $('atlas-count').textContent=`Исследовано ≈ ${fmt(exploredCount())} св. лет²`;
  atlas.dirty=false;
 }
 function showMap(){
@@ -2191,7 +2208,7 @@ function showMap(){
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">+</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">−</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">⌖</button></div></div>
  <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ МЕНЬШЕ ТЕБЯ — ДОБЫЧА · БОЛЬШЕ — ОПАСНОСТЬ</span></div>
- <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Все расстояния — в секторах мира.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
+ <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Расстояния и диаметры — в световых годах. Площадь — в квадратных световых годах.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  $('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
  cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
@@ -2209,7 +2226,7 @@ function showMap(){
  $('atlas-pin-go').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){atlas.x=p.x;atlas.y=p.y;atlas.zoom=p.zoom;atlas.dirty=true;}};
  refreshPinPanel();
  const giant=nearestAbyss();
- $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${atlasNumber(giant.r*2/CHUNK)} сект. · в ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. За горизонтом весь прогресс теряется.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
+ $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${lightYears(giant.r*2)} · в ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. За горизонтом весь прогресс теряется.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
  requestAnimationFrame(drawAtlas);
 }
 
@@ -2306,7 +2323,7 @@ function testerInit(){
   g.stageExplored=Math.max(g.stageExplored,m.explore);for(const r of stageRecipe())g.materials[r.type]=Math.max(g.materials[r.type]||0,r.amount);renderUI(true);toast('Рецепт и задачи выполнены');};
  $('tester-next').onclick=()=>testerSetTier(g.tier+1);
  $('tester-jump').onclick=()=>{player.x+=CHUNK*10;player.vx=player.vy=0;camera.x=player.x;camera.y=player.y;
-  visitPosition();testerRemakeNearby();renderUI(true);toast('Перемещение в новый сектор (тест)');};
+  visitPosition();testerRemakeNearby();renderUI(true);toast('Перемещение на 10 св. лет (тест)');};
  $('tester-abyss').onclick=testerVisitAbyss;
  $('tester-reset-mods').onclick=()=>{
   Object.assign(tester,TEST_DEFAULTS);saveTester();testerRemakeNearby();testerRefresh();
@@ -2336,7 +2353,7 @@ function onWorldWheel(ev){
  if(!running||atlasVisible||ev.ctrlKey||!Number.isFinite(ev.deltaY))return;
  ev.preventDefault();
  const pixels=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?H:1);
- g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.0015),.8,1.25);
+ g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.0015),.4,2.5);
  // The normal camera follows this target smoothly; autosave/pagehide persist it.
 }
 canvas.addEventListener('wheel',onWorldWheel,{passive:false});

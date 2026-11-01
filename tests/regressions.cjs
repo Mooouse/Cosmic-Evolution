@@ -654,8 +654,8 @@ vm.createContext(wheelBox);vm.runInContext(game.slice(game.indexOf('function onW
 let prevented=0;
 const wheel=(deltaY,deltaMode=0,ctrlKey=false)=>wheelBox.onWorldWheel({deltaY,deltaMode,ctrlKey,preventDefault(){prevented++}});
 wheel(-100);assert.ok(wheelBox.g.viewZoom>1&&wheelBox.g.viewZoom<1.25);
-for(let i=0;i<20;i++)wheel(-100);assert.equal(wheelBox.g.viewZoom,1.25);
-for(let i=0;i<20;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.8);
+for(let i=0;i<20;i++)wheel(-100);assert.equal(wheelBox.g.viewZoom,2.5);
+for(let i=0;i<20;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.4);
 wheelBox.g.viewZoom=1;wheel(-5,1);const lineZoom=wheelBox.g.viewZoom;
 wheelBox.g.viewZoom=1;wheel(-80);assert.equal(wheelBox.g.viewZoom,lineZoom,'Line/pixel wheels agree');
 for(const mode of ['paused','map','browser']){
@@ -664,7 +664,7 @@ for(const mode of ['paused','map','browser']){
 }
 for(const tier of [0,10,22]){
  scaleBox.g.viewZoom=1;const normal=scaleBox.campaignZoom(scaleBox.radiusAt(tier,0));
- scaleBox.g.viewZoom=1.25;assert.ok(Math.abs(scaleBox.campaignZoom(scaleBox.radiusAt(tier,0))/normal-1.25)<1e-10);
+ for(const offset of [.4,1.25,2.5]){scaleBox.g.viewZoom=offset;assert.ok(Math.abs(scaleBox.campaignZoom(scaleBox.radiusAt(tier,0))/normal-offset)<1e-10);}
 }
 scaleBox.g.viewZoom=1;
 vm.runInContext(game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback(')),scaleBox);
@@ -675,3 +675,22 @@ vm.runInContext(game.slice(game.indexOf('function macroOpacity('),game.indexOf('
 assert.equal(brightBox.macroOpacity({r:3e6},20,1),1,'A visible galaxy must not become translucent relative to a giant hole');
 assert.ok(brightBox.macroOpacity({r:3e6},20,.5)>.7);assert.equal(brightBox.macroOpacity({r:3e6},20,0),0,'LOD endpoints stay seamless');
 console.log('PASS: wheel range/unit normalization/UI isolation, wider base fields, bright giant-hole galaxies');
+
+// Compact suffixes continue past T and remain bounded up to maximum finite mass.
+const numberBox={CHUNK:480};vm.createContext(numberBox);
+vm.runInContext(game.slice(game.indexOf('function numberSuffix('),game.indexOf('const timeFmt'))+
+ game.slice(game.indexOf('function lightYears('),game.indexOf('function atlasNiceDistance(')),numberBox);
+for(const [n,expected] of [[1e12,'1.00T'],[1e15,'1.00Qa'],[1e18,'1.00Qi'],[1e21,'1.00Sx'],[1e24,'1.00Sp'],[1e33,'1.00Dc'],[1e36,'1.00aa'],[1e39,'1.00ab'],[999999.99,'1.00M'],[2236251538096.98e12,'2.24Sp']])assert.equal(numberBox.fmt(n),expected);
+for(let exponent=12;exponent<=306;exponent+=3){
+ const text=numberBox.fmt(1.2345*10**exponent);assert.ok(text.length<=9&&!text.includes('Infinity'));
+ if(exponent<306)assert.notEqual(numberBox.numberSuffix(exponent/3),numberBox.numberSuffix(exponent/3+1));
+}
+assert.ok(numberBox.fmt(Number.MAX_VALUE).length<12);assert.equal(numberBox.fmt(NaN),'0');
+assert.equal(numberBox.lightYears(480),'1 св. лет');assert.equal(numberBox.lightYears(-960),'-2 св. лет');
+assert.equal(numberBox.lightYears(480e15),'1.00Qa св. лет');
+assert.ok(numberBox.lightYears(.000001).includes('10^-'));
+const uiCode=game.slice(game.indexOf('function renderUI('),game.indexOf('function spawn('));
+assert.ok(uiCode.includes('lightYears(blackHoleCoreWorldRadius())'),'Displayed hole radius must use its visible horizon');
+assert.ok(!uiCode.includes(' секторов')&&!uiCode.includes('СЕКТОР ${'));
+assert.ok(!game.includes("+' сект.'")&&!game.includes('} сект.'));
+console.log('PASS: suffixes through 1e308, rounding boundaries, signed light-years, consistent physical HUD/map units');

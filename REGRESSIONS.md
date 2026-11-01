@@ -141,3 +141,10 @@
 - Wheel over the game canvas smoothly adjusts the automatic camera by 80–125%. Offset is saved with the run, applied on load/evolution/tester jumps, and shown as ОБЗОР in the HUD. Normalize pixel/line/page wheel units. UI panel scrolling, atlas wheel controls, pause screens and Ctrl-wheel browser zoom remain independent; no synchronous save per wheel event.
 - Visible galaxies no longer dim in proportion to the final hole's radius. Increased cached galaxy core/arm/star brightness and used smooth square-root LOD blending. Full absorption still fades only after entry; opaque horizon and cached lens remain unchanged.
 - Validation: base field ratios, manual zoom bounds/unit normalization/UI isolation, camera offset at multiple stages, final-hole galaxy opacity/LOD endpoints, grazing escape at normal/astronomical scales, complete regression suite and native Canvas smoke including 1e200 mass.
+
+## v3.23 — unbounded compact numbers, light-years and wider camera control
+
+- Replaced the T-capped formatter with K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc and continuing two-letter suffixes from aa onward. All finite game magnitudes stay compact; rounded 1000 promotes to the next suffix. Shared by matter, currency, progress and large map values.
+- Adopted a fixed game-world distance conversion: 480 world units = 1 light-year. All map scale bars, visible spans, diameters, coordinates, waypoints, rival-hole distances and tester jumps use it; physical coordinates, saves and generation stay unchanged. Explored area uses square light-years. The HUD now reports diameter, and the final-stage radius panel uses the actual visible event horizon.
+- Wheel camera offset widened from 80–125% to 40–250%, including save normalization and first-stage camera limits. Map zoom remains independent.
+- Validation: screenshot-reported magnitude, every suffix through the finite Number range, rounding promotion, signed/subpixel light-year formatting, consistent HUD/map units, zoom bounds at multiple stages, complete regression suite, native Canvas render/absorption/death smoke at normal and astronomical scales.
