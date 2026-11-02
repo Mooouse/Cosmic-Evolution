@@ -2182,7 +2182,7 @@ function showAchievements(){
  show(`<div class="eyebrow">ВЕХИ ТВОЕГО ПУТЕШЕСТВИЯ</div><div class="overlay-title">ДОСТИЖЕНИЯ</div><div class="achievement-list">${milestones.map(([name,desc,done])=>`<div class="achievement ${done?'earned':''}"><span>${done?'✦':'◇'}</span><div><strong>${name}</strong><small>${desc}</small></div><b>${done?'ОТКРЫТО':'—'}</b></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.35 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.35.1 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=resumeGame;$('menu-map').onclick=showMap;
  $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};
@@ -2258,8 +2258,14 @@ function refreshPinPanel(){
  $('atlas-pin-name').value=pin?.name||'';$('atlas-pin-name').disabled=!pin;
  $('atlas-pin-go').disabled=!pin;$('atlas-pin-delete').disabled=!pin;
  $('atlas-pin-add').setAttribute('aria-pressed',String(!!atlas.placingPin));
- $('atlas-pin-hint').textContent=atlas.placingPin?'Нажми на карту, чтобы поставить метку.':'Метки сохраняются. Нажми на метку, чтобы выбрать её; на дыру — чтобы приблизить.';
+ $('atlas-pin-hint').textContent=atlas.placingPin?'Нажми на карту, чтобы поставить метку.':'ПКМ — поставить метку. Нажми на метку, чтобы выбрать её; на дыру — чтобы приблизить.';
  $('atlas-canvas').style.cursor=atlas.placingPin?'crosshair':'grab';
+}
+function atlasContextMenu(ev){
+ ev.preventDefault();
+ const bounds=$('atlas-canvas').getBoundingClientRect();
+ atlas.drag=false;atlas.placingPin=true;
+ atlasMapClick(ev.clientX-bounds.left,ev.clientY-bounds.top);
 }
 function atlasMapClick(px,py){
  const bounds=$('atlas-canvas').getBoundingClientRect(),scale=atlasScale();
@@ -2420,10 +2426,11 @@ function showMap(){
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">${uiIcon('plus')}</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">${uiIcon('minus')}</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">${uiIcon('center')}</button></div></div>
  <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ МЕНЬШЕ ТЕБЯ — ДОБЫЧА · БОЛЬШЕ — ОПАСНОСТЬ</span></div>
- <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Расстояния и диаметры — в световых годах. Площадь — в квадратных световых годах.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
+ <div class="atlas-footer"><small>Перетаскивай карту · ПКМ — метка · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Расстояния и диаметры — в световых годах. Площадь — в квадратных световых годах.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  setNavigationState('map');$('modal').dataset.screen='map';$('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
- cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
+ cv.addEventListener('contextmenu',atlasContextMenu);
+ cv.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
  cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;if(Math.hypot(ev.clientX-atlas.downX,ev.clientY-atlas.downY)>6)atlas.moved=true;if(atlas.placingPin||!atlas.moved)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
  cv.addEventListener('pointerup',ev=>{if(atlas.drag&&!atlas.moved){const box=cv.getBoundingClientRect();atlasMapClick(ev.clientX-box.left,ev.clientY-box.top);}atlas.drag=false;});cv.addEventListener('pointercancel',()=>atlas.drag=false);
  cv.addEventListener('wheel',ev=>{ev.preventDefault();const box=cv.getBoundingClientRect();changeAtlasZoom(Math.exp(-clamp(ev.deltaY,-300,300)*.002),ev.clientX-box.left,ev.clientY-box.top);},{passive:false});

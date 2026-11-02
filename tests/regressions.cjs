@@ -810,3 +810,13 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  assert.ok(draws.every(args=>args[4]===8),'Comet thickness must not grow with tail length');
  console.log('PASS: frequent independent menu comets, bounded population, one shared thin sprite');
 }
+
+// Right-click uses the actual map projection and normal persistent pin creation.
+{
+ let saves=0,prevented=0;
+ const box={atlas:{x:1000,y:-200,zoom:2,drag:true},g:{mapPins:[],nextPinId:1,activePin:null},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),save(){saves++},toast(){},refreshPinPanel(){},atlasScale:()=>.5,$:()=>({getBoundingClientRect:()=>({left:30,top:90,width:1000,height:600})})};
+ vm.createContext(box);vm.runInContext(game.slice(game.indexOf('function addMapPin('),game.indexOf('function removeMapPin('))+game.slice(game.indexOf('function atlasContextMenu('),game.indexOf('function drawMapPins(')),box);
+ box.atlasContextMenu({clientX:680,clientY:340,preventDefault(){prevented++}});
+ assert.equal(prevented,1);assert.equal(saves,1);assert.equal(box.g.mapPins.length,1);assert.equal(box.g.mapPins[0].x,1300);assert.equal(box.g.mapPins[0].y,-300);assert.equal(box.g.activePin,1);assert.equal(box.atlas.drag,false);assert.equal(box.atlas.placingPin,false);
+ console.log('PASS: right-click places one saved pin at cursor coordinates and exits dragging');
+}
