@@ -1510,21 +1510,39 @@ function renderBackgroundComets(){
   nextBackgroundComet=g.time+8+rng()*8;
  }
  backgroundComets=backgroundComets.filter(c=>g.time-c.born<c.duration);
- if(!backgroundComets.length)return;
+ for(const comet of backgroundComets)drawBackgroundComet(comet,g.time);
+}
+// The same needle-thin light profile is used in flight and in the menu.
+function drawBackgroundComet(comet,time){
  if(!cometSprite){
-  cometSprite=document.createElement('canvas');cometSprite.width=320;cometSprite.height=32;
-  const c=cometSprite.getContext('2d'),tail=c.createLinearGradient(0,0,308,0);
-  tail.addColorStop(0,'#7aaaff00');tail.addColorStop(.45,'#84bbff19');tail.addColorStop(.85,'#b8e5ff80');tail.addColorStop(1,'#f2fbffef');
-  c.fillStyle=tail;c.beginPath();c.moveTo(0,5);c.quadraticCurveTo(190,9,308,16);c.quadraticCurveTo(190,21,0,27);c.closePath();c.fill();
-  const head=c.createRadialGradient(308,16,0,308,16,10);head.addColorStop(0,'#ffffff');head.addColorStop(.18,'#e7f8ff');head.addColorStop(.4,'#9ad8ff88');head.addColorStop(1,'#83bcff00');
-  c.fillStyle=head;c.fillRect(298,6,20,20);
+  cometSprite=document.createElement('canvas');cometSprite.width=512;cometSprite.height=16;
+  const c=cometSprite.getContext('2d'),tail=c.createLinearGradient(0,0,504,0);
+  tail.addColorStop(0,'#b5dfff00');tail.addColorStop(.35,'#c0e3ff18');tail.addColorStop(.8,'#d7f0ff80');tail.addColorStop(1,'#f5fcffff');
+  // A faint sheath around a subpixel taper, not a broad triangular plume.
+  c.fillStyle=tail;c.globalAlpha=.18;c.fillRect(0,6,504,4);c.globalAlpha=1;
+  c.beginPath();c.moveTo(0,8);c.lineTo(504,7);c.lineTo(504,9);c.closePath();c.fill();
+  const head=c.createRadialGradient(504,8,0,504,8,4);
+  head.addColorStop(0,'#ffffff');head.addColorStop(.25,'#edfaff');head.addColorStop(1,'#bce6ff00');
+  c.fillStyle=head;c.fillRect(500,4,8,8);
  }
- for(const c of backgroundComets){
-  const t=(g.time-c.born)/c.duration,x=c.fromX+c.dx*t,y=c.fromY+c.dy*t;
-  ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(c.dy,c.dx));
-  ctx.globalAlpha=Math.min(1,t*8,(1-t)*8)*.85;
-  ctx.drawImage(cometSprite,-c.length,-c.length/20,c.length,c.length/10);ctx.restore();
+ const t=(time-comet.born)/comet.duration,x=comet.fromX+comet.dx*t,y=comet.fromY+comet.dy*t;
+ ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(comet.dy,comet.dx));
+ ctx.globalAlpha=Math.max(0,Math.min(1,t*8,(1-t)*8))*.9;
+ // Fixed 8 CSS pixels for the whole glow; the luminous tail itself is 1 px.
+ ctx.drawImage(cometSprite,-comet.length,-4,comet.length,8);ctx.restore();
+}
+let menuComets=[],nextMenuComet=0,lastMenuCometTime=-1,menuCometSequence=0;
+function renderMenuComets(time){
+ if(lastMenuCometTime<0||time<lastMenuCometTime||time-lastMenuCometTime>1){menuComets=[];nextMenuComet=time;}
+ lastMenuCometTime=time;
+ if(time>=nextMenuComet){
+  const rng=chunkRandom(0x5ab8+menuCometSequence++*7919),direction=rng()<.5?1:-1;
+  const first=menuComets.length===0,duration=7+rng()*4;
+  menuComets.push({born:time-(first?1.4:0),duration,fromX:direction>0?-.12*W:1.12*W,fromY:H*(.08+rng()*.8),dx:direction*W*1.24,dy:H*(rng()-.5)*.35,length:100+rng()*180});
+  nextMenuComet=time+1.8+rng()*2;
  }
+ menuComets=menuComets.filter(c=>time-c.born<c.duration).slice(-6);
+ for(const comet of menuComets)drawBackgroundComet(comet,time);
 }
 
 let skyCameraX=camera.x,skyCameraY=camera.y;
@@ -2043,7 +2061,7 @@ for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/
 let menuBackdrop=null,menuBackdropKey='',menuLensMap=null,menuLensKey='',menuLensRetryAt=0;
 function menuBlackHoleGeometry(){
  const p={x:W*(W<=560?.77:.76),y:H*(W<=560?.36:.54)};
- const R=Math.min(W*.48,H*.72),outer=Math.min(R*2.30,W*.63);
+ const R=.85*Math.min(W*.48,H*.72),outer=Math.min(R*2.30,W*.63);
  return {p,R,outer};
 }
 function renderMenuScene(time){
@@ -2053,9 +2071,7 @@ function renderMenuScene(time){
  const dx=(time*4)%W,dy=(time*1.3)%H;
  for(let y=-dy;y<H;y+=H)for(let x=-dx;x<W;x+=W)ctx.drawImage(menuBackdrop,x,y,W,H);
  const target=menuBlackHoleGeometry(),{p,R}=target;
- // Two slowly moving distant galaxies reveal the curved and duplicated light.
- paintGalaxy(p.x+Math.cos(time*.045)*R*.7,p.y+Math.sin(time*.045)*R*.43,Math.min(65,H*.065),'#b990ff',time);
- paintGalaxy(p.x+Math.cos(time*.032+2)*R*.85,p.y+Math.sin(time*.032+2)*R*.48,Math.min(45,H*.045),'#76dfff',time+40);
+ renderMenuComets(time);
  const previousMap=lensPixelMap,previousKey=lensPixelMapKey;
  lensPixelMap=menuLensMap;lensPixelMapKey=menuLensKey;
  try{
@@ -2166,7 +2182,7 @@ function showAchievements(){
  show(`<div class="eyebrow">ВЕХИ ТВОЕГО ПУТЕШЕСТВИЯ</div><div class="overlay-title">ДОСТИЖЕНИЯ</div><div class="achievement-list">${milestones.map(([name,desc,done])=>`<div class="achievement ${done?'earned':''}"><span>${done?'✦':'◇'}</span><div><strong>${name}</strong><small>${desc}</small></div><b>${done?'ОТКРЫТО':'—'}</b></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.34 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.35 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=resumeGame;$('menu-map').onclick=showMap;
  $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};

@@ -789,12 +789,24 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
 {
  const calls=[],world={time:123,matter:456};
  const ui={W:1366,H:900,frameCanvas:{width:1366,height:900},g:world,menuBackdrop:null,menuBackdropKey:'',menuLensMap:null,menuLensKey:'',menuLensRetryAt:0,lensPixelMap:{world:true},lensPixelMapKey:'world',
- ctx:{fillRect(){calls.push('sky')},drawImage(){calls.push('tile')}},makeSkyDepthTexture(){calls.push('bake');return{};},paintGalaxy(...args){calls.push(['galaxy',args[0],args[1]])},renderBlackHoleLensing(t){calls.push('lens');ui.lensPixelMap={menu:true};ui.lensPixelMapKey='menu';if(ui.fail)throw Error('lens unavailable');},paintBlackHole(){calls.push('horizon')},update(){throw Error('Menu must not simulate gameplay')}};
+ ctx:{fillRect(){calls.push('sky')},drawImage(){calls.push('tile')}},makeSkyDepthTexture(){calls.push('bake');return{};},renderMenuComets(time){calls.push(['comets',time])},renderBlackHoleLensing(t){calls.push('lens');ui.lensPixelMap={menu:true};ui.lensPixelMapKey='menu';if(ui.fail)throw Error('lens unavailable');},paintBlackHole(){calls.push('horizon')},update(){throw Error('Menu must not simulate gameplay')}};
  vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function menuBlackHoleGeometry(){'),game.indexOf('function render(time){')),ui);
  const saved=ui.lensPixelMap;ui.renderMenuScene(1);const a=calls.find(x=>Array.isArray(x));ui.renderMenuScene(2);
  assert.equal(calls.filter(x=>x==='bake').length,1);assert.equal(ui.lensPixelMap,saved);assert.equal(ui.lensPixelMapKey,'world');assert.equal(world.time,123);assert.equal(world.matter,456);assert.ok(calls.indexOf('lens')<calls.indexOf('horizon'));
- const positions=calls.filter(x=>Array.isArray(x));assert.notDeepEqual(positions[0],positions[2]);
+ const positions=calls.filter(x=>Array.isArray(x));assert.notDeepEqual(positions[0],positions[1]);assert.ok(calls.findIndex(x=>Array.isArray(x)&&x[0]==='comets')<calls.indexOf('lens'));assert.ok(!game.slice(game.indexOf('function renderMenuScene(time){'),game.indexOf('function render(time){')).includes('paintGalaxy('));
  ui.fail=true;ui.renderMenuScene(3);assert.equal(calls.at(-1),'horizon');assert.equal(ui.lensPixelMap,saved);
  for(const [w,h] of [[390,844],[1920,1080],[2560,1440]]){ui.W=w;ui.H=h;const t=ui.menuBlackHoleGeometry();assert.ok(t.R>0&&t.p.x<w&&t.p.y<h);}
  console.log('PASS: cached moving menu sky, real lens before opaque horizon, failure isolation and untouched save');
+}
+
+// Menu cadence is independent of saved game time and shares the thin cached sprite.
+{
+ const gameTime=cometBox.g.time;let peak=0,count=0;
+ for(let time=0;time<30;time+=.1){cometBox.renderMenuComets(time);peak=Math.max(peak,vm.runInContext('menuComets.length',cometBox));}
+ count=vm.runInContext('menuCometSequence',cometBox);assert.ok(count>=8&&count<=17);assert.ok(peak>=2&&peak<=6);assert.equal(cometBox.g.time,gameTime);assert.equal(cometAllocations,1);
+ cometBox.renderMenuComets(1000);assert.equal(vm.runInContext('menuComets.length',cometBox),1,'Returning to menu must not replay a backlog');
+ const draws=[];cometBox.ctx=new Proxy({drawImage(...args){draws.push(args)}},{get:(o,k)=>k in o?o[k]:()=>{}});
+ for(const length of [100,280])cometBox.drawBackgroundComet({born:0,duration:10,fromX:0,fromY:0,dx:100,dy:20,length},5);
+ assert.ok(draws.every(args=>args[4]===8),'Comet thickness must not grow with tail length');
+ console.log('PASS: frequent independent menu comets, bounded population, one shared thin sprite');
 }
