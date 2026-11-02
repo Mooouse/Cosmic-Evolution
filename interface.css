@@ -88,3 +88,38 @@ button{transition:background .16s,border-color .16s,box-shadow .16s,transform .1
  .hud,.modal-card{-webkit-user-select:none;user-select:none;}
  input,textarea{-webkit-user-select:text;user-select:text;}
 }
+
+/* Short landscape screens retain a useful map viewport and reachable menu controls. */
+@media(max-height:500px) and (orientation:landscape){
+ #modal[data-screen=menu] .menu-card{display:block;padding:84px 0 0!important;overflow:auto;}
+ #modal[data-screen=menu] .menu-content{display:grid;grid-template-columns:160px minmax(0,440px);align-items:start;gap:24px;width:calc(100% - 48px)!important;max-width:none;margin:0 24px!important;padding:18px 0!important;}
+ .menu-card h1{float:none;font-size:32px;margin:10px 0;}
+ .menu-nav{width:100%;max-width:none;grid-template-columns:1fr 1fr;gap:5px;}
+ .menu-nav>button:not(.primary-button),.menu-nav>.primary-button{min-height:42px;padding:8px 10px;margin:0;font-size:10px;}
+ .menu-scene-label{display:none;}
+ #modal[data-screen=map]{padding:76px 0 0;}
+ .modal-card.atlas-card{max-width:none;max-height:none;padding:8px 18px;gap:5px;}
+ .atlas-top{min-height:40px;flex-shrink:0;}
+ .atlas-top .eyebrow{font-size:7px;}
+ .atlas-top .overlay-title{font-size:18px!important;}
+ .atlas-measures{position:absolute;top:6px;right:72px;width:50%;}
+ .atlas-measures>div{padding:5px 10px;}
+ .atlas-measures strong{font-size:12px;}
+ .atlas-card>.panel-close{top:8px;right:18px;}
+ .atlas-card .atlas-wrap{height:auto!important;min-height:100px;flex:1;}
+ .atlas-pin-hint,.atlas-footer{display:none;}
+ .atlas-legend{font-size:7px;gap:10px;flex-shrink:0;}
+ .atlas-pins{flex-shrink:0;gap:5px;}
+ .atlas-pins input,.atlas-pins select{max-width:150px;}
+ .atlas-controls{gap:5px;right:10px;}
+ .atlas-controls button{min-width:38px;min-height:38px;width:38px;height:38px;}
+ .body-measure{top:82px;}
+ .body-measure strong{font-size:18px;}
+ .camera-buttons{bottom:18px;right:18px;}
+ .center-abilities{top:auto;transform:none;bottom:100px;right:18px;}
+ .ability{width:122px;height:48px;}
+ .bottom-center{width:min(440px,calc(100% - 290px));bottom:20px;}
+ .flight-stick{bottom:24px;left:18px;width:90px;height:90px;}
+ .zoom-indicator{display:none;}
+ .sidebar,.evolution-panel{max-height:calc(100dvh - 150px);}
+}
