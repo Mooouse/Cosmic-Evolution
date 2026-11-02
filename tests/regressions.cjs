@@ -746,3 +746,22 @@ rivalLensBox.renderRivalLensing();assert.equal(rivalLensBox.calls.length,1);
 assert.equal(rivalLensBox.lensPixelMapKey,'player');assert.ok(rivalLensBox.lensPixelMap.player);
 rivalLensBox.g.abyssConsumed.near=true;assert.equal(rivalLensBox.rivalLensTargets().length,0);
 console.log('PASS: rival holes reuse player lens with true radius, visibility culling and isolated geometry caches');
+
+// Parallax layers cover the viewport continuously at both wheel extremes.
+const skyRects=[],skyDepthBox={W:1366,H:768,dpr:.87,g:{viewZoom:1},ctx:{save(){},restore(){},drawImage(_c,x,y,w,h){skyRects.push({x,y,w,h})}}};
+vm.createContext(skyDepthBox);
+vm.runInContext(game.slice(game.indexOf('function drawSkyDepthLayer('),game.indexOf('\nlet backgroundComets=')),skyDepthBox);
+for(const zoom of [.1,1,10])for(const offset of [-100000,0,1365.5]){
+ skyDepthBox.g.viewZoom=zoom;skyRects.length=0;
+ const layer={canvas:{},x:offset,y:-offset,depth:.19,brightness:1};
+ skyDepthBox.drawSkyDepthLayer(layer,123,-57);
+ assert.ok(layer.x>=0&&layer.x<1366&&layer.y>=0&&layer.y<768);
+ assert.ok(skyRects.length<=9,'Layer rendering must stay bounded at wide zoom');
+ for(const x of [.5,100,683,1365.5])for(const y of [.5,100,384,767.5])
+  assert.ok(skyRects.some(r=>x>=r.x-.6&&x<=r.x+r.w+.6&&y>=r.y-.6&&y<=r.y+r.h+.6),'No uncovered viewport corners or tile seams');
+}
+skyDepthBox.g.viewZoom=1;
+const farSky={canvas:{},x:500,y:300,depth:.035,brightness:.6},nearSky={...farSky,depth:.19};
+skyDepthBox.drawSkyDepthLayer(farSky,100,0);skyDepthBox.drawSkyDepthLayer(nearSky,100,0);
+assert.ok(500-nearSky.x>(500-farSky.x)*5,'Near clusters must shift visibly faster than distant clusters');
+console.log('PASS: independent sky depth, bounded scrolling and seamless viewport coverage at 10–1000%');

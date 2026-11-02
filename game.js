@@ -235,15 +235,15 @@ function save(){g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAV
 let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Cosmic Evolution: сохранение мира не помещается в localStorage');}}
 
 function makeSky(){
- skyLayer=null;
+ skyLayer=null;skyDepthLayers=[];
  const rng=chunkRandom(0x73a9f),colors=['#eaf1ff','#c6d9ff','#fff0d4','#fff9ef'];
  stars=Array.from({length:Math.min(520,Math.max(140,Math.floor(W*H/4100)))},()=>{
   return {x:rng()*W,y:rng()*H,r:1,
-   alpha:.82+rng()*.18,depth:.08+rng()*.4,color:colors[Math.floor(rng()*colors.length)]};
+   alpha:.82+rng()*.18,depth:.5+rng()*.45,color:colors[Math.floor(rng()*colors.length)]};
  });
  nebula=Array.from({length:8},()=>({x:rng()*W,y:H*(.72-.45*rng()),r:180+rng()*Math.min(W,H)*.4,h:210+rng()*35,a:.018+rng()*.025}));
 }
-let performanceScale=1,frameFps=60,perfSample=0,perfFrames=0,skyLayer=null,skyLayerEpoch=-1;
+let performanceScale=1,frameFps=60,perfSample=0,perfFrames=0,skyLayer=null,skyLayerEpoch=-1,skyDepthLayers=[];
 function applyResolution(){
  const base=Math.min(devicePixelRatio||1,W*H>=2200000?.87:1.25);
  const effective=base*(g.quality===.5?.75:1)*performanceScale;
@@ -1423,24 +1423,19 @@ function glowDot(x,y,r,color,intensity=1){
 // Keep fine stars at display resolution: downsampled pinpoints look like fog.
 function ensureSkyLayer(){
  if(skyLayer&&skyLayerEpoch===g.tier&&skyLayer.width===frameCanvas.width&&skyLayer.height===frameCanvas.height)return;
- skyLayer=document.createElement('canvas');
- skyLayer.width=frameCanvas.width;skyLayer.height=frameCanvas.height;
- const c=skyLayer.getContext('2d'),rng=chunkRandom(0x41c078);
- c.scale(skyLayer.width/W,skyLayer.height/H);
- const bg=c.createLinearGradient(0,0,W,H);
- bg.addColorStop(0,'#02040a');bg.addColorStop(.55,'#050812');bg.addColorStop(1,'#010207');
- c.fillStyle=bg;c.fillRect(0,0,W,H);
- for(const n of nebula){
-  const grad=c.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r);
-  grad.addColorStop(0,`hsla(${n.h},30%,55%,${n.a})`);
-  grad.addColorStop(.55,`hsla(${n.h},25%,40%,${n.a*.35})`);
-  grad.addColorStop(1,`hsla(${n.h},25%,40%,0)`);
-  c.fillStyle=grad;c.beginPath();c.arc(n.x,n.y,n.r,0,TAU);c.fill();
- }
+ const previous=skyDepthLayers;
+ skyDepthLayers=[{seed:0x8361a,density:.4,depth:.035,brightness:.6},{seed:0x41c078,density:.75,depth:.19,brightness:1}].map((layer,i)=>({
+  ...layer,canvas:makeSkyDepthTexture(layer.seed,layer.density),x:previous[i]?.x||0,y:previous[i]?.y||0
+ }));
+ skyLayer=skyDepthLayers[0].canvas;skyLayerEpoch=g.tier;
+}
+function makeSkyDepthTexture(seed,density){
+ const skyLayer=document.createElement('canvas');skyLayer.width=frameCanvas.width;skyLayer.height=frameCanvas.height;
+ const c=skyLayer.getContext('2d'),rng=chunkRandom(seed);
  // Thousands of bright single-render-pixel stars, baked at the exact frame size.
  // Integer coordinates prevent subpixel coverage from making the stars dim.
  c.setTransform(1,0,0,1,0,0);
- const count=Math.min(72000,Math.max(4500,Math.floor(W*H/48)));
+ const count=Math.min(72000,Math.max(4500,Math.floor(W*H/48)))*density;
  // Each association has a coherent hue, several knots and a curved outline.
  // Most stars belong to associations; sparse field stars leave dark gaps.
  const palettes=[['#a54dff','#c675ff','#d9a2ff'],['#35aaff','#60c6ff','#8ddbff'],
@@ -1455,16 +1450,18 @@ function ensureSkyLayer(){
  // Soft unresolved starlight follows the same irregular knots, so group hues
  // remain readable when a monitor or adaptive rendering downsamples the points.
  c.save();c.scale(skyLayer.width/W,skyLayer.height/H);
- for(const group of groups){
-  c.save();c.translate(group.x,group.y);c.transform(group.cos,group.sin,-group.sin,group.cos,0,0);
-  for(const knot of group.knots){
-   const x=knot.x*group.rx,y=(knot.y+Math.sin(knot.x*1.9)*group.bend)*group.ry;
-   c.save();c.translate(x,y);c.scale(group.rx*.85,group.ry*1.1);
+ for(const group of groups)for(const knot of group.knots){
+  const u=knot.x*group.rx,v=(knot.y+Math.sin(knot.x*1.9)*group.bend)*group.ry;
+  const cx=((group.x+u*group.cos-v*group.sin)%W+W)%W,cy=((group.y+u*group.sin+v*group.cos)%H+H)%H;
+  const rx=group.rx*.85,ry=group.ry*1.1,bound=Math.max(rx,ry)*1.6;
+  // Wrap each glow with its stars so tiled edges never expose a seam.
+  for(let iy=-1;iy<=1;iy++)for(let ix=-1;ix<=1;ix++){
+   const x=cx+ix*W,y=cy+iy*H;if(x+bound<0||x-bound>W||y+bound<0||y-bound>H)continue;
+   c.save();c.translate(x,y);c.transform(group.cos,group.sin,-group.sin,group.cos,0,0);c.scale(rx,ry);
    const light=c.createRadialGradient(0,0,0,0,0,1.6);
    light.addColorStop(0,group.palette[0]+'24');light.addColorStop(.5,group.palette[0]+'0e');light.addColorStop(1,group.palette[0]+'00');
    c.fillStyle=light;c.fillRect(-1.6,-1.6,3.2,3.2);c.restore();
   }
-  c.restore();
  }
  c.restore();
  const gaussian=()=>Math.sqrt(-2*Math.log(Math.max(1e-8,rng())))*Math.cos(rng()*TAU);
@@ -1479,10 +1476,24 @@ function ensureSkyLayer(){
    color=rng()<.025?'#f5f0ff':group.palette[Math.floor(rng()*group.palette.length)];
   }else{x=rng()*W;y=rng()*H;color=['#e4edff','#ffffff','#fff2d9','#d4e7ff'][i%4];}
   c.globalAlpha=.94+rng()*.06;c.fillStyle=color;
-  c.fillRect(Math.floor(x*skyLayer.width/W),Math.floor(y*skyLayer.height/H),1,1);
+  c.fillRect(Math.floor(((x%W+W)%W)*skyLayer.width/W),Math.floor(((y%H+H)%H)*skyLayer.height/H),1,1);
  }
- c.globalAlpha=1;skyLayerEpoch=g.tier;
+ c.globalAlpha=1;return skyLayer;
 }
+function drawSkyDepthLayer(layer,dx,dy){
+ // Bounded screen-space offsets remain precise even at astronomical coordinates.
+ layer.x=((layer.x-dx*layer.depth)%W+W)%W;
+ layer.y=((layer.y-dy*layer.depth)%H+H)%H;
+ const scale=Math.pow(g.viewZoom||1,layer.depth*.35),tw=W*scale,th=H*scale;
+ const ox=((layer.x*scale+(W-tw)*.5)%tw+tw)%tw,oy=((layer.y*scale+(H-th)*.5)%th+th)%th;
+ ctx.save();ctx.globalAlpha=layer.brightness;ctx.imageSmoothingEnabled=false;
+ for(let y=oy-th;y<H;y+=th)for(let x=ox-tw;x<W;x+=tw){
+  const left=Math.round(x*dpr)/dpr,top=Math.round(y*dpr)/dpr;
+  ctx.drawImage(layer.canvas,left,top,Math.round((x+tw)*dpr)/dpr-left,Math.round((y+th)*dpr)/dpr-top);
+ }
+ ctx.restore();
+}
+
 let backgroundComets=[],nextBackgroundComet=4,lastCometTime=0,cometSequence=0,cometSprite=null;
 function renderBackgroundComets(){
  if(g.time<lastCometTime){backgroundComets=[];nextBackgroundComet=g.time+4;}
@@ -1518,9 +1529,10 @@ function sky(t){
  const skyDX=clamp((camera.x-skyCameraX)*camera.zoom,-W,W);
  const skyDY=clamp((camera.y-skyCameraY)*camera.zoom,-H,H);
  skyCameraX=camera.x;skyCameraY=camera.y;
- ensureSkyLayer();ctx.drawImage(skyLayer,0,0,W,H);
+ ensureSkyLayer();ctx.fillStyle='#02040b';ctx.fillRect(0,0,W,H);
+ for(const layer of skyDepthLayers)drawSkyDepthLayer(layer,skyDX,skyDY);
  for(const s of stars){
-  const x=s.x=((s.x-skyDX*s.depth*.25)%W+W)%W,y=s.y=((s.y-skyDY*s.depth*.25)%H+H)%H;
+  const x=s.x=((s.x-skyDX*s.depth)%W+W)%W,y=s.y=((s.y-skyDY*s.depth)%H+H)%H;
   // Stars in vacuum shine steadily; no synchronized twinkling or stage dimming.
   ctx.globalAlpha=s.alpha;ctx.fillStyle=s.color;
   ctx.fillRect(Math.round(x*dpr)/dpr,Math.round(y*dpr)/dpr,1/dpr,1/dpr);
