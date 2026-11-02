@@ -8,7 +8,7 @@ const canvas = $('universe');
 const screenCtx=canvas.getContext('2d',{alpha:false,desynchronized:false});
 const frameCanvas=document.createElement('canvas');
 const frameCtx=frameCanvas.getContext('2d',{alpha:false});
-let ctx=screenCtx;
+let ctx=screenCtx;window.SpaceI18n?.context(screenCtx);window.SpaceI18n?.context(frameCtx);
 const TAU = Math.PI * 2;
 // The painted black disk, its lens and its physical absorption use one radius.
 const BLACK_HOLE_CORE_FRACTION = .245;
@@ -25,7 +25,7 @@ function numberSuffix(group){
 function fmt(value){
  if(!Number.isFinite(value))return '0';
  const n=Math.abs(value),sign=value<0?'−':'';
- if(n<10000)return Math.floor(value).toLocaleString('ru-RU');
+ if(n<10000)return Math.floor(value).toLocaleString(typeof window!=='undefined'&&window.SpaceI18n?.language||'ru-RU');
  let group=Math.floor(Math.log10(n)/3),scaled=n/10**(group*3);
  if(Number(scaled.toFixed(2))>=1000){group++;scaled=n/10**(group*3);}
  return sign+scaled.toFixed(2)+numberSuffix(group);
@@ -89,7 +89,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,controlMode:'follow',flightFeel:'smooth',viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[0],activeTrack:0,controlMode:'follow',flightFeel:'smooth',viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -114,7 +114,7 @@ function normaliseMapPins(value){
  if(!Array.isArray(value))return [];
  const ids=new Set();
  return value.filter(p=>p&&Number.isSafeInteger(p.id)&&p.id>0&&!ids.has(p.id)&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&(ids.add(p.id),true)).slice(0,64)
-  .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32)}));
+  .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32),color:/^#[0-9a-f]{6}$/i.test(p.color)?p.color:'#7ddcff'}));
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.1,10):1;
@@ -126,6 +126,10 @@ let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,menuVi
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
 function radiusAt(tier,fraction){return 13*Math.pow(1.65,tier+clamp(fraction,0,1));}
+// Nominal scale belongs to physics; manual camera zoom never changes forces or speed.
+function physicsZoom(){const r=Math.max(1,player.r);return clamp(g.endless?(83+27*Math.log2(1+r/100))/r:Math.min(145,16+14*Math.log2(1+r/13))/r,1e-155,32);}
+function canAbsorbBody(e){return g.endless||e.r<=player.r;}
+function solarMass(){return Math.min(1e290,blackHoleCoreWorldRadius()/CHUNK*(9.4607304725808e12/2.95325));}
 function campaignZoom(radius){return clamp(tester.zoom*(g.viewZoom||1)*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,32);}
 function currentRadius(){
  const base=radiusAt(g.tier,stageFraction());
@@ -156,14 +160,14 @@ function updateStickPosition(e){const pad=$('flight-stick'),rect=pad.getBounding
 function setupFlightStick(){const pad=$('flight-stick');pad.addEventListener('pointerdown',e=>{if(!running)return;e.preventDefault();e.stopPropagation();stick.active=true;stick.id=e.pointerId;pad.classList.add('engaged');pad.setPointerCapture(e.pointerId);updateStickPosition(e);});pad.addEventListener('pointermove',e=>{if(stick.active&&stick.id===e.pointerId){e.preventDefault();updateStickPosition(e);}});const release=e=>{if(stick.id!==e.pointerId)return;stick.active=false;stick.id=null;stick.x=stick.y=0;pad.classList.remove('engaged');$('stick-thumb').style.transform='translate(-50%, -50%)';};pad.addEventListener('pointerup',release);pad.addEventListener('pointercancel',release);pad.addEventListener('lostpointercapture',release);}
 setupFlightStick();
 let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
-let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
+let externalMusic=null;let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
 let pickupSoundAt=-1e9,pickupCount=0,pickupValue=0,pickupDisplayAt=-1e9;
 let absorptionTokens=0;
 let harvestChain=0,harvestChainTime=0;
 function chainMultiplier(){return g.tier<13?1+Math.min(1,Math.floor(harvestChain/4)*.25):1;}
 function advanceHarvestChain(){
  if(g.tier>=13)return 1;
- harvestChain=harvestChainTime>0?harvestChain+1:1;harvestChainTime=5;
+ harvestChain=harvestChainTime>0?harvestChain+1:1;harvestChainTime=5;g.bestChain=Math.max(g.bestChain||0,harvestChain);
  if(harvestChain%4===0){
   const color=harvestChain>=12?'#ffd6a0':'#86eaff';
   shockwaves.push({x:player.x,y:player.y,r:player.r,life:.7,max:.7,color,range:110});
@@ -171,7 +175,7 @@ function advanceHarvestChain(){
  }
  return chainMultiplier();
 }
-function ordinaryGravityRadius(){return Math.max(116.4+g.upgrade.gravity*7,player.r*3.36)*tester.gravity;}
+function ordinaryGravityRadius(){return Math.max((g.tier<4?165:116.4)+g.upgrade.gravity*7,player.r*3.36)*tester.gravity;}
 function pickupFeedback(value,rare=false){
  pickupCount++;pickupValue+=value;
  const now=performance.now();
@@ -182,7 +186,7 @@ function pickupFeedback(value,rare=false){
  }
  // One compact feedback number per cluster; no individual floating labels.
  if(now-pickupDisplayAt>650&&player.r<CHUNK*4){
-  popText(player.x,player.y-player.r*1.3,`+${pickupValue<10?pickupValue.toLocaleString('ru-RU',{maximumFractionDigits:1}):fmt(pickupValue)}`,'#b7e9fc');
+  popText(player.x,player.y-player.r*1.3,`+${pickupValue<10?pickupValue.toLocaleString(typeof window!=='undefined'&&window.SpaceI18n?.language||'ru-RU',{maximumFractionDigits:1}):fmt(pickupValue)}`,'#b7e9fc');
   pickupValue=0;pickupCount=0;pickupDisplayAt=now;
  }
  if(player.r>=CHUNK*4){pickupValue=0;pickupCount=0;}
@@ -190,7 +194,7 @@ function pickupFeedback(value,rare=false){
 
 
 const cssColor = (h,a) => h.startsWith('#')?`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`:`rgba(119,190,255,${a})`;
-function sound(freq=350,type='sine',duration=.075,vol=.045){if(!g.sound)return;try{soundCtx??=new (window.AudioContext||window.webkitAudioContext)();if(soundCtx.state==='suspended')soundCtx.resume();const osc=soundCtx.createOscillator(),gain=soundCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,soundCtx.currentTime);osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.63),soundCtx.currentTime+duration);gain.gain.setValueAtTime(vol,soundCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,soundCtx.currentTime+duration);osc.connect(gain);gain.connect(soundCtx.destination);osc.start();osc.stop(soundCtx.currentTime+duration+.01);}catch(_){}}
+function sound(freq=350,type='sine',duration=.075,vol=.045){if(!g.sound||window.SpacePlatform?.muted||g.soundVolume===0)return;try{soundCtx??=new (window.AudioContext||window.webkitAudioContext)();if(soundCtx.state==='suspended')soundCtx.resume();const osc=soundCtx.createOscillator(),gain=soundCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,soundCtx.currentTime);osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.63),soundCtx.currentTime+duration);gain.gain.setValueAtTime(Math.max(.0001,vol*(g.soundVolume??.7)),soundCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,soundCtx.currentTime+duration);osc.connect(gain);gain.connect(soundCtx.destination);osc.start();osc.stop(soundCtx.currentTime+duration+.01);}catch(_){}}
 // Original procedurally composed cinematic space ambient — not the film soundtrack.
 const musicChords=[[45,52,57,60,64],[41,48,53,57,60],[38,45,50,53,57],[43,50,55,59,62],[40,496,52,55,59],[36,43,48,52,55]];
 const hz=midi=>440*Math.pow(2,(midi-69)/12);
@@ -210,7 +214,7 @@ function initAudio(){
   if(!musicLoop){musicBeat=0;musicNext=soundCtx.currentTime+.12;musicLoop=setInterval(scheduleMusic,120);}
  }catch(_){/* Audio may be unsupported */}
 }
-function setMusicVolume(){if(musicMaster&&soundCtx)musicMaster.gain.setTargetAtTime(g.music?g.musicVolume*.42:0,soundCtx.currentTime,.12);}
+function setMusicVolume(){const audible=g.music&&!window.SpacePlatform?.muted;if(musicMaster&&soundCtx)musicMaster.gain.setTargetAtTime(audible&&!g.activeTrack?g.musicVolume*.42:0,soundCtx.currentTime,.12);if(externalMusic){externalMusic.volume=audible?g.musicVolume:0;}}
 function playVoice(note,when,duration,level=.08,type='triangle'){
  if(!soundCtx||!musicFX)return;
  const o=soundCtx.createOscillator(),o2=soundCtx.createOscillator(),gain=soundCtx.createGain();
@@ -230,7 +234,8 @@ function scheduleMusic(){
   musicNext+=beat;musicBeat++;
  }
 }
-function startMusic(){initAudio();setMusicVolume();}
+function startMusic(){if(g.activeTrack&&!externalMusic){const t=MUSIC_TRACKS.find(t=>t.id===g.activeTrack);if(t?.src){externalMusic=new Audio(t.src);externalMusic.loop=true;externalMusic.play().catch(()=>{});}else g.activeTrack=0;}initAudio();setMusicVolume();}
+addEventListener('space-platform-audio',()=>setMusicVolume());
 function save(){g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAVE_KEY,JSON.stringify(g));}catch(_){toastStorageWarning();}}
 let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Infiniti Space: сохранение мира не помещается в localStorage');}}
 
@@ -277,7 +282,7 @@ function uiIcon(name){
 function populateUpgrades(){const root=$('upgrades');root.textContent='';for(const u of upgrades){let b=document.createElement('button');b.className='upgrade';b.dataset.upgrade=u.id;b.addEventListener('click',()=>buy(u.id));b.innerHTML=`<span class="upgrade-icon">${uiIcon(u.id)}</span><span class="upgrade-description"><strong>${u.name}</strong><small>${u.label} · <span class="upgrade-level"></span></small></span><span class="upgrade-cost"><span class="upgrade-price"></span><small>✦ цена</small></span>`;root.append(b);}}
 populateUpgrades();
 function renderUI(force=false){
- $('matter-value').textContent=fmt(g.total);$('credit-value').textContent=fmt(g.credits);$('time-value').textContent=timeFmt(g.time);
+ $('matter-value').textContent=g.endless?fmt(solarMass())+' M☉':fmt(g.total);$('matter-label').textContent=g.endless?L('BLACK HOLE MASS','МАССА ЧЁРНОЙ ДЫРЫ','MASA DEL AGUJERO NEGRO'):L('MATTER','МАТЕРИЯ','MATERIA');$('radius-value').textContent=lightYears(g.endless?blackHoleCoreWorldRadius():player.r);$('credit-value').textContent=fmt(g.credits);$('time-value').textContent=timeFmt(g.time);
  const t=TA[g.tier],next=TA[g.tier+1],progress=clamp(g.matter/t.required,0,1);
  $('tier-number').innerHTML=`${String(g.tier+1).padStart(2,'0')} <span>/ ${TA.length}</span>`;
  $('epoch-name').textContent=t.epoch.toUpperCase();$('tier-title').textContent=t.name;$('tier-desc').textContent=g.tier<13?(harvestChainTime>0?`ЦЕПОЧКА: ${harvestChain} · ${harvestChainTime.toFixed(1)} с`:t.desc+' Собирай цепочки и закручивай потоки материи.'):t.desc;
@@ -286,13 +291,13 @@ function renderUI(force=false){
  if(g.endless){
   const rank=Math.log2(1+Math.max(0,g.matter)/t.required),sub=(rank%1)*100;
   $('progress-fill').style.width=sub.toFixed(1)+'%';
-  $('progress-percent').textContent=`∞ РОСТ · ×${(currentRadius()/radiusAt(g.tier,0)).toFixed(2)} РАДИУС`;
+  $('progress-percent').textContent=`∞ ${fmt(solarMass())} M☉`;
  }else{
   $('progress-fill').style.width=(progress*100).toFixed(1)+'%';
   $('progress-percent').textContent=progress>=1&&!missionsDone()?'ВЫПОЛНИ ЗАДАЧИ':Math.round(progress*100)+'%';
  }
  const m=missionReq(),cs=g.endless?[true,true,true]:[g.stageCollects>=m.collect,recipeDone(),g.stageExplored>=m.explore];
- $('mission-1-label').textContent=g.endless?'Поглощено в чёрную дыру':'Нарасти массу';$('mission-1-val').textContent=g.endless?fmt(g.matter):`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
+ $('mission-1-label').textContent=g.endless?'Поглощено в чёрную дыру':'Нарасти массу';$('mission-1-val').textContent=g.endless?fmt(solarMass())+' M☉':`${fmt(g.stageCollects)}/${fmt(m.collect)}`;
  $('mission-2-label').textContent=g.endless?'Радиус горизонта событий':'Собери рецепт';$('mission-2-val').textContent=g.endless?lightYears(blackHoleCoreWorldRadius()):`${stageRecipe().filter(({type,amount})=>(g.materials[type]||0)>=amount).length}/${stageRecipe().length}`;
  $('mission-3-label').textContent=g.endless?'Исследованная площадь':'Исследуй пространство';$('mission-3-val').textContent=g.endless?fmt(exploredCount())+' св. лет²':`${fmt(g.stageExplored)}/${fmt(m.explore)} св. лет²`;
  const matRoot=$('materials-inventory');if(matRoot){
@@ -309,7 +314,7 @@ function renderUI(force=false){
  if($('btn-music').dataset.music!==String(g.music)){$('btn-music').innerHTML=uiIcon(g.music?'music':'mute');$('btn-music').dataset.music=String(g.music);}$('btn-music').setAttribute('aria-label',g.music?'Выключить музыку':'Включить музыку');const sx=Math.floor(player.x/CHUNK),sy=Math.floor(player.y/CHUNK);$('world-label').textContent=`${t.epoch.toUpperCase()} · НЕИЗВЕДАННАЯ ВСЕЛЕННАЯ`;$('world-subtitle').textContent=`X ${lightYears(player.x)} · Y ${lightYears(player.y)} · ${BIOME_NAMES[chunkInfo(sx,sy).biome]} · ИЗУЧЕНО ${fmt(exploredCount())} св. лет²`;
  const stats=$('tester-stats');
  if(stats)stats.textContent=`${Math.round(frameFps)} FPS · ${lensBackend.toUpperCase()} · ${entities.length} объектов · ${loadedChunks.size} областей · X ${lightYears(player.x)} · Y ${lightYears(player.y)}`;
- if(force)save();
+ if(force)save();window.SpaceI18n?.refresh();
 }
 // World is deterministic: the same sector always has the same matter, even after a restart.
 // 32 fixed objects per sector allow a single 32-bit bitmask to remember everything harvested.
@@ -363,7 +368,7 @@ function chunkInfo(cx,cy){
  return {biome,seed};
 }
 function materialFor(biome,dist,rng){
- const d=rng();
+ const roll=rng();if(roll<.22)return 'ice';const d=(roll-.22)/.78;
  if(biome==='rich')return d<.58?'crystal':'ore';
  if(biome==='void')return d<.62?'ice':'ore';
  if(biome==='nebula')return d<.72?'gas':'ore';
@@ -441,7 +446,7 @@ function makeChunk(cx,cy){
   // Always advance RNG for every index (including harvested ones). Otherwise,
   // depleted bodies silently shift all later positions when the sector reloads.
   let e=spawn(px,py,kind,rng);
-  const dist=Math.hypot(cx,cy);e.material=materialFor(info.biome,dist,rng);
+  const dist=Math.hypot(cx,cy);e.material=materialFor(info.biome,dist,rng);if(i===1)e.material='ice';
   if((mask&(1<<i))!==0||i>=sectorQuota(info,cx,cy)||absorbingMacroKeys.has(`0:${key}:${i}`))continue;
   e.chunk=key;e.index=i;
   // Regions farther from the origin contain physically larger, richer bodies.
@@ -471,8 +476,8 @@ function macroNodes(cx,cy){
   const x=(cx+.09+rng()*.82)*MACRO_SIZE,y=(cy+.09+rng()*.82)*MACRO_SIZE;
   const macroDistance=Math.hypot(cx,cy);
   const worldScale=1+Math.min(2.8,Math.pow(macroDistance/6,.62)*.6);
-  const r=(i<4?65+Math.pow(rng(),.7)*370:18+rng()*118)*worldScale;
-  const roll=rng(),material=biome==='anomaly'?(roll<.5?'exotic':'plasma'):
+  const r=(i===0?65+Math.pow(rng(),.7)*370:18+Math.pow(rng(),1.5)*118)*worldScale;
+  const roll=rng(),material=i===1?'ice':biome==='anomaly'?(roll<.5?'exotic':'plasma'):
    biome==='nebula'?(roll<.55?'gas':'exotic'):
    biome==='void'?(roll<.6?'ice':'crystal'):
    biome==='relic'?(roll<.55?'plasma':'exotic'):
@@ -678,7 +683,7 @@ function macroLODNodes(gx,gy,level){
   const sub=seedHash(cellX+j*113,cellY-j*191);
   const shape=(sub>>>4)%3,style=(sub>>>7)%8,palette=(sub>>>19)%9;
   const hole=j===0&&(sub%17===0),isUniverse=j===1&&sub%31===0,holeType=(sub>>>13)%3;
-  const r=Math.max(30,Math.min(span*.34,span*(.09+rng()*.16)));
+  const r=Math.max(30,Math.min(span*.34,span*(j===0?.09+rng()*.16:.028+rng()*.065)));
   nodes.push({x:rx,y:ry,r,style,palette,shape,holeType,material:MATERIAL_KEYS[(sub+level)%MATERIAL_KEYS.length],kind:isUniverse?'universe':'matter',cosmic:true,level,gx,gy,index:j});
  }
  if(macroLODCache.size>=1400){
@@ -713,16 +718,16 @@ function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
  return cosmicViewAt(camera.x,camera.y,W,H,camera.zoom,referenceWidth,referenceHeight);
 }
 function blackHoleGravityRadius(){
- const zoom=Math.max(1e-155,camera.zoom),core=blackHoleCoreWorldRadius();
+ const zoom=physicsZoom(),core=blackHoleCoreWorldRadius();
  return core+Math.max(216,core*zoom*2.64)*(1+g.upgrade.gravity*.012)*tester.gravity/zoom;
 }
 function applyBlackHoleGravity(e,dt){
  if(e.freeFlight&&g.freeFlights[flightKey(e)])Object.assign(e,freeFlightAt(g.freeFlights[flightKey(e)]));
- const zoom=Math.max(1e-155,camera.zoom),dx=(player.x-e.x)*zoom,dy=(player.y-e.y)*zoom,d=Math.hypot(dx,dy);
+ const zoom=physicsZoom(),dx=(player.x-e.x)*zoom,dy=(player.y-e.y)*zoom,d=Math.hypot(dx,dy);
  const core=blackHoleCoreWorldRadius(),touch=blackHoleTouchDistance(e,core)*zoom;
  const range=blackHoleGravityRadius()*zoom+touch-core*zoom;
  if(d>range){e.gravityBound=false;return !!e.freeFlight;}
- const strength=clamp(1-d/Math.max(1,range),0,1),acceleration=(308*strength+1400*strength*strength)*4;
+ const strength=clamp(1-d/Math.max(1,range),0,1),acceleration=(308*strength+1400*strength*strength)*4*2.4;
  const ax=dx/Math.max(d,.001)*acceleration/zoom,ay=dy/Math.max(d,.001)*acceleration/zoom;
  e.vx=(e.motionVX||0)+ax*dt;e.vy=(e.motionVY||0)+ay*dt;
  e.x+=ax*dt*dt*.5;e.y+=ay*dt*dt*.5;e.motionVX=e.vx;e.motionVY=e.vy;
@@ -736,7 +741,7 @@ function harvestCosmicLOD(dt){
  if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
  if(cosmicAbsorptions.length>=160)return;
- const core=g.endless?blackHoleCoreWorldRadius():player.r,gravity=g.endless?blackHoleGravityRadius():ordinaryGravityRadius(),view=cosmicVisibleLOD();
+ const core=g.endless?blackHoleCoreWorldRadius():player.r,gravity=g.endless?blackHoleGravityRadius():ordinaryGravityRadius(),view=cosmicViewAt(player.x,player.y,1920,1080,physicsZoom());
  const contacts=[];
  // Promote visible LOD proxies when they enter the gravitational field,
  // before their rendered silhouette reaches the event horizon.
@@ -771,7 +776,7 @@ function harvestCosmicLOD(dt){
   if(opacity<.025)continue;
   // Attraction does not deplete a sector; wait until the whole body is inside.
   const body={...e,cosmic:true,captureBag:bag,captureKey:key,captureOpacity:opacity};
-  body.gravityBound=true;body.vx=body.vy=0;
+  body.gravityBound=canAbsorbBody(body);body.vx=body.vy=0;
   absorbingMacroKeys.add(absorptionKey(body));cosmicAbsorptions.push(body);budget--;
  }
 }
@@ -912,7 +917,8 @@ function distantSamples(cx,cy){
   const px=(cx+rng())*CHUNK,py=(cy+rng())*CHUNK;
   const r=rng();let kind=sectorType(info,r);
   if(Math.hypot(px,py)<110)kind='matter';
-  const e=spawn(px,py,kind,rng),material=materialFor(info.biome,Math.hypot(cx,cy),rng);
+  const e=spawn(px,py,kind,rng);let material=materialFor(info.biome,Math.hypot(cx,cy),rng);if(i===1)material='ice';
+  if(i===1)e.material='ice';
   const grade=clamp(Math.floor(Math.log(1+Math.hypot(cx,cy)/3)/Math.log(1.46)),0,27);
   const radius=e.r*Math.pow(1.125,grade)*(i%17===0?1.45:1);
   const value=e.value*(1+Math.pow(Math.max(1,radius/5),1.55)*.42)*(info.biome==='rich'?2.1:1);
@@ -1006,7 +1012,7 @@ function respawn(e){delete g.freeFlights[flightKey(e)];markHarvested(e);absorbin
 function startAbsorption(e){
  if(e.dead||e.absorbing)return;
  e.absorbing=.000001;e.absorbScale=1;e.absorbOriginX=e.x;e.absorbOriginY=e.y;
- e.absorbDuration=clamp(.85+Math.hypot(e.x-player.x,e.y-player.y)*camera.zoom/420,.85,1.6);
+ e.absorbDuration=clamp(.85+Math.hypot(e.x-player.x,e.y-player.y)*physicsZoom()/420,.85,1.6);
  if(e.chunk!==undefined||e.cosmic)absorbingMacroKeys.add(absorptionKey(e));
 }
 function absorptionLight(e){
@@ -1083,7 +1089,7 @@ function attractSmallerAbyss(h,dt){
  const core=blackHoleCoreWorldRadius(),dx=player.x-h.x,dy=player.y-h.y,d=Math.hypot(dx,dy);
  const range=blackHoleGravityRadius()+h.r;if(d>range)return;
  // Exact world radius: no minimum sprite size, no vanishing at first contact.
- const speed=Math.max(core*3.08,896/Math.max(1e-155,camera.zoom))*(.3+.7*(1-clamp(d/range,0,1)));
+ const speed=2.4*Math.max(core*3.08,896/physicsZoom())*(.3+.7*(1-clamp(d/range,0,1)));
  const travel=Math.min(d,speed*dt),fraction=d>0?travel/d:0;
  h={...h,x:h.x+dx*fraction,y:h.y+dy*fraction};
  g.abyssPositions[h.id]=[h.x,h.y];
@@ -1144,7 +1150,7 @@ function pullBodyIntoAbyss(e,dt){
  for(const h of abyssPhysical){
   if(g.abyssConsumed[h.id]||canEatAbyss(h))continue;
   const d=Math.hypot(h.x-e.x,h.y-e.y);if(d>h.r*5)continue;
-  const zoom=Math.max(1e-155,camera.zoom),pull=abyssPull(h,e.x,e.y,180/zoom);
+  const zoom=physicsZoom(),pull=abyssPull(h,e.x,e.y,180/zoom);
   const x=e.x,y=e.y;e.x+=pull.x*dt;e.y+=pull.y*dt;
   // Keep a single live image while the rival moves it out of its sector.
   e.gravityBound=true;e.rivalBound=true;e.absorbing=0;absorbingMacroKeys.add(absorptionKey(e));
@@ -1232,12 +1238,25 @@ function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const val=Math.
  player.targetR=currentRadius();
  if(e.kind!=='relic')pickupFeedback(val,false);if(!g.endless&&player.r<CHUNK*4&&g.particles&&Math.random()<.36)energyArcs.push({x:e.x,y:e.y,toX:player.x,toY:player.y,r:e.r,life:.24,max:.24,color:e.kind==='relic'?'#ffe7af':'#77dfff'});respawn(e);if(!g.complete&&g.matter>=TA[g.tier].required&&missionsDone())evolve();}
 // Bodies larger than you stay in the universe; avoid them until you outgrow them.
+function applyGiantPull(dt,speed){
+ if(g.endless)return;
+ let fx=0,fy=0;
+ for(const e of [...entities,...macroEntities,...cosmicAbsorptions]){
+  if(e.dead||e.absorbing||canAbsorbBody(e))continue;
+  const dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy),range=e.r+player.r*4;
+  if(d<=0||d>=range)continue;
+  const force=speed*.9*(1-d/range)**2;
+  fx+=dx/d*force;fy+=dy/d*force;
+ }
+ const length=Math.hypot(fx,fy),limit=speed*.65,k=length>limit?limit/length:1;
+ player.vx+=fx*k*dt;player.vy+=fy*k*dt;
+}
 function collideWithGiant(e,dx,dy,dist){
  if(g.tier===TA.length-1||player.shield>0)return;
  const ux=dx/(dist||1),uy=dy/(dist||1);
  player.x+=ux*3;player.y+=uy*3;player.vx+=ux*130;player.vy+=uy*130;
  player.shield=.9;shake=5;
- const lost=Math.ceil(Math.min(g.matter*.035,TA[g.tier].required*.009));
+ const lost=0; // Contact redirects flight; oversized obstacles no longer tax stage progress.
  g.matter=Math.max(0,g.matter-lost);g.losses++;
  popText(player.x,player.y-player.r,'СЛИШКОМ БОЛЬШОЙ','#ffaba9');
  sound(135,'triangle',.16,.022);
@@ -1265,24 +1284,25 @@ function activatePulse(){
  const range=Math.max(270+g.upgrade.gravity*7,ordinaryGravityRadius()*1.25);
  shockwaves.push({x:player.x,y:player.y,r:player.r,max:1.2,life:1.2,color:'#84dfff',range});
  for(const e of [...entities,...macroEntities,...cosmicAbsorptions]){
-  if(e.dead||e.absorbing||e.gathering)continue;
+  if(e.dead||e.absorbing||e.gathering||!canAbsorbBody(e))continue;
   const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);if(d>=range||!d)continue;
   if(e.kind==='hazard'){e.kind='matter';e.material='crystal';}
-  const impulse=880/Math.min(1,Math.max(1e-155,camera.zoom))*(1-d/range)*Math.min(1,(player.r/e.r)**2);
+  const impulse=1100/Math.min(1,physicsZoom())*(1-d/range)*Math.min(1,(player.r/e.r)**2);
   e.vx=(e.motionVX||0)+dx/d*impulse;e.vy=(e.motionVY||0)+dy/d*impulse;
   e.motionVX=e.vx;e.motionVY=e.vy;rememberFlight(e);
  }
  shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();
 }
-function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=1.15;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
+function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=2.5;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
 // A finite field changes momentum; it does not attach a body to the player.
 // driftBody/freeFlightAt already advanced the inertial position to this time.
 function deflectResource(e,dt,range){
+ if(!canAbsorbBody(e)){e.gravityBound=false;return false;}
  const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
  const inside=d<range&&d>0;
  e.gravityBound=inside;
  if(!inside)return false;
- const q=clamp(1-d/range,0,1),acceleration=2016/Math.min(1,Math.max(1e-155,camera.zoom))*q*q*Math.min(1,(player.r/e.r)**2);
+ const q=clamp(1-d/range,0,1),acceleration=2016*(g.tier<4?1.5:1)/Math.min(1,physicsZoom())*q*q*Math.min(1,(player.r/e.r)**2);
  const ax=dx/d*acceleration,ay=dy/d*acceleration;
  e.vx=(e.motionVX||0)+ax*dt;e.vy=(e.motionVY||0)+ay*dt;
  e.x+=ax*dt*dt*.5;e.y+=ay*dt*dt*.5;
@@ -1320,19 +1340,20 @@ function update(dt){
  // fixed count of world units. Previously the player became effectively
  // stationary once the camera zoom fell below 1e-12.
  const cosmicSpeed=player.r>CHUNK*5
-  ? Math.min(1e290,Math.max(ordinarySpeed,140/Math.max(camera.zoom,1e-155)))
+  ? Math.min(1e290,Math.max(ordinarySpeed,140/physicsZoom()))
   : ordinarySpeed;
  const speed=tester.speed*cosmicSpeed*(boostTime>0?2.5:1);
  // Direct flight stops almost immediately; "smooth" gives optional controlled inertia.
  const response=g.flightFeel==='smooth'?(ax||ay?7:11):(ax||ay?23:34),lerp=1-Math.exp(-dt*response);
  player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
+ applyGiantPull(dt,speed);
  const oldX=player.x,oldY=player.y;
  player.x+=player.vx*dt;player.y+=player.vy*dt;
  if(!updateAbysses(dt,speed,oldX,oldY))return;
  visitPosition();player.rotation+=dt*(.13+Math.hypot(player.vx,player.vy)/850);
  if(Math.hypot(player.vx,player.vy)>28&&Math.random()<dt*24){player.trail.push({x:player.x,y:player.y,r:player.r,life:.55});}
  player.trail.forEach(p=>p.life-=dt);player.trail=player.trail.filter(p=>p.life>0).slice(-30);
- let gravRange=ordinaryGravityRadius(),collectR=g.endless?blackHoleCoreWorldRadius():player.r+4;
+ let gravRange=ordinaryGravityRadius(),collectR=g.endless?blackHoleCoreWorldRadius():player.r+(g.tier<4?10:4);
  const giantMode=g.endless&&player.r>CHUNK*5;
  // Fixed collection rate, independent of render FPS or the number of bodies
  // touched by the enormous horizon. This prevents a thousand simultaneous
@@ -1346,7 +1367,7 @@ function update(dt){
  // simulated; objects jumped when their turn in the queue arrived.
  for(const e of nearbyObjects){
   if(e.dead)continue;
-  if(!e.absorbing&&!e.gathering&&(e.r/player.r<.025||e.r*camera.zoom<.65))continue;
+  if(!e.absorbing&&!e.gathering&&(e.r/player.r<.025||e.r*physicsZoom()<.65))continue;
   if(gatherBody(e,dt))continue;
   if(!e.absorbing&&!e.rivalBound&&!(g.endless&&e.gravityBound)){
    if(e.freeFlight)Object.assign(e,freeFlightAt(g.freeFlights[flightKey(e)]||{...e,flightTime:g.time}));
@@ -1365,8 +1386,8 @@ function update(dt){
   e.spin+=dt*.6;e.twinkle+=dt*2.5;
   if(Math.hypot(player.x-e.x,player.y-e.y)<(g.endless?blackHoleTouchDistance(e,collectR):collectR+e.r)){
    if(g.endless){startAbsorption(e);continue;}
-   if(e.kind==='hazard'){e.kind='matter';e.material='crystal';absorb(e);}
-   else if(!g.endless&&e.r>player.r*.82)collideWithGiant(e,dx,dy,dist);
+   if(e.kind==='hazard'&&canAbsorbBody(e)){e.kind='matter';e.material='crystal';absorb(e);}
+   else if(!canAbsorbBody(e))collideWithGiant(e,dx,dy,dist);
    else {e.gathering=.000001;e.gatherX=e.x;e.gatherY=e.y;e.gravityBound=true;absorbingMacroKeys.add(flightKey(e));}
   }
  }
@@ -1388,30 +1409,15 @@ function update(dt){
  const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-155),1e-10,1e10);
  camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
  camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
- uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();}
+ uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();checkProgression();}
  if(saveTimer>12){saveTimer=0;save();}
 }
 function project(x,y){return {x:(x-camera.x)*camera.zoom+W/2,y:(y-camera.y)*camera.zoom+H/2};}
-function blackHoleCoreWorldRadius(){
- const zoom=Math.max(1e-155,camera.zoom);
- // Account for the visual size cap: nothing should disappear outside the black disk.
- const paintedRadius=clamp(player.r*zoom,8,Math.max(W,H)*.54);
- return paintedRadius*BLACK_HOLE_CORE_FRACTION/zoom;
-}
-// True screen-size contact, including the minimum size of distant cached
-// galaxy sprites. At extreme magnification ordinary world radii disagree
-// with painted artwork, which previously made those galaxies untouchable.
+function blackHoleCoreWorldRadius(){return player.r*BLACK_HOLE_CORE_FRACTION;}
 function blackHoleTouchDistance(e,core=blackHoleCoreWorldRadius()){
- const zoom=Math.max(1e-155,camera.zoom);
- if(e.macro||e.cosmic){
-  const spriteRadius=Math.min(e.r*zoom,Math.max(W,H)*2);
-  // Collide with the *drawn* silhouette, even when a galaxy looks
-  // larger than the player. A cap tied to core size made giant bodies
-  // untouchable despite visibly overlapping the black horizon.
-  return core+spriteRadius*(e.kind==='blackhole'?.90:1.12)/zoom;
- }
- return core+Math.max(.3,e.r*zoom)/zoom;
+ return core+e.r*((e.macro||e.cosmic)?(e.kind==='blackhole'?.90:1.12):1);
 }
+
 const dotCache=new Map();
 function glowDot(x,y,r,color,intensity=1){
  if(r<1.7){ctx.fillStyle=color;ctx.fillRect(x-r*.5,y-r*.5,Math.max(1,r),Math.max(1,r));return;}
@@ -1499,14 +1505,18 @@ function drawSkyDepthLayer(layer,dx,dy){
  ctx.restore();
 }
 
+function cometPath(rng){
+ const a=rng()*TAU,ux=Math.cos(a),uy=Math.sin(a),span=Math.hypot(W,H)*.75;
+ const offset=(rng()-.5)*Math.min(W,H)*.7,cx=W/2-uy*offset,cy=H/2+ux*offset;
+ return {fromX:cx-ux*span,fromY:cy-uy*span,dx:ux*span*2,dy:uy*span*2};
+}
 let backgroundComets=[],nextBackgroundComet=4,lastCometTime=0,cometSequence=0,cometSprite=null;
 function renderBackgroundComets(){
  if(g.time<lastCometTime){backgroundComets=[];nextBackgroundComet=g.time+4;}
  lastCometTime=g.time;
  if(g.time>=nextBackgroundComet){
-  const rng=chunkRandom(0x7c09+cometSequence++*7919),direction=rng()<.5?1:-1;
-  const duration=7+rng()*4,fromX=direction>0?-.2*W:1.2*W,fromY=H*(.1+rng()*.7);
-  backgroundComets.push({born:g.time,duration,fromX,fromY,dx:direction*W*1.4,dy:H*(rng()-.5)*.6,length:110+rng()*130});
+  const rng=chunkRandom(0x7c09+cometSequence++*7919),duration=7+rng()*4;
+  backgroundComets.push({born:g.time,duration,...cometPath(rng),length:110+rng()*130});
   nextBackgroundComet=g.time+8+rng()*8;
  }
  backgroundComets=backgroundComets.filter(c=>g.time-c.born<c.duration);
@@ -1536,9 +1546,9 @@ function renderMenuComets(time){
  if(lastMenuCometTime<0||time<lastMenuCometTime||time-lastMenuCometTime>1){menuComets=[];nextMenuComet=time;}
  lastMenuCometTime=time;
  if(time>=nextMenuComet){
-  const rng=chunkRandom(0x5ab8+menuCometSequence++*7919),direction=rng()<.5?1:-1;
+  const rng=chunkRandom(0x5ab8+menuCometSequence++*7919);
   const first=menuComets.length===0,duration=7+rng()*4;
-  menuComets.push({born:time-(first?1.4:0),duration,fromX:direction>0?-.12*W:1.12*W,fromY:H*(.08+rng()*.8),dx:direction*W*1.24,dy:H*(rng()-.5)*.35,length:100+rng()*180});
+  menuComets.push({born:time-(first?1.4:0),duration,...cometPath(rng),length:100+rng()*180});
   nextMenuComet=time+1.8+rng()*2;
  }
  menuComets=menuComets.filter(c=>time-c.born<c.duration).slice(-6);
@@ -1787,7 +1797,7 @@ function warpLensPixels(a,b,sw,sh,left,top,sampleX,sampleY,px,py,core,outer,lutS
 let lensPixelMap=null,lensPixelMapKey='';
 function renderBlackHoleLensing(target=null){
  if(!target&&g.tier!==TA.length-1)return;
- const p=target?.p||project(player.x,player.y),R=target?.R??clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
+ const p=target?.p||project(player.x,player.y),R=target?.R??Math.max(.01,player.r*camera.zoom);
  // The Einstein ring stays proportional to the actual black horizon.
  const outer=target?.outer??Math.min(R*2.30,Math.max(W,H)*.85);
  if(renderGpuLens(p,R,outer))return;
@@ -1872,7 +1882,7 @@ function renderRivalLensing(){
 }
 
 function paintBlackHole(x,y,r,time){
- const R=clamp(r,8,Math.max(W,H)*.54),core=R*BLACK_HOLE_CORE_FRACTION;
+ const R=Math.max(.01,r),core=R*BLACK_HOLE_CORE_FRACTION;
  ctx.save();
  ctx.globalAlpha=1;
  ctx.globalCompositeOperation='source-over';
@@ -2024,7 +2034,7 @@ function renderPlayer(time){
  // At the final tier the black hole uses a dedicated, always-opaque final
  // compositor pass. Never blend it with evolution morphs or other particles.
  if(g.tier===TA.length-1)return;
- const t=TA[g.tier],p=project(player.x,player.y),r=Math.min(player.r*camera.zoom,Math.max(W,H)*.54);ctx.save();
+ const t=TA[g.tier],p=project(player.x,player.y),r=player.r*camera.zoom;ctx.save();
  for(const tr of (g.endless?[]:player.trail)){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,Math.min(Math.max(W,H)*3,tr.r*camera.zoom*(.45+alpha*.3)),0,TAU);ctx.fill();}
  // Gravity field ring and orbiting shards.
  let range=Math.min(ordinaryGravityRadius()*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);if(!g.endless){ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);}
@@ -2111,7 +2121,7 @@ function render(time){
  // light effect and entity. It can never fade behind the background.
  if(g.tier===TA.length-1){
   const p=project(player.x,player.y);
-  const r=clamp(player.r*camera.zoom,8,Math.max(W,H)*.54);
+  const r=Math.max(.01,player.r*camera.zoom);
   ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   paintBlackHole(p.x,p.y,r,time);
   ctx.restore();
@@ -2132,7 +2142,7 @@ function render(time){
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
- if(!running&&now-idleLast<(menuVisible?33:70))return;idleLast=now;
+ if(!running&&now-idleLast<(menuVisible||atlas.focusTween?33:70))return;idleLast=now;
  const elapsed=clamp((now-last)/1000,.001,.08);last=now;
  if(running){
   update(Math.min(elapsed,.05));
@@ -2148,7 +2158,7 @@ function frame(now){
   }
  }
  render(now/1000);
- if(atlasVisible&&atlas.dirty)drawAtlas();
+ if(atlasVisible){updateAtlasMotion(elapsed);if(atlas.dirty)drawAtlas();}
 }
 requestAnimationFrame(frame);
 // One shared shell keeps navigation and resume behavior consistent across every screen.
@@ -2159,9 +2169,9 @@ function toggleOverlay(screen,open){
  const modal=$('modal');
  if(!modal.classList.contains('off')&&modal.dataset.screen===screen)resumeGame();else open();
 }
-function resumeGame(){clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=true;startMusic();$('modal').classList.add('off');last=performance.now();}
+function resumeGame(){closePinEditor();clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=true;window.SpacePlatform?.playing(true);startMusic();$('modal').classList.add('off');last=performance.now();}
 function show(html){
- clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=false;
+ clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=false;window.SpacePlatform?.playing(false);
  $('evolution-panel').classList.add('hidden');
  $('modal').dataset.screen='panel';
  $('modal').innerHTML=`<div class="modal-card"><button id="panel-close" class="panel-close" aria-label="Вернуться в игру">${uiIcon('close')}</button>${html}</div>`;
@@ -2177,16 +2187,124 @@ function openEvolution(){
 function showStatistics(){
  show(`<div class="eyebrow">ТВОЙ ПУТЬ В КОСМОСЕ</div><div class="overlay-title">СТАТИСТИКА</div><p class="overlay-copy">${TA[g.tier].name} · форма ${g.tier+1} из ${TA.length}</p><div class="stat-list"><div><strong>${fmt(g.total)}</strong><small>Собрано материи</small></div><div><strong>${timeFmt(g.time)}</strong><small>Время в космосе</small></div><div><strong>${fmt(g.collects)}</strong><small>Поглощено объектов</small></div><div><strong>${fmt(g.rare)}</strong><small>Найдено реликвий</small></div><div><strong>${fmt(exploredCount())}</strong><small>Исследовано, св. лет²</small></div><div><strong>${lightYears(2*(g.endless?blackHoleCoreWorldRadius():player.r))}</strong><small>Текущий диаметр</small></div></div><div class="modal-actions">${continueButton()}</div>`);attachContinue();
 }
+// Progression, field guide and audio catalogue share the existing save.
+const L=(en,ru,es)=>({en,ru,es}[window.SpaceI18n?.language||'en']||en);
+const RARITIES=[
+ ['common','#9fb7cd',['Common','Обычное','Común']],['uncommon','#66e4a6',['Uncommon','Необычное','Poco común']],
+ ['rare','#66c9ff',['Rare','Редкое','Raro']],['epic','#bc8aff',['Epic','Эпическое','Épico']],
+ ['legendary','#ffc871',['Legendary','Легендарное','Legendario']],['mythic','#ff79ba',['Mythic','Мифическое','Mítico']]
+];
+const ACHIEVEMENTS=[
+ ['spark',0,['First spark','Первая искра','Primera chispa'],'collects',1],
+ ['hundred',0,['Appetite for space','Космический аппетит','Apetito espacial'],'collects',100],
+ ['worlds',1,['A thousand worlds','Тысяча миров','Mil mundos'],'collects',1000],
+ ['collector',3,['World collector','Коллекционер миров','Coleccionista de mundos'],'collects',100000],
+ ['million',4,['A million encounters','Миллион встреч','Un millón de encuentros'],'collects',1e6],
+ ['chain4',0,['In the flow','В потоке','En la corriente'],'bestChain',4],
+ ['chain12',2,['Orbital dance','Орбитальный танец','Danza orbital'],'bestChain',12],
+ ['chain50',3,['Unbroken orbit','Непрерывная орбита','Órbita sin fin'],'bestChain',50],
+ ['planet',1,['A world of your own','Собственный мир','Tu propio mundo'],'tier',7],
+ ['star',2,['Let there be light','Да будет свет','Que se haga la luz'],'tier',15],
+ ['galaxy',3,['Island of stars','Остров звёзд','Isla de estrellas'],'tier',23],
+ ['horizon',4,['Beyond the horizon','За горизонтом','Más allá del horizonte'],'tier',27],
+ ['explorer',1,['Cosmic voyager','Космический странник','Viajero cósmico'],'explored',100],
+ ['cartographer',3,['Cartographer','Картограф','Cartógrafo'],'explored',1e6],
+ ['atlas',5,['Atlas of infinity','Атлас бесконечности','Atlas del infinito'],'explored',1e30],
+ ['relic10',1,['Relic hunter','Охотник за реликвиями','Cazador de reliquias'],'rare',10],
+ ['relic1000',3,['Ancient archive','Древний архив','Archivo ancestral'],'rare',1000],
+ ['pulse100',2,['Gravity conductor','Повелитель гравитации','Director de gravedad'],'pulses',100],
+ ['abyss1',4,['Devour the abyss','Поглотить бездну','Devorar el abismo'],'holes',1],
+ ['abyss10',5,['Singularity sovereign','Властелин сингулярности','Soberano de la singularidad'],'holes',10],
+ ['mass12',3,['Trillion suns','Триллион солнц','Un billón de soles'],'solar',1e12],
+ ['mass30',4,['Beyond imagination','За гранью воображения','Más allá de la imaginación'],'solar',1e30],
+ ['mass60',5,['Impossible horizon','Невозможный горизонт','Horizonte imposible'],'solar',1e60],
+ ['mass100',5,['Googol suns','Гугол солнц','Un gúgol de soles'],'solar',1e100],
+ ['dust30',5,['Stardust empire','Империя звёздной пыли','Imperio de polvo estelar'],'credits',1e30]
+];
+function achievementValue(key){return key==='solar'?(g.endless?solarMass():0):key==='holes'?Object.keys(g.abyssConsumed).length:key==='explored'?exploredCount():Math.max(0,g[key]||0);}
+function achievementProgress(a){return clamp(achievementValue(a[3])/a[4]*100,0,100);}
+function goalLabel(key){return ({collects:L('objects','объектов','objetos'),bestChain:L('chain','цепочка','cadena'),tier:L('evolution stage','стадия','etapa'),explored:L('ly² explored','св. лет² изучено','al² explorados'),rare:L('relics','реликвий','reliquias'),pulses:L('pulses','импульсов','pulsos'),holes:L('black holes','чёрных дыр','agujeros negros'),solar:'M☉',credits:L('stardust','звёздной пыли','polvo estelar')})[key];}
+let achievementQueue=[],achievementToastAt=-10,requirementNotice='',requirementNoticeAt=-100;
+function checkProgression(){
+ g.achievements??={};
+ for(const a of ACHIEVEMENTS)if(!g.achievements[a[0]]&&achievementProgress(a)>=100){g.achievements[a[0]]=true;achievementQueue.push(a);save();}
+ if(achievementQueue.length&&g.time-achievementToastAt>4.5){achievementToastAt=g.time;celebrateAchievement(achievementQueue.shift());}
+ if(g.endless||g.matter<TA[g.tier].required){requirementNotice='';return;}
+ const missing=stageRecipe().filter(r=>(g.materials[r.type]||0)<r.amount);
+ const explore=Math.max(0,missionReq().explore-g.stageExplored),collect=Math.max(0,missionReq().collect-g.stageCollects);
+ const key=g.tier+':'+missing.map(r=>r.type).join(',')+':'+(explore>0)+':'+(collect>0);
+ if(key!==requirementNotice&&g.time-requirementNoticeAt>8){
+  requirementNotice=key;requirementNoticeAt=g.time;
+  const items=missing.map(r=>`${window.SpaceI18n?.t(MATERIALS[r.type].label)||MATERIALS[r.type].label}: ${Math.ceil((r.amount-g.materials[r.type])*10)/10}`);
+  if(explore)items.push(`${L('Explore','Исследуй','Explora')}: ${fmt(explore)} ${L('ly²','св. лет²','al²')}`);
+  if(collect)items.push(`${L('Collect','Собери','Recoge')}: ${fmt(collect)}`);
+  if(items.length)toast(L('Mass ready. Still needed: ','Масса набрана. Не хватает: ','Masa lista. Falta: ')+items.join(' · '),'requirements');
+ }
+}
+function celebrateAchievement(a){
+ const [key,color,label]=RARITIES[a[1]],el=document.createElement('div');
+ el.className=`achievement-unlock rarity-${key}`;el.style.setProperty('--rarity',color);el.setAttribute('role','status');
+ el.innerHTML=`<span class="achievement-seal">✦</span><div><small>${L(...label)} · ${L('ACHIEVEMENT','ДОСТИЖЕНИЕ','LOGRO')}</small><strong>${L(...a[2])}</strong></div><span class="achievement-rays" aria-hidden="true"></span>`;
+ $('toast-root').append(el);setTimeout(()=>el.remove(),4300);
+ for(let i=0;i<=a[1];i++)setTimeout(()=>sound(330*2**((i*3+a[1])/12),a[1]>3?'triangle':'sine',.25+a[1]*.05,.02),i*120);
+ if(a[1]>=4)window.SpacePlatform?.happy();
+}
 function showAchievements(){
- const milestones=[['Первая искра','Поглоти первый объект',g.collects>=1],['Космический странник','Исследуй 100 св. лет²',exploredCount()>=100],['Охотник за реликвиями','Найди 10 реликвий',g.rare>=10],['Тысяча миров','Поглоти 1 000 объектов',g.collects>=1000],['За горизонтом','Достигни последней формы',g.tier===TA.length-1]];
- show(`<div class="eyebrow">ВЕХИ ТВОЕГО ПУТЕШЕСТВИЯ</div><div class="overlay-title">ДОСТИЖЕНИЯ</div><div class="achievement-list">${milestones.map(([name,desc,done])=>`<div class="achievement ${done?'earned':''}"><span>${done?'✦':'◇'}</span><div><strong>${name}</strong><small>${desc}</small></div><b>${done?'ОТКРЫТО':'—'}</b></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();
+ const earned=Object.keys(g.achievements||{}).length;
+ show(`<div class="eyebrow">${L('THE RECORD OF YOUR JOURNEY','ИСТОРИЯ ТВОЕГО ПУТИ','EL REGISTRO DE TU VIAJE')}</div><div class="overlay-title">${L('ACHIEVEMENTS','ДОСТИЖЕНИЯ','LOGROS')} <small>${earned}/${ACHIEVEMENTS.length}</small></div><div class="achievement-list">${ACHIEVEMENTS.map(a=>{
+  const rarity=RARITIES[a[1]],done=!!g.achievements?.[a[0]],progress=done?100:achievementProgress(a),percent=progress===100?'100':progress>0&&progress<.01?'<0.01':progress.toFixed(1);
+  return `<div class="achievement ${done?'earned':''} rarity-${rarity[0]}" style="--rarity:${rarity[1]}"><span>✦</span><div><small class="rarity-label">${L(...rarity[2])}</small><strong>${L(...a[2])}</strong><small>${fmt(achievementValue(a[3]))} / ${fmt(a[4])} ${goalLabel(a[3])}</small><div class="achievement-progress" role="progressbar" aria-label="${L(...a[2])}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div></div><b>${percent}%</b></div>`;
+ }).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();
+}
+const FIELD_GUIDE=[
+ ['rock',0,['Asteroids & moons','Астероиды и спутники','Asteroides y lunas'],['Small rocky bodies carry minerals, crystals and ice. Cross their paths to capture them; a close pass changes their trajectory.','Малые каменные тела несут минералы, кристаллы и лёд. Пересекай их траекторию: близкий пролёт меняет направление движения.','Los cuerpos rocosos contienen minerales, cristales y hielo. Cruza su trayectoria para capturarlos; un paso cercano cambia su rumbo.']],
+ ['planet',7,['Rocky & ocean worlds','Каменные и океанические миры','Mundos rocosos y oceánicos'],['Planets are larger reservoirs of matter. You can absorb bodies up to your own radius. Bigger bodies pull you instead.','Планеты — крупные запасы материи. Можно поглощать тела не больше своего радиуса. Более крупные тела притягивают тебя.','Los planetas son grandes reservas de materia. Puedes absorber cuerpos de hasta tu radio. Los mayores te atraen a ti.']],
+ ['ice',8,['Ice worlds','Ледяные миры','Mundos helados'],['Ice is needed from stage 9. Look for cyan bodies. Ice also occurs in every region, not only in cold clouds.','Лёд нужен с 9-й стадии. Ищи голубые тела. Он встречается во всех областях, а не только в холодных облаках.','El hielo se necesita desde la etapa 9. Busca cuerpos cian. Aparece en todas las regiones, no solo en nubes frías.']],
+ ['gas',11,['Gas giants','Газовые гиганты','Gigantes gaseosos'],['Vast atmospheres supply gas. Their gravity bends the flight of smaller bodies. Boost to escape a larger neighbour.','Огромные атмосферы дают газ. Гравитация искривляет полёт малых тел. Используй рывок, чтобы уйти от крупного соседа.','Sus enormes atmósferas aportan gas. Su gravedad curva el vuelo de cuerpos menores. Usa el impulso para escapar.']],
+ ['star',13,['Stars & plasma','Звёзды и плазма','Estrellas y plasma'],['Stars are luminous plasma spheres. Their colours reflect different temperatures; the game compresses astronomical scales for play.','Звёзды — светящиеся плазменные шары. Их цвета связаны с температурой; игра условно сжимает астрономические масштабы.','Las estrellas son esferas de plasma luminoso. El color refleja su temperatura; el juego comprime las escalas astronómicas.']],
+ ['galaxy',22,['Galaxies & clusters','Галактики и скопления','Galaxias y cúmulos'],['Billions of stars form galaxies. The atlas reveals their scale before you reach them. A black hole draws the whole body behind its horizon.','Миллиарды звёзд образуют галактики. Карта заранее показывает их масштаб. Чёрная дыра втягивает всё тело за горизонт событий.','Miles de millones de estrellas forman galaxias. El atlas muestra su escala por adelantado. Un agujero negro absorbe todo el cuerpo tras su horizonte.']],
+ ['blackhole',27,['Black holes: mass & radius','Чёрные дыры: масса и радиус','Agujeros negros: masa y radio'],['M☉ means one solar mass. Mass is not size: radius is shown separately in light-years (ly). For a non-rotating black hole, the Schwarzschild radius is about 2.953 km per M☉. This game uses that relation as a scale model. Its lensing ring is an optical effect, not the event horizon. Smaller black holes are prey; entering a larger horizon resets your run.','M☉ — одна масса Солнца. Масса не является размером: радиус отдельно показан в световых годах. Для невращающейся дыры радиус Шварцшильда — примерно 2,953 км на M☉. Игра использует эту связь как модель масштаба. Кольцо искажения — оптический эффект, а не горизонт событий. Меньшие дыры — добыча; вход за горизонт большей дыры обнуляет прохождение.','M☉ significa una masa solar. La masa no es el tamaño: el radio se muestra aparte en años luz (al). Para un agujero negro sin rotación, el radio de Schwarzschild es de unos 2,953 km por M☉. El juego usa esta relación como modelo de escala. El anillo es un efecto óptico, no el horizonte. Puedes devorar agujeros menores; entrar en uno mayor reinicia la partida.']]
+];
+function showBestiary(){
+ show(`<div class="eyebrow">${L('FIELD GUIDE / 07 ENTRIES','СПРАВОЧНИК / 07 ЗАПИСЕЙ','GUÍA / 07 ENTRADAS')}</div><div class="overlay-title">${L('COSMIC BESTIARY','КОСМИЧЕСКИЙ БЕСТИАРИЙ','BESTIARIO CÓSMICO')}</div><div class="bestiary-grid">${FIELD_GUIDE.map(([id,t,title,desc])=>`<article class="bestiary-entry"><div class="bestiary-orb orb-${id}" aria-hidden="true"></div><div><small>${g.tier>=t?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR')} · ${String(t+1).padStart(2,'0')}</small><h3>${L(...title)}</h3><p>${L(...desc)}</p></div></article>`).join('')}</div><p class="overlay-copy">${L('Number scale: K = 10³ · M = 10⁶ · B = 10⁹ · T = 10¹² · Qa = 10¹⁵. After Dc the scale continues with aa, ab… Every step is ×1000.','Сокращения: K = 10³ · M = 10⁶ · B = 10⁹ · T = 10¹² · Qa = 10¹⁵. После Dc идут aa, ab… Каждый шаг — ×1000.','Escala: K = 10³ · M = 10⁶ · B = 10⁹ · T = 10¹² · Qa = 10¹⁵. Después de Dc sigue aa, ab… Cada paso es ×1000.')}</p><div class="modal-actions">${continueButton()}</div>`);attachContinue();
+}
+let tutorialStep=0;
+function showTutorial(step=0){
+ tutorialStep=step;
+ const steps=[
+  [L('01 / FIND YOUR ORBIT','01 / НАЙДИ СВОЮ ОРБИТУ','01 / ENCUENTRA TU ÓRBITA'),L('Move with WASD, arrow keys or the cursor. On a phone, use the joystick. Approach smaller objects: your gravity catches them automatically.','Двигайся WASD, стрелками или курсором. На телефоне — джойстиком. Подлетай к мелким телам: гравитация подхватит их автоматически.','Muévete con WASD, flechas o el cursor. En el móvil usa el joystick. Acércate a cuerpos pequeños: tu gravedad los captura automáticamente.')],
+  [L('02 / READ THE CURRENT','02 / ПОЧУВСТВУЙ ПОТОК','02 / LEE LA CORRIENTE'),L('Bigger bodies attract you. Use Dash (Shift) to escape and Pulse (E) to draw in edible objects. The wheel or +/− controls only the camera.','Большие тела притягивают тебя. Рывок (Shift) поможет уйти, импульс (E) притянет доступную добычу. Колёсико и +/− меняют только камеру.','Los cuerpos mayores te atraen. Usa Acelerón (Shift) para escapar y Pulso (E) para atraer presas. La rueda y +/− solo controlan la cámara.')],
+  [L('03 / EVOLVE & EXPLORE','03 / РАСТИ И ИССЛЕДУЙ','03 / EVOLUCIONA Y EXPLORA'),L('Open the evolution card for your recipe. Gather mass, materials and explore. The atlas (M) shows giants ahead. Right-click to name and colour a waypoint; on mobile use + Marker. A larger black hole ends your run.','Открой карточку эволюции: там рецепт. Собирай массу, материалы и исследуй космос. Карта (M) заранее покажет гигантов. ПКМ создаёт метку с именем и цветом; на телефоне — + Метка. Большая чёрная дыра завершит прохождение.','Abre la tarjeta de evolución para ver la receta. Reúne masa y materiales y explora. El atlas (M) revela gigantes. Clic derecho crea una marca con nombre y color; en móvil usa + Marca. Un agujero negro mayor termina tu partida.')]
+ ];
+ show(`<div class="eyebrow">${L('QUICK FLIGHT SCHOOL','МИНИ-ОБУЧЕНИЕ','ESCUELA DE VUELO')}</div><div class="tutorial-orbit" aria-hidden="true">${uiIcon(['gravity','speed','map'][step])}</div><div class="overlay-title">${steps[step][0]}</div><p class="overlay-copy">${steps[step][1]}</p><label class="settings-line"><span>Language / Язык / Idioma</span>${languageSelect()}</label><div class="tutorial-dots">${[0,1,2].map(i=>`<i class="${i===step?'active':''}"></i>`).join('')}</div><div class="modal-actions"><button id="tutorial-next" class="primary-button">${step===2?L('START FLIGHT','НАЧАТЬ ПОЛЁТ','COMENZAR VUELO'):L('NEXT','ДАЛЬШЕ','SIGUIENTE')}</button><button id="tutorial-skip" class="secondary-button">${L('SKIP','ПРОПУСТИТЬ','SALTAR')}</button></div>`);
+ $('modal').dataset.screen='tutorial';
+ const finish=()=>{g.tutorialDone=true;save();resumeGame();};
+ $('panel-close').onclick=finish;$('tutorial-skip').onclick=finish;$('tutorial-next').onclick=()=>step===2?finish():showTutorial(step+1);
+ $('set-language').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);showTutorial(step);};
+}
+function languageSelect(){return `<select id="set-language" aria-label="Language / Язык / Idioma">${[['en','English'],['ru','Русский'],['es','Español']].map(([id,name])=>`<option value="${id}" ${window.SpaceI18n?.language===id?'selected':''}>${name}</option>`).join('')}</select>`;}
+const MUSIC_TRACKS=window.SpaceMusicTracks||[{id:0,title:'First Light',price:0,src:null},...Array.from({length:7},(_,i)=>({id:i+1,title:`Transmission 0${i+2}`,price:10**(6+i*4),src:null}))];
+
+function chooseTrack(track){
+ if(!track||track.id!==0&&!track.src)return false;
+ g.ownedTracks??=[0];
+ if(!g.ownedTracks.includes(track.id)){
+  if(g.credits<track.price){toast('Недостаточно звёздной пыли');return false;}
+  g.credits-=track.price;g.ownedTracks.push(track.id);
+ }
+ g.activeTrack=track.id;g.music=true;if(externalMusic){externalMusic.pause();externalMusic=null;}
+ if(track.src){externalMusic=new Audio(track.src);externalMusic.loop=true;externalMusic.play().catch(()=>{});}
+ startMusic();save();return true;
+}
+function showMusicShop(){
+ show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('First Light is included. Seven future tracks will be added later. Preview prices are in stardust; unavailable tracks cannot be purchased.','First Light уже доступен. Ещё семь треков будут добавлены позже. Цены указаны в звёздной пыли; недоступные треки пока нельзя купить.','First Light está incluido. Se añadirán siete pistas más. Los precios son en polvo estelar; las pistas no disponibles no se pueden comprar.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===0?L('Included · original ambient','Включено · оригинальный эмбиент','Incluida · ambiente original'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${t.id!==0&&!t.src?'disabled':''}>${t.id!==0&&!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.35.1 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.36.0 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
- $('btn-start').onclick=resumeGame;$('menu-map').onclick=showMap;
+ $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
  $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};
- $('menu-achievements').onclick=showAchievements;$('menu-statistics').onclick=showStatistics;$('menu-settings').onclick=showSettings;
+ $('menu-bestiary').onclick=showBestiary;$('menu-achievements').onclick=showAchievements;$('menu-statistics').onclick=showStatistics;$('menu-settings').onclick=showSettings;
 }
 // The atlas reads the exact same deterministic sector data as gameplay; it is not an evolution-level menu.
 function popcount32(x){x=x>>>0;x=x-((x>>>1)&0x55555555);x=(x&0x33333333)+((x>>>2)&0x33333333);return (((x+(x>>>4))&0x0F0F0F0F)*0x01010101)>>>24;}
@@ -2197,7 +2315,7 @@ function atlasNumber(value){
  const n=Math.abs(value);
  if(n>=10000)return fmt(value);
  if(n>0&&n<.001)return value.toExponential(2).replace('e+',' × 10^').replace('e-',' × 10^-');
- return value.toLocaleString('ru-RU',{maximumFractionDigits:n<1?3:n<100?1:0});
+ return value.toLocaleString(typeof window!=='undefined'&&window.SpaceI18n?.language||'ru-RU',{maximumFractionDigits:n<1?3:n<100?1:0});
 }
 function atlasNiceDistance(value){
  const power=10**Math.floor(Math.log10(Math.max(1e-155,value))),fraction=value/power;
@@ -2206,11 +2324,19 @@ function atlasNiceDistance(value){
 function atlasFitZoom(w,h){
  return clamp(Math.min(w/W,h/H)*.72*camera.zoom*CHUNK/27,1e-155,12);
 }
-function atlasFitPlayer(){
+function atlasFitPlayer(animate=false){
  const bounds=$('atlas-canvas').getBoundingClientRect();
- atlas.x=player.x;atlas.y=player.y;atlas.zoom=atlasFitZoom(bounds.width,bounds.height);atlas.dirty=true;
+ const zoom=atlasFitZoom(bounds.width,bounds.height);
+ if(animate){atlas.focusTween={x:atlas.x,y:atlas.y,z:atlas.zoom,toX:player.x,toY:player.y,toZ:zoom,t:0};}
+ else {atlas.x=player.x;atlas.y=player.y;atlas.zoom=zoom;atlas.focusTween=null;}atlas.dirty=true;
+}
+function updateAtlasMotion(dt){
+ const f=atlas.focusTween;if(!f)return;f.t=Math.min(1,f.t+dt/.8);const t=f.t*f.t*(3-2*f.t);
+ atlas.x=f.x*(1-t)+f.toX*t;atlas.y=f.y*(1-t)+f.toY*t;atlas.zoom=Math.exp(Math.log(f.z)*(1-t)+Math.log(f.toZ)*t);atlas.dirty=true;
+ if(f.t>=1)atlas.focusTween=null;
 }
 function changeAtlasZoom(factor,anchorX,anchorY){
+ atlas.focusTween=null;
  const bounds=$('atlas-canvas').getBoundingClientRect(),before=atlasScale();
  atlas.zoom=clamp(atlas.zoom*factor,1e-155,12);
  const after=atlasScale();
@@ -2240,7 +2366,7 @@ function atlasFocusHoles(bodies){
 }
 function addMapPin(x,y,zoom=atlas.zoom){
  if(!Number.isFinite(x)||!Number.isFinite(y)||g.mapPins.length>=64)return null;
- const id=g.nextPinId++,pin={id,x,y,zoom:clamp(zoom,1e-155,12),name:`Метка ${id}`};
+ const id=g.nextPinId++,pin={id,x,y,zoom:clamp(zoom,1e-155,12),name:L('Marker','Метка','Marca')+` ${id}`,color:'#7ddcff'};
  g.mapPins.push(pin);g.activePin=id;save();return pin;
 }
 function removeMapPin(id){
@@ -2252,28 +2378,47 @@ function refreshPinPanel(){
  const list=$('atlas-pin-list');if(!list)return;
  list.replaceChildren();
  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=g.mapPins.length?'Выбери метку':'Нет меток';list.append(placeholder);
- for(const pin of g.mapPins){const option=document.createElement('option');option.value=String(pin.id);option.textContent=pin.name;list.append(option);}
+ for(const pin of g.mapPins){const option=document.createElement('option');option.value=String(pin.id);option.textContent=pin.name;option.dataset.noTranslate='';list.append(option);}
  list.value=g.activePin?String(g.activePin):'';
  const pin=g.mapPins.find(p=>p.id===g.activePin);
  $('atlas-pin-name').value=pin?.name||'';$('atlas-pin-name').disabled=!pin;
  $('atlas-pin-go').disabled=!pin;$('atlas-pin-delete').disabled=!pin;
  $('atlas-pin-add').setAttribute('aria-pressed',String(!!atlas.placingPin));
- $('atlas-pin-hint').textContent=atlas.placingPin?'Нажми на карту, чтобы поставить метку.':'ПКМ — поставить метку. Нажми на метку, чтобы выбрать её; на дыру — чтобы приблизить.';
+ $('atlas-pin-hint').textContent=atlas.placingPin?'Нажми на карту, чтобы поставить метку.':L('Right-click: create or edit a marker. On touch: + Marker, then tap the map.','ПКМ: создать или изменить метку. На телефоне: + Метка, затем точка на карте.','Clic derecho: crear o editar marca. En móvil: + Marca y toca el mapa.');
  $('atlas-canvas').style.cursor=atlas.placingPin?'crosshair':'grab';
+}
+function closePinEditor(){$('pin-editor')?.remove();}
+function openPinEditor(px,py,clientX,clientY){
+ closePinEditor();atlas.drag=false;atlas.focusTween=null;
+ const bounds=$('atlas-canvas').getBoundingClientRect(),scale=atlasScale();
+ const pin=g.mapPins.find(p=>Math.hypot(bounds.width/2+(p.x-atlas.x)*scale-px,bounds.height/2+(p.y-atlas.y)*scale-py)<18);
+ const x=atlas.x+(px-bounds.width/2)/scale,y=atlas.y+(py-bounds.height/2)/scale;
+ const el=document.createElement('form');el.id='pin-editor';el.className='pin-editor';el.setAttribute('aria-label',L('Map marker','Метка на карте','Marca del mapa'));
+ el.innerHTML=`<strong>${pin?L('EDIT MARKER','ИЗМЕНИТЬ МЕТКУ','EDITAR MARCA'):L('CREATE MARKER','СОЗДАТЬ МЕТКУ','CREAR MARCA')}</strong><label>${L('Name','Название','Nombre')}<input id="pin-editor-name" data-no-translate maxlength="32" required></label><label class="pin-color-line">${L('Colour','Цвет','Color')}<input id="pin-editor-color" type="color" value="${pin?.color||'#7ddcff'}"></label><div><button class="primary-button" type="submit">${pin?L('Save','Сохранить','Guardar'):L('Create','Создать','Crear')}</button>${pin?`<button type="button" id="pin-editor-delete" class="secondary-button">${L('Delete','Удалить','Eliminar')}</button>`:''}<button type="button" id="pin-editor-cancel" class="secondary-button">${L('Cancel','Отмена','Cancelar')}</button></div>`;
+ $('modal').append(el);$('pin-editor-name').value=pin?.name||L('Marker','Метка','Marca')+' '+g.nextPinId;
+ el.style.left=clamp(clientX,12,Math.max(12,W-292))+'px';el.style.top=clamp(clientY,90,Math.max(90,H-265))+'px';
+ const finish=()=>{closePinEditor();refreshPinPanel();atlas.dirty=true;};
+ el.onsubmit=ev=>{ev.preventDefault();const name=$('pin-editor-name').value.trim().slice(0,32);if(!name)return;
+  const target=pin||addMapPin(x,y);if(!target){toast('На карте уже 64 метки');return;}
+  target.name=name;target.color=$('pin-editor-color').value;g.activePin=target.id;save();finish();
+ };
+ $('pin-editor-cancel').onclick=finish;if(pin)$('pin-editor-delete').onclick=()=>{removeMapPin(pin.id);finish();};
+ el.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();finish();}};
+ $('pin-editor-name').focus();$('pin-editor-name').select();
 }
 function atlasContextMenu(ev){
  ev.preventDefault();
  const bounds=$('atlas-canvas').getBoundingClientRect();
- atlas.drag=false;atlas.placingPin=true;
- atlasMapClick(ev.clientX-bounds.left,ev.clientY-bounds.top);
+ atlas.drag=false;atlas.placingPin=false;
+ openPinEditor(ev.clientX-bounds.left,ev.clientY-bounds.top,ev.clientX,ev.clientY);
 }
 function atlasMapClick(px,py){
  const bounds=$('atlas-canvas').getBoundingClientRect(),scale=atlasScale();
  if(atlas.placingPin){
-  const pin=addMapPin(atlas.x+(px-bounds.width/2)/scale,atlas.y+(py-bounds.height/2)/scale);
-  if(!pin)toast('На карте уже 64 метки');
-  atlas.placingPin=false;refreshPinPanel();atlas.dirty=true;return;
+  atlas.placingPin=false;refreshPinPanel();
+  openPinEditor(px,py,bounds.left+px,bounds.top+py);return;
  }
+ closePinEditor();
  const pin=g.mapPins.find(p=>Math.hypot(bounds.width/2+(p.x-atlas.x)*scale-px,bounds.height/2+(p.y-atlas.y)*scale-py)<14);
  if(pin){g.activePin=pin.id;save();refreshPinPanel();atlas.dirty=true;return;}
  const marker=atlasAbyssMarkers(atlas.x,atlas.y,bounds.width,bounds.height,scale).find(m=>Math.hypot(m.x-px,m.y-py)<Math.max(12,m.r));
@@ -2283,9 +2428,9 @@ function drawMapPins(c,w,h,scale){
  for(const pin of g.mapPins){
   const x=w/2+(pin.x-atlas.x)*scale,y=h/2+(pin.y-atlas.y)*scale;
   if(x<0||y<0||x>w||y>h)continue;
-  c.save();c.strokeStyle=pin.id===g.activePin?'#e7dfb4':'#93b6c2';c.fillStyle='#111c28';c.lineWidth=1.5;
+  c.save();c.strokeStyle=pin.color||'#7ddcff';c.fillStyle='#111c28';c.lineWidth=1.5;
   c.beginPath();c.moveTo(x,y-6);c.lineTo(x+5,y);c.lineTo(x,y+6);c.lineTo(x-5,y);c.closePath();c.fill();c.stroke();
-  c.fillStyle=pin.id===g.activePin?'#e7dfb4':'#afc6d1';c.font='11px Inter,sans-serif';c.textAlign=x>w-150?'right':'left';
+  c.fillStyle=pin.color||'#7ddcff';c.font='11px Inter,sans-serif';c.textAlign=x>w-150?'right':'left';
   c.fillText(pin.name,x+(x>w-150?-10:10),clamp(y-9,13,h-13));c.restore();
  }
 }
@@ -2294,7 +2439,7 @@ function renderWaypoint(){
  const p=project(pin.x,pin.y),angle=Math.atan2(p.y-H/2,p.x-W/2);
  const outside=p.x<40||p.y<110||p.x>W-40||p.y>H-130;
  const x=outside?W/2+Math.cos(angle)*W*.38:p.x,y=outside?H/2+Math.sin(angle)*H*.32:p.y;
- ctx.save();ctx.strokeStyle='#d2c99b';ctx.fillStyle='#d2c99b';ctx.lineWidth=1.5;
+ ctx.save();ctx.strokeStyle=pin.color||'#7ddcff';ctx.fillStyle=pin.color||'#7ddcff';ctx.lineWidth=1.5;
  ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+4,y);ctx.lineTo(x,y+5);ctx.lineTo(x-4,y);ctx.closePath();ctx.stroke();
  ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(pin.name+' · '+lightYears(Math.hypot(pin.x-player.x,pin.y-player.y)),x,y+19);ctx.restore();
 }
@@ -2303,7 +2448,7 @@ function drawAtlas(){
  const bounds=surface.getBoundingClientRect();if(bounds.width<10)return;
  const w=Math.round(bounds.width),h=Math.round(bounds.height),pixelRatio=Math.min(devicePixelRatio||1,1.5);
  if(surface.width!==Math.floor(w*pixelRatio)||surface.height!==Math.floor(h*pixelRatio)){surface.width=Math.floor(w*pixelRatio);surface.height=Math.floor(h*pixelRatio);}
- const c=surface.getContext('2d'),scale=atlasScale();
+ const c=surface.getContext('2d'),scale=atlasScale();window.SpaceI18n?.context(c);
  const projectMap=(x,y)=>({x:w/2+(x-atlas.x)*scale,y:h/2+(y-atlas.y)*scale});
  c.setTransform(pixelRatio,0,0,pixelRatio,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';
  c.fillStyle='#050b17';c.fillRect(0,0,w,h);
@@ -2422,7 +2567,7 @@ function showMap(){
  show(`<div class="atlas-top"><div><div class="eyebrow">ГАЛАКТИЧЕСКАЯ НАВИГАЦИЯ</div><div class="overlay-title">КАРТА ВСЕЛЕННОЙ</div></div><span class="atlas-north">N ↑</span></div>
  <div class="atlas-measures"><div><small>${g.endless?'ДИАМЕТР ГОРИЗОНТА':'ТВОЙ ДИАМЕТР'}</small><strong id="atlas-diameter"></strong></div><div><small>ШИРИНА ИГРОВОГО ЭКРАНА</small><strong id="atlas-viewport"></strong></div><div><small>ШИРИНА КАРТЫ</small><strong id="atlas-span"></strong></div></div>
  <div class="atlas-danger-bar"><span id="atlas-threat"></span><button id="atlas-abyss" class="secondary-button">ОБЗОР ГИГАНТОВ ↗</button></div>
- <div class="atlas-pins"><button id="atlas-pin-add" class="secondary-button" aria-pressed="false">＋ МЕТКА</button><select id="atlas-pin-list" aria-label="Метки на карте"></select><input id="atlas-pin-name" aria-label="Название метки" maxlength="32" placeholder="Название метки"><button id="atlas-pin-go" class="secondary-button">К МЕТКЕ</button><button id="atlas-pin-delete" class="secondary-button" aria-label="Удалить выбранную метку">УДАЛИТЬ</button></div><div id="atlas-pin-hint" class="atlas-pin-hint" aria-live="polite"></div>
+ <div class="atlas-pins"><button id="atlas-pin-add" class="secondary-button" aria-pressed="false">＋ МЕТКА</button><select id="atlas-pin-list" aria-label="Метки на карте"></select><input data-no-translate id="atlas-pin-name" aria-label="Название метки" maxlength="32" placeholder="Название метки"><button id="atlas-pin-edit" class="secondary-button">${L('EDIT','ИЗМЕНИТЬ','EDITAR')}</button><button id="atlas-pin-go" class="secondary-button">К МЕТКЕ</button><button id="atlas-pin-delete" class="secondary-button" aria-label="Удалить выбранную метку">УДАЛИТЬ</button></div><div id="atlas-pin-hint" class="atlas-pin-hint" aria-live="polite"></div>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">${uiIcon('plus')}</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">${uiIcon('minus')}</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">${uiIcon('center')}</button></div></div>
  <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ МЕНЬШЕ ТЕБЯ — ДОБЫЧА · БОЛЬШЕ — ОПАСНОСТЬ</span></div>
@@ -2430,18 +2575,18 @@ function showMap(){
  setNavigationState('map');$('modal').dataset.screen='map';$('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
  cv.addEventListener('contextmenu',atlasContextMenu);
- cv.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
+ cv.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;atlas.focusTween=null;atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
  cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;if(Math.hypot(ev.clientX-atlas.downX,ev.clientY-atlas.downY)>6)atlas.moved=true;if(atlas.placingPin||!atlas.moved)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
  cv.addEventListener('pointerup',ev=>{if(atlas.drag&&!atlas.moved){const box=cv.getBoundingClientRect();atlasMapClick(ev.clientX-box.left,ev.clientY-box.top);}atlas.drag=false;});cv.addEventListener('pointercancel',()=>atlas.drag=false);
  cv.addEventListener('wheel',ev=>{ev.preventDefault();const box=cv.getBoundingClientRect();changeAtlasZoom(Math.exp(-clamp(ev.deltaY,-300,300)*.002),ev.clientX-box.left,ev.clientY-box.top);},{passive:false});
  $('atlas-zoom-in').onclick=()=>changeAtlasZoom(1.4);
  $('atlas-zoom-out').onclick=()=>changeAtlasZoom(1/1.4);
- $('atlas-center').onclick=atlasFitPlayer;
+ $('atlas-center').onclick=()=>atlasFitPlayer(true);
  $('atlas-abyss').onclick=atlasShowAbyss;
  $('atlas-pin-add').onclick=()=>{atlas.placingPin=!atlas.placingPin;refreshPinPanel();};
  $('atlas-pin-list').onchange=ev=>{g.activePin=Number(ev.target.value)||null;save();refreshPinPanel();atlas.dirty=true;};
  $('atlas-pin-name').onchange=ev=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){p.name=ev.target.value.trim().slice(0,32)||`Метка ${p.id}`;save();refreshPinPanel();atlas.dirty=true;}};
- $('atlas-pin-delete').onclick=()=>{removeMapPin(g.activePin);refreshPinPanel();atlas.dirty=true;};
+ $('atlas-pin-edit').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(!p)return;const b=cv.getBoundingClientRect(),z=atlasScale();openPinEditor(b.width/2+(p.x-atlas.x)*z,b.height/2+(p.y-atlas.y)*z,W/2,H/2);};$('atlas-pin-delete').onclick=()=>{removeMapPin(g.activePin);refreshPinPanel();atlas.dirty=true;};
  $('atlas-pin-go').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){atlas.x=p.x;atlas.y=p.y;atlas.zoom=p.zoom;atlas.dirty=true;}};
  refreshPinPanel();
  const giant=nearestAbyss();
@@ -2451,9 +2596,10 @@ function showMap(){
 
 function showPause(){showMainMenu(true);}
 
-function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('modal').dataset.screen='settings';setNavigationState('settings');attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
+function showSettings(){show(`<label class="settings-line"><span>Language / Язык / Idioma</span>${languageSelect()}</label><div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><label class="settings-line"><span>${L('Effects volume','Громкость эффектов','Volumen de efectos')}</span><input id="set-sound-volume" type="range" min="0" max="100" value="${Math.round((g.soundVolume??.7)*100)}"></label><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions"><button id="settings-music" class="secondary-button">${L('Music collection','Коллекция музыки','Colección de música')}</button><button id="settings-tutorial" class="secondary-button">${L('Flight tutorial','Обучение','Tutorial de vuelo')}</button>${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('modal').dataset.screen='settings';setNavigationState('settings');attachContinue();$('set-language').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);renderUI();showSettings();};$('settings-music').onclick=showMusicShop;$('settings-tutorial').onclick=()=>showTutorial();$('set-sound-volume').oninput=e=>{g.soundVolume=+e.target.value/100;save();};$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function resetCampaignState(resetModifiers=false){
- const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,quality:g.quality,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel};
+ achievementQueue=[];achievementToastAt=-10;requirementNotice='';requirementNoticeAt=-100;if(externalMusic){externalMusic.pause();externalMusic=null;}
+ const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,soundVolume:g.soundVolume,tutorialDone:g.tutorialDone,quality:g.quality,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel};
  cosmicAbsorptions.length=0;absorbingMacroKeys.clear();
  const next=fresh();Object.assign(g,next,preferences);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
  if(resetModifiers&&TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
@@ -2470,7 +2616,7 @@ function dieInAbyss(h){
  attachContinue();
 }
 function restartCampaign(){
- if(!confirm('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
+ if(!confirm(window.SpaceI18n?.t('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.')||'Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
  try{localStorage.setItem(SAVE_KEY+'-backup',localStorage.getItem(SAVE_KEY)||'');}catch(_){}
  resetCampaignState(true);running=true;
  $('modal').classList.add('off');toast('Новая Вселенная создана · предыдущий прогресс сохранён');
@@ -2550,22 +2696,24 @@ function testerInit(){
   toast('Тестовые множители сброшены');};
  $('tester-new-game').onclick=restartCampaign;
  $('tester-copy-save').onclick=()=>{
-  if(!confirm('Скопировать основное прохождение в тестерское? Текущий тестовый прогресс будет заменён.'))return;
+  if(!confirm(window.SpaceI18n?.t('Скопировать основное прохождение в тестерское? Текущий тестовый прогресс будет заменён.')||'Скопировать основное прохождение в тестерское? Текущий тестовый прогресс будет заменён.'))return;
   try{const data=localStorage.getItem('cosmic-evolution-save-v1');if(!data){toast('Основное сохранение не найдено');return;}localStorage.setItem(SAVE_KEY,data);location.reload();}
   catch(_){toast('Не удалось скопировать сохранение');}
  };
- $('btn-new-game').onclick=restartCampaign;
+ $('camera-minus').onclick=()=>{g.viewZoom=clamp(g.viewZoom/1.25,.1,10);save();};$('camera-plus').onclick=()=>{g.viewZoom=clamp(g.viewZoom*1.25,.1,10);save();};
+$('btn-new-game').onclick=restartCampaign;
 }
 function panelValue(key,v){
  const label=document.querySelector(`#tester-panel [data-test-value="${key}"]`);
  if(label)label.textContent=key==='density'?`${v}/32`:`${v}×`;
 }
 testerInit();
+$('camera-minus').onclick=()=>{g.viewZoom=clamp(g.viewZoom/1.25,.1,10);save();};$('camera-plus').onclick=()=>{g.viewZoom=clamp(g.viewZoom*1.25,.1,10);save();};
 $('btn-new-game').onclick=restartCampaign;
-function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Теперь горизонт событий растёт бесконечно.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поглощай материю и продолжай увеличиваться без предела!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('btn-new-universe').onclick=restartCampaign;}
+function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Теперь горизонт событий растёт бесконечно.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поглощай материю и продолжай увеличиваться без предела!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('set-language').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);renderUI();showSettings();};$('settings-music').onclick=showMusicShop;$('settings-tutorial').onclick=()=>showTutorial();$('set-sound-volume').oninput=e=>{g.soundVolume=+e.target.value/100;save();};$('btn-new-universe').onclick=restartCampaign;}
 $('btn-menu').onclick=()=>toggleOverlay('menu',showMainMenu);
 $('btn-evolution').onclick=openEvolution;$('btn-stage-details').onclick=openEvolution;$('btn-evolution-close').onclick=()=>{$('evolution-panel').classList.add('hidden');};
-showMainMenu();
+showMainMenu();window.SpacePlatform?.loaded();
 $('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=()=>toggleOverlay('map',showMap);$('btn-pause').onclick=()=>toggleOverlay('menu',showPause);$('btn-settings').onclick=()=>toggleOverlay('settings',showSettings);
 $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
 $('btn-sidebar').onclick=()=>{if(W<=800){$('sidebar').classList.remove('mobile-open')}else $('sidebar').classList.add('collapsed');$('btn-show-sidebar').classList.remove('hidden');};

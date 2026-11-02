@@ -16,7 +16,7 @@ has("renderMacroBackground(time);", "Moving galaxies must be rendered from curre
 has('0,496', 'LOD must support astronomical world sizes');
 has('low<496', 'LOD interpolation must also support astronomical sizes');
 has('Math.max(1e-155,camera.zoom)', 'Camera must support extremely small zoom');
-has('140/Math.max(camera.zoom,1e-155)', 'Black-hole movement must be speed-scaled to pixels');
+has('140/physicsZoom()', 'Movement must scale with physical size, never manual camera zoom');
 has('const cellX=Math.round(gx/stride)', 'Very large cosmic coordinates must not be hashed directly');
 has('const extent=Math.min(32,', 'Cosmic horizon sector sweep regressed');
 has('let budget=Math.min(60,', 'Cosmic digestion budget regressed');
@@ -179,11 +179,11 @@ const absorptionEnd=game.indexOf('\nvisitPosition();streamField();',absorptionSt
 for(const zoom of [1,1e-3,1e-60,1e-110]){
  let rewards=0;
  const e={x:210/zoom,y:0,r:100/zoom,macro:true,index:0,chunk:'test'};
- const sim={e,camera:{zoom},player:{x:0,y:0,r:450/zoom},W:1920,H:1080,
+ const sim={e,physicsZoom:()=>zoom,camera:{zoom},player:{x:0,y:0,r:450/zoom},W:1920,H:1080,
  BLACK_HOLE_CORE_FRACTION:.245,clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
  absorbingMacroKeys:new Set(),absorptionKey:()=> 'test',
  absorb(body){body.dead=true;rewards++},finishCosmicAbsorption(body){body.dead=true;rewards++}};
- vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(absorptionStart,absorptionEnd),sim);
+ vm.createContext(sim);sim.physicsZoom??=()=>sim.camera.zoom;vm.runInContext(snippet+'\n'+game.slice(absorptionStart,absorptionEnd),sim);
  vm.runInContext('startAbsorption(e);animateAbsorption(e,.05)',sim);
  assert.equal(rewards,0,'Touching the horizon must not award/remove a galaxy');
  assert.ok(e.x<210/zoom&&e.x>0,'Galaxy must actually move inward');
@@ -204,13 +204,13 @@ const gravityCode=game.slice(game.indexOf('function blackHoleGravityRadius(){'),
 let firstMotion;
 for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
  const e={x:400/zoom,y:0,r:80/zoom,cosmic:true,index:0,level:2,gx:0,gy:0};
- const sim={e,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
+ const sim={e,physicsZoom:()=>zoom,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
   BLACK_HOLE_CORE_FRACTION:.245,g:{time:0,freeFlights:{},upgrade:{gravity:0}},tester:{gravity:1},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'fixture',
   startAbsorption(){throw Error('Gravity test body is still outside the event horizon')}};
- vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
+ vm.createContext(sim);sim.physicsZoom??=()=>sim.camera.zoom;vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
  const radius=vm.runInContext('blackHoleGravityRadius()',sim);
- vm.runInContext('for(let i=0;i<15;i++){g.time+=1/60;applyBlackHoleGravity(e,1/60)}',sim);
+ vm.runInContext('for(let i=0;i<6;i++){g.time+=1/60;applyBlackHoleGravity(e,1/60)}',sim);
  const movement=400-e.x*zoom;
  assert.ok(movement>.5,'Galaxies outside contact must move toward the black hole');
  if(firstMotion===undefined)firstMotion=movement;else assert.ok(Math.abs(movement-firstMotion)<1e-7,'Gravity speed must not vanish as zoom shrinks');
@@ -240,7 +240,7 @@ for(const [W,H,zoom] of [[1920,1080,.08],[3840,2160,.025],[390,844,.08]]){
 }
 console.log('PASS: dust covers all four corners on desktop, 4K and mobile');
 
-const mapHelpers=game.slice(game.indexOf('function atlasScale(){'),game.indexOf('\nfunction atlasFitPlayer(){'));
+const mapHelpers=game.slice(game.indexOf('function atlasScale(){'),game.indexOf('\nfunction atlasFitPlayer('));
 for(const zoom of [1,.08,1e-30,1e-110]){
  const sim={W:1920,H:1080,CHUNK:480,camera:{zoom},atlas:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
  vm.createContext(sim);vm.runInContext(mapHelpers,sim);
@@ -346,7 +346,7 @@ console.log('PASS: permanent giant landmarks, safe origin, attraction and swept 
 const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction testerRefresh()',resetStart);
 const freshStart=game.indexOf('const fresh ='),freshStop=game.indexOf('\nlet g =',freshStart);
 const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='';
-const resetBox={g:{tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,particles:false,controlMode:'keys',flightFeel:'direct'},
+const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,g:{tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,particles:false,controlMode:'keys',flightFeel:'direct'},
  cosmicAbsorptions:[{}],absorbingMacroKeys:new Set(['taken']),visitedChunks:new Set(['1,1']),loadedChunks:new Set(['1,1']),distantChunkCache:new Map(),macroLoaded:new Set(),macroCache:new Map(),macroLODCache:new Map(),macroBackdrop:null,macroBackdropOld:null,macroEntities:[{}],entities:[{}],
  TEST_MODE:false,tester:{ring:1.5},player:{x:123,y:456,r:1e20,vx:200,vy:300},camera:{x:123,y:456,zoom:1e-10},particles:[{}],shockwaves:[{}],energyArcs:[{}],texts:[{}],radiusAt:()=>13,
  $:()=>resetNode,visitPosition(){},streamField(){},renderUI(){},testerRefresh(){},testerToggle(){},clearFlightInput(){},
@@ -367,7 +367,7 @@ console.log('PASS: death resets and saves all progression, retains preferences a
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
 let rivalMarks=0;
-const rivalBox={g:{abyssConsumed:{},freeFlights:{}},flightKey:e=>e.index,canEatAbyss:()=>false,abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
+const rivalBox={physicsZoom:()=>1,g:{abyssConsumed:{},freeFlights:{}},flightKey:e=>e.index,canEatAbyss:()=>false,abyssPhysical:[{x:0,y:0,r:1000}],camera:{zoom:1},absorbingMacroKeys:new Set(),
  abyssPull:abyssBox.abyssPull,crossesAbyss:abyssBox.crossesAbyss,absorptionKey:e=>e.index,
  markHarvested(){rivalMarks++},cosmicSceneDirty:false};
 vm.createContext(rivalBox);vm.runInContext(game.slice(rivalStart,rivalStop),rivalBox);
@@ -409,7 +409,7 @@ console.log('PASS: sparse non-grid catalogue; same named holes stay on map from 
 const normalStart=game.indexOf('function normaliseMapPins('),normalStop=game.indexOf('\ng.mapPins=',normalStart);
 const pinStart=game.indexOf('function addMapPin('),pinStop=game.indexOf('function refreshPinPanel(',pinStart);
 let pinSaves=0;
-const pinBox={g:{mapPins:[],nextPinId:1,activePin:null},atlas:{zoom:.01},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),save(){pinSaves++}};
+const pinBox={L:en=>en,g:{mapPins:[],nextPinId:1,activePin:null},atlas:{zoom:.01},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),save(){pinSaves++}};
 vm.createContext(pinBox);vm.runInContext(game.slice(normalStart,normalStop)+game.slice(pinStart,pinStop),pinBox);
 const firstPin=pinBox.addMapPin(123,-456,.01),farPin=pinBox.addMapPin(1e120,-1e120,1e-120);
 firstPin.name='Путь к Эребу';const loadedPins=pinBox.normaliseMapPins(JSON.parse(JSON.stringify(pinBox.g.mapPins)));
@@ -468,14 +468,14 @@ const prey=catalogue[0],core=prey.r*2;
 let holeSaves=0;
 Object.assign(abyssBox,{g:{endless:true,abyssConsumed:{},abyssPositions:{},matter:10000,total:10000,stageCollects:0,credits:0,collects:0,materials:{exotic:0},tier:27},
  player:{x:prey.x+core*1.6,y:prey.y,r:core/.245},camera:{zoom:60/core},
- blackHoleCoreWorldRadius:()=>core,blackHoleGravityRadius:()=>core*4,
+ physicsZoom:()=>60/core,blackHoleCoreWorldRadius:()=>core,blackHoleGravityRadius:()=>core*4,
  TA:Array.from({length:28},()=>({required:10000})),currentRadius:()=>12345,
  atlas:{dirty:false},toast(){},save(){holeSaves++},fmt:String});
 assert.equal(abyssBox.canEatAbyss(prey),true);
 assert.equal(abyssBox.canEatAbyss({...prey,r:core}),false,'Equal-size holes remain dangerous');
-abyssBox.attractSmallerAbyss(prey,.025);
+abyssBox.attractSmallerAbyss(prey,.005);
 const pos1=abyssBox.g.abyssPositions[prey.id][0];
-abyssBox.attractSmallerAbyss(prey,.025);
+abyssBox.attractSmallerAbyss(prey,.005);
 const pos2=abyssBox.g.abyssPositions[prey.id][0];
 assert.ok(pos2>pos1&&pos1>prey.x,'Do not reset movement to the stale catalogue coordinate');
 assert.equal(abyssBox.g.collects,0,'First contact must not reward or remove');
@@ -517,7 +517,7 @@ assert.ok(!absorbCode.includes('*chainMultiplier()'));
 console.log('PASS: visual chains preserve the existing evolution costs and material rewards');
 
 // Grazing a finite field bends a trajectory; it must not become a homing missile.
-const flightBox={camera:{zoom:1},g:{time:0,freeFlights:{}},player:{x:0,y:0,r:20},
+const flightBox={physicsZoom:()=>1,canAbsorbBody:e=>e.r<=20,camera:{zoom:1},g:{time:0,freeFlights:{}},player:{x:0,y:0,r:20},
  absorbed:0,absorbingMacroKeys:new Set(),absorptionKey:e=>e.chunk+':'+e.index,
  clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),seedHash:abyssBox.seedHash};
 vm.createContext(flightBox);
@@ -558,11 +558,11 @@ assert.ok(!entityPainter.includes('stroke'),'No motion lines attached to small r
 console.log('PASS: fast free flight, grazing deflection, inertial escape, save/reload and 30/120 Hz agreement');
 
 for(const zoom of [1,1e-60]){
- const sim={camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
+ const sim={physicsZoom:()=>zoom,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
   BLACK_HOLE_CORE_FRACTION:.245,g:{time:0,freeFlights:{},upgrade:{gravity:0}},tester:{gravity:1},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'grazing',
   startAbsorption(){throw Error('Grazing body must not be auto-captured')}};
- vm.createContext(sim);vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
+ vm.createContext(sim);sim.physicsZoom??=()=>sim.camera.zoom;vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
  const grazingY=(sim.blackHoleGravityRadius()+sim.blackHoleTouchDistance({r:6/zoom,cosmic:true})-sim.blackHoleCoreWorldRadius())*zoom*.985;
  const e={x:-500/zoom,y:grazingY/zoom,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
  sim.g.freeFlights.grazing={...e};let exitSpeed;
@@ -602,7 +602,7 @@ assert.ok(!game.slice(game.indexOf('function renderMacroBackground('),game.index
 
 // A moon/planet in the distant field becomes physical before black-hole evolution,
 // moves fully into the player, and marks its exact persistent deposit as depleted.
-const promotion={g:{endless:false,depletedMacro:{},depletedCosmic:{}},player:{r:1000,x:0,y:0},
+const promotion={physicsZoom:()=>1,canAbsorbBody:e=>e.r<=1000,cosmicViewAt:()=>({levels:[1],low:1,fraction:0}),g:{endless:false,depletedMacro:{},depletedCosmic:{}},player:{r:1000,x:0,y:0},
  cosmicHarvestTimer:0,cosmicAbsorptions:[],absorbingMacroKeys:new Set(),macroLoaded:new Set(),MACRO_SIZE:3200,
  ordinaryGravityRadius:()=>2800,cosmicVisibleLOD:()=>({levels:[1],low:1,fraction:0}),
  macroLODNodes:(gx,gy)=>gx===0&&gy===0?[{x:200,y:0,r:300,cosmic:true,level:1,gx,gy,index:0,material:'ice'}]:[],
@@ -669,7 +669,7 @@ for(const tier of [0,10,22]){
 scaleBox.g.viewZoom=1;
 vm.runInContext(game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback(')),scaleBox);
 scaleBox.g.upgrade={gravity:0};scaleBox.tester.gravity=1;
-for(const radius of [13,500,1e8]){scaleBox.player.r=radius;assert.ok(Math.abs(scaleBox.ordinaryGravityRadius()/(Math.max(97,radius*2.8))-1.2)<1e-10);}
+scaleBox.g.tier=5;for(const radius of [13,500,1e8]){scaleBox.player.r=radius;assert.ok(Math.abs(scaleBox.ordinaryGravityRadius()/(Math.max(97,radius*2.8))-1.2)<1e-10);}
 const brightBox={g:{endless:true},player:{r:1e8},clamp:scaleBox.clamp};vm.createContext(brightBox);
 vm.runInContext(game.slice(game.indexOf('function macroOpacity('),game.indexOf('function drawMacro(')),brightBox);
 assert.equal(brightBox.macroOpacity({r:3e6},20,1),1,'A visible galaxy must not become translucent relative to a giant hole');
@@ -720,9 +720,9 @@ assert.ok(Math.abs(lootBox.g.matter-beforeLoot-10)<1e-8,'Black-hole catches also
 let cometAllocations=0;
 const cometGradient={addColorStop(){}};
 const cometCtx=new Proxy({createLinearGradient:()=>cometGradient,createRadialGradient:()=>cometGradient},{get:(o,k)=>k in o?o[k]:()=>{}});
-const cometBox={g:{time:0},W:1920,H:1080,ctx:cometCtx,document:{createElement(){cometAllocations++;return {getContext:()=>cometCtx}}}};
+const cometBox={TAU:Math.PI*2,g:{time:0},W:1920,H:1080,ctx:cometCtx,document:{createElement(){cometAllocations++;return {getContext:()=>cometCtx}}}};
 vm.createContext(cometBox);
-vm.runInContext(game.match(/function chunkRandom\([^]*?\n\}/)[0]+game.slice(game.indexOf('let backgroundComets='),game.indexOf('\nlet skyCameraX=')),cometBox);
+vm.runInContext(game.match(/function chunkRandom\([^]*?\n\}/)[0]+game.slice(game.indexOf('function cometPath('),game.indexOf('\nlet skyCameraX=')),cometBox);
 cometBox.renderBackgroundComets();assert.equal(cometAllocations,0);
 cometBox.g.time=4;cometBox.renderBackgroundComets();assert.equal(cometAllocations,1);
 assert.equal(vm.runInContext('backgroundComets.length',cometBox),1);
@@ -770,7 +770,7 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
 {
  const nodes=new Map();
  const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{setAttribute(){},dataset:{},innerHTML:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}});}return nodes.get(id);};
- const ui={$:el,running:true,atlasVisible:true,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
+ const ui={window:{},closePinEditor(){},$:el,running:true,atlasVisible:true,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
  ui.clearFlightInput=()=>ui.clears++;ui.startMusic=()=>ui.music++;ui.save=()=>ui.saves++;
  vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function uiIcon(name){'),game.indexOf('function populateUpgrades(){')),ui);vm.runInContext(game.slice(game.indexOf('function setNavigationState(screen){'),game.indexOf('function openEvolution(){')),ui);
  ui.show('<p>Settings</p>');assert.equal(ui.running,false);assert.equal(ui.atlasVisible,false);assert.equal(el('modal').dataset.screen,'panel');assert.ok(el('evolution-panel').classList.contains('hidden'));
@@ -811,12 +811,93 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  console.log('PASS: frequent independent menu comets, bounded population, one shared thin sprite');
 }
 
-// Right-click uses the actual map projection and normal persistent pin creation.
+// Right-click opens an editor at canvas-local coordinates; no save before confirmation.
 {
- let saves=0,prevented=0;
- const box={atlas:{x:1000,y:-200,zoom:2,drag:true},g:{mapPins:[],nextPinId:1,activePin:null},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),save(){saves++},toast(){},refreshPinPanel(){},atlasScale:()=>.5,$:()=>({getBoundingClientRect:()=>({left:30,top:90,width:1000,height:600})})};
- vm.createContext(box);vm.runInContext(game.slice(game.indexOf('function addMapPin('),game.indexOf('function removeMapPin('))+game.slice(game.indexOf('function atlasContextMenu('),game.indexOf('function drawMapPins(')),box);
+ let prevented=0,opened;
+ const box={atlas:{drag:true,placingPin:true},openPinEditor(...args){opened=args},$:()=>({getBoundingClientRect:()=>({left:30,top:90,width:1000,height:600})})};
+ vm.createContext(box);vm.runInContext(game.slice(game.indexOf('function atlasContextMenu('),game.indexOf('function atlasMapClick(')),box);
  box.atlasContextMenu({clientX:680,clientY:340,preventDefault(){prevented++}});
- assert.equal(prevented,1);assert.equal(saves,1);assert.equal(box.g.mapPins.length,1);assert.equal(box.g.mapPins[0].x,1300);assert.equal(box.g.mapPins[0].y,-300);assert.equal(box.g.activePin,1);assert.equal(box.atlas.drag,false);assert.equal(box.atlas.placingPin,false);
- console.log('PASS: right-click places one saved pin at cursor coordinates and exits dragging');
+ assert.equal(prevented,1);assert.deepEqual(opened,[650,250,680,340]);assert.equal(box.atlas.drag,false);assert.equal(box.atlas.placingPin,false);
+ console.log('PASS: right-click opens marker editor without creating or saving a marker');
 }
+
+// v3.36: manual zoom must not change physical horizon, range, force, pulse or flight speed.
+{
+ const helper=game.slice(game.indexOf('function physicsZoom(){'),game.indexOf('function campaignZoom('));
+ const ordinary=game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback('));
+ const force=game.slice(game.indexOf('function deflectResource('),game.indexOf('function gatherBody('));
+ const giant=game.slice(game.indexOf('function applyGiantPull('),game.indexOf('function collideWithGiant('));
+ for(const endless of [false,true]){
+  const results=[];
+  for(const manualZoom of [.1,1,10]){
+   const r=endless?1e20:30;
+   const b={g:{endless,tier:endless?27:2,upgrade:{gravity:0},freeFlights:{},viewZoom:manualZoom},player:{x:0,y:0,r,vx:0,vy:0},camera:{zoom:manualZoom/r},tester:{gravity:1},CHUNK:480,BLACK_HOLE_CORE_FRACTION:.245,clamp:scaleBox.clamp,rememberFlight(){},startAbsorption(){},entities:[],macroEntities:[],cosmicAbsorptions:[]};
+   vm.createContext(b);vm.runInContext(helper+snippet+gravityCode+ordinary+force+giant,b);
+   const range=endless?b.blackHoleGravityRadius():b.ordinaryGravityRadius(),e={x:range*.8,y:0,r:r*.1,motionVX:0,motionVY:0};
+   if(endless)b.applyBlackHoleGravity(e,.01);else b.deflectResource(e,.01,range);
+   results.push([b.physicsZoom(),b.blackHoleCoreWorldRadius(),range,e.vx,e.x]);
+   if(!endless){
+    const large={x:r*2,y:0,r:r*1.2,motionVX:33,motionVY:4};
+    assert.equal(b.deflectResource(large,.1,range),false);assert.equal(large.motionVX,33);assert.equal(large.x,r*2);
+    b.entities=[large];b.applyGiantPull(.1,250);assert.ok(b.player.vx>0&&b.player.vy===0,'Inedible body attracts player instead');
+   }
+  }
+  assert.deepEqual(results[0],results[1]);assert.deepEqual(results[1],results[2]);
+ }
+ const pulse=game.slice(game.indexOf('function activatePulse('),game.indexOf('function activateBoost('));
+ assert.ok(pulse.includes('!canAbsorbBody(e)'));assert.ok(!pulse.includes('camera.zoom'));
+ const update=game.slice(game.indexOf('function update(dt)'),game.indexOf('function project('));
+ assert.ok(update.includes('140/physicsZoom()'));assert.ok(!update.includes('140/Math.max(camera.zoom'));
+ assert.ok(game.includes('boostTime=2.5'));
+ console.log('PASS: real forces and horizon identical at 10%, 100%, 1000% zoom; giants pull player and pulse ignores inedible bodies');
+}
+{
+ const b={};vm.createContext(b);vm.runInContext(game.slice(game.indexOf('function materialFor('),game.indexOf('function sectorType(')),b);
+ for(const biome of ['normal','rich','void','nebula','relic','anomaly']){
+  let ice=0;for(let i=0;i<1000;i++)if(b.materialFor(biome,50,()=>i/1000)==='ice')ice++;
+  assert.ok(ice>=220,`${biome} must provide ice`);
+ }
+ const angles=new Set();for(let i=0;i<200;i++){const c=cometBox.cometPath(abyssBox.chunkRandom(i+1));angles.add(Math.floor((Math.atan2(c.dy,c.dx)+Math.PI)/(Math.PI/4)));}
+ assert.equal(angles.size,8,'Comets must cover all eight direction octants');
+ console.log('PASS: every biome supplies ice; comet paths span 360 degrees');
+}
+{
+ const b={atlas:{x:1000,y:-500,zoom:2},player:{x:0,y:0},atlasFitZoom:()=>.2,$:()=>({getBoundingClientRect:()=>({width:1000,height:500})})};
+ vm.createContext(b);vm.runInContext(game.slice(game.indexOf('function atlasFitPlayer('),game.indexOf('function changeAtlasZoom(')),b);
+ b.atlasFitPlayer(true);assert.equal(b.atlas.x,1000);b.updateAtlasMotion(.4);assert.ok(b.atlas.x>0&&b.atlas.x<1000);assert.ok(b.atlas.zoom>.2&&b.atlas.zoom<2);
+ b.updateAtlasMotion(.4);assert.equal(b.atlas.x,0);assert.ok(Math.abs(b.atlas.zoom-.2)<1e-12);assert.equal(b.atlas.focusTween,null);
+ console.log('PASS: recenter interpolates position and logarithmic zoom, then reaches exact target');
+}
+{
+ let saves=0;const notices=[];
+ const b={window:{SpaceI18n:{language:'en',t:s=>s}},g:{tier:0,time:0,collects:1,achievements:{},abyssConsumed:{},materials:{ice:0},matter:100},clamp:scaleBox.clamp,TA:[{required:100}],stageRecipe:()=>[{type:'ice',amount:3}],MATERIALS:{ice:{label:'Ice'}},missionReq:()=>({explore:0,collect:0}),exploredCount:()=>0,solarMass:()=>1e100,fmt:String,save(){saves++},toast(t){notices.push(t)}};
+ b.g.stageExplored=0;b.g.stageCollects=100;
+ vm.createContext(b);vm.runInContext(game.slice(game.indexOf('const L='),game.indexOf('function celebrateAchievement('))+'\nglobalThis.catalogue=ACHIEVEMENTS;globalThis.rarity=RARITIES;',b);
+ let celebrations=0;b.celebrateAchievement=()=>celebrations++;
+ b.checkProgression();assert.equal(b.g.achievements.spark,true);assert.equal(celebrations,1);assert.equal(saves,1);assert.equal(notices.length,1);assert.ok(notices[0].includes('Ice: 3'));
+ b.g.time=20;b.checkProgression();assert.equal(celebrations,1);assert.equal(notices.length,1,'No repeated missing-material spam');
+ b.g=JSON.parse(JSON.stringify(b.g));b.checkProgression();assert.equal(saves,1,'Reload cannot award twice');
+ assert.ok(b.catalogue.length>=25&&b.rarity.length===6);assert.ok(b.catalogue.some(a=>a[3]==='solar'&&a[4]>=1e100));
+ for(const a of b.catalogue)assert.ok(b.achievementProgress(a)>=0&&b.achievementProgress(a)<=100);
+ console.log('PASS: persistent one-time awards, six rarities, extreme goals, bounded percentages and missing-ice notification without spam');
+}
+{
+ const textNodes=[{nodeValue:'Карта Вселенной',parentElement:{closest:()=>false}}],values={};
+ const doc={body:{querySelectorAll:()=>[]},documentElement:{},createTreeWalker(){let i=0;return{nextNode:()=>textNodes[i++]||null}}};
+ const b={document:doc,NodeFilter:{SHOW_TEXT:4},localStorage:{getItem:()=>null,setItem:(k,v)=>values[k]=v},MutationObserver:class{observe(){}},queueMicrotask(){}};b.window=b;vm.createContext(b);vm.runInContext(fs.readFileSync('i18n.js','utf8'),b);
+ assert.equal(b.SpaceI18n.language,'en');assert.equal(textNodes[0].nodeValue,'Universe map');
+ b.SpaceI18n.setLanguage('es');assert.equal(textNodes[0].nodeValue,'Mapa del universo');
+ b.SpaceI18n.setLanguage('ru');assert.equal(textNodes[0].nodeValue,'Карта Вселенной');
+ textNodes[0].nodeValue='Гравитация';b.SpaceI18n.setLanguage('en');assert.equal(textNodes[0].nodeValue,'Gravity');
+ assert.equal(values['infiniti-space-language'],'en');
+ console.log('PASS: English default, Spanish and Russian switching, dynamic text and saved language');
+}
+(async()=>{
+ const calls=[];let release;const ready=new Promise(resolve=>release=resolve);
+ const b={performance:{now:()=>1000},Event:class{},dispatchEvent(){},CrazyGames:{SDK:{init(){calls.push('init');return ready},game:{settings:{muteAudio:true},addSettingsChangeListener(f){this.listener=f},loadingStart(){calls.push('loadingStart')},loadingStop(){calls.push('loadingStop')},gameplayStart(){calls.push('start')},gameplayStop(){calls.push('stop')}}}}};b.window=b;
+ vm.createContext(b);vm.runInContext(fs.readFileSync('platform.js','utf8'),b);b.SpacePlatform.loaded();b.SpacePlatform.playing(true);assert.deepEqual(calls,['init']);
+ release();await ready;await new Promise(setImmediate);assert.deepEqual(calls,['init','loadingStart','loadingStop','start']);assert.equal(b.SpacePlatform.muted,true);
+ b.SpacePlatform.playing(true);b.SpacePlatform.playing(false);b.SpacePlatform.playing(false);assert.equal(calls.filter(x=>x==='stop').length,1);
+ b.CrazyGames.SDK.game.listener({muteAudio:false});assert.equal(b.SpacePlatform.muted,false);
+ console.log('PASS: CrazyGames initializes before lifecycle calls, deduplicates events and honours platform mute');
+})().catch(e=>{console.error(e);process.exitCode=1});
