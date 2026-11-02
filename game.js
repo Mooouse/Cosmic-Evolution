@@ -117,7 +117,7 @@ function normaliseMapPins(value){
   .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32)}));
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
-g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.4,2.5):1;
+g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.1,10):1;
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
@@ -126,7 +126,7 @@ let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTime
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
 function radiusAt(tier,fraction){return 13*Math.pow(1.65,tier+clamp(fraction,0,1));}
-function campaignZoom(radius){return clamp(tester.zoom*(g.viewZoom||1)*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,8);}
+function campaignZoom(radius){return clamp(tester.zoom*(g.viewZoom||1)*Math.min(145,16+14*Math.log2(1+radius/13))/Math.max(1,radius),1e-155,32);}
 function currentRadius(){
  const base=radiusAt(g.tier,stageFraction());
  if(g.tier===TA.length-1){
@@ -2470,7 +2470,7 @@ function onWorldWheel(ev){
  if(!running||atlasVisible||ev.ctrlKey||!Number.isFinite(ev.deltaY))return;
  ev.preventDefault();
  const pixels=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?H:1);
- g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.0015),.4,2.5);
+ g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.002),.1,10);
  // The normal camera follows this target smoothly; autosave/pagehide persist it.
 }
 canvas.addEventListener('wheel',onWorldWheel,{passive:false});

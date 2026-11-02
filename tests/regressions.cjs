@@ -648,14 +648,14 @@ jumpBox.testerSetTier(10);assert.equal(jumpBox.cosmicAbsorptions.length,0);asser
 assert.equal(jumpBox.g.freeFlights.old,undefined);assert.ok(jumpBox.g.freeFlights.fly);assert.equal(jumpBox.absorbingMacroKeys.has('capture'),false);
 assert.equal(jumpBox.remade,true);console.log('PASS: tester stage jumps reframe immediately and clear old digestion, preserving free flight');
 
-// Manual zoom is a small, persistent offset from auto framing, not a world reset.
+// Manual zoom is a wide, persistent offset from auto framing, not a world reset.
 const wheelBox={g:{viewZoom:1},running:true,atlasVisible:false,H:1080,clamp:scaleBox.clamp};
 vm.createContext(wheelBox);vm.runInContext(game.slice(game.indexOf('function onWorldWheel('),game.indexOf("canvas.addEventListener('wheel',onWorldWheel")),wheelBox);
 let prevented=0;
 const wheel=(deltaY,deltaMode=0,ctrlKey=false)=>wheelBox.onWorldWheel({deltaY,deltaMode,ctrlKey,preventDefault(){prevented++}});
 wheel(-100);assert.ok(wheelBox.g.viewZoom>1&&wheelBox.g.viewZoom<1.25);
-for(let i=0;i<20;i++)wheel(-100);assert.equal(wheelBox.g.viewZoom,2.5);
-for(let i=0;i<20;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.4);
+for(let i=0;i<40;i++)wheel(-100);assert.equal(wheelBox.g.viewZoom,10);
+for(let i=0;i<40;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.1);
 wheelBox.g.viewZoom=1;wheel(-5,1);const lineZoom=wheelBox.g.viewZoom;
 wheelBox.g.viewZoom=1;wheel(-80);assert.equal(wheelBox.g.viewZoom,lineZoom,'Line/pixel wheels agree');
 for(const mode of ['paused','map','browser']){
@@ -664,7 +664,7 @@ for(const mode of ['paused','map','browser']){
 }
 for(const tier of [0,10,22]){
  scaleBox.g.viewZoom=1;const normal=scaleBox.campaignZoom(scaleBox.radiusAt(tier,0));
- for(const offset of [.4,1.25,2.5]){scaleBox.g.viewZoom=offset;assert.ok(Math.abs(scaleBox.campaignZoom(scaleBox.radiusAt(tier,0))/normal-offset)<1e-10);}
+ for(const offset of [.1,.4,1.25,2.5,10]){scaleBox.g.viewZoom=offset;assert.ok(Math.abs(scaleBox.campaignZoom(scaleBox.radiusAt(tier,0))/normal-offset)<1e-10);}
 }
 scaleBox.g.viewZoom=1;
 vm.runInContext(game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback(')),scaleBox);
