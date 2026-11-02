@@ -772,7 +772,7 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{dataset:{},innerHTML:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}});}return nodes.get(id);};
  const ui={$:el,running:true,atlasVisible:true,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
  ui.clearFlightInput=()=>ui.clears++;ui.startMusic=()=>ui.music++;ui.save=()=>ui.saves++;
- vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function resumeGame(){'),game.indexOf('function openEvolution(){')),ui);
+ vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function uiIcon(name){'),game.indexOf('function populateUpgrades(){')),ui);vm.runInContext(game.slice(game.indexOf('function resumeGame(){'),game.indexOf('function openEvolution(){')),ui);
  ui.show('<p>Settings</p>');assert.equal(ui.running,false);assert.equal(ui.atlasVisible,false);assert.equal(el('modal').dataset.screen,'panel');assert.ok(el('evolution-panel').classList.contains('hidden'));
  for(const close of [()=>ui.resumeGame(),()=>el('panel-close').onclick(),()=>{ui.attachContinue();el('btn-continue').onclick();}]){
   ui.running=false;ui.atlasVisible=true;close();assert.equal(ui.running,true);assert.equal(ui.atlasVisible,false);assert.ok(el('modal').classList.contains('off'));assert.equal(ui.last,123);
