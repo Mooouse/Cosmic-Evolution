@@ -111,7 +111,7 @@ function traceFrame(lensFails=false){
  });
  const screenCtx=mockCtx("front"),frameCtx=mockCtx("back");
  const universe={
-  ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},
+  ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},menuVisible:false,
   dpr:1,W:1920,H:1080,g:{tier:27},TA:Array(28),
   sky(){calls.push("sky")},renderBackgroundComets(){calls.push("comet")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
@@ -769,13 +769,32 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
 // Every way out of an overlay must release the atlas and resume one simulation.
 {
  const nodes=new Map();
- const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{dataset:{},innerHTML:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}});}return nodes.get(id);};
+ const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{setAttribute(){},dataset:{},innerHTML:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}});}return nodes.get(id);};
  const ui={$:el,running:true,atlasVisible:true,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
  ui.clearFlightInput=()=>ui.clears++;ui.startMusic=()=>ui.music++;ui.save=()=>ui.saves++;
- vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function uiIcon(name){'),game.indexOf('function populateUpgrades(){')),ui);vm.runInContext(game.slice(game.indexOf('function resumeGame(){'),game.indexOf('function openEvolution(){')),ui);
+ vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function uiIcon(name){'),game.indexOf('function populateUpgrades(){')),ui);vm.runInContext(game.slice(game.indexOf('function setNavigationState(screen){'),game.indexOf('function openEvolution(){')),ui);
  ui.show('<p>Settings</p>');assert.equal(ui.running,false);assert.equal(ui.atlasVisible,false);assert.equal(el('modal').dataset.screen,'panel');assert.ok(el('evolution-panel').classList.contains('hidden'));
  for(const close of [()=>ui.resumeGame(),()=>el('panel-close').onclick(),()=>{ui.attachContinue();el('btn-continue').onclick();}]){
   ui.running=false;ui.atlasVisible=true;close();assert.equal(ui.running,true);assert.equal(ui.atlasVisible,false);assert.ok(el('modal').classList.contains('off'));assert.equal(ui.last,123);
  }
- console.log('PASS: shared menu/map/settings exit clears atlas, releases input and resumes game');
+ let opened=0;
+ const openMap=()=>{opened++;ui.show('Map');el('modal').dataset.screen='map';ui.atlasVisible=true;};
+ ui.toggleOverlay('map',openMap);assert.equal(opened,1);assert.equal(ui.running,false);
+ ui.toggleOverlay('map',openMap);assert.equal(opened,1);assert.equal(ui.running,true);assert.equal(ui.atlasVisible,false);
+ for(const name of ['settings','menu']){const open=()=>{opened++;ui.show(name);el('modal').dataset.screen=name;ui.menuVisible=name==='menu';};ui.toggleOverlay(name,open);assert.equal(ui.running,false);ui.toggleOverlay(name,open);assert.equal(ui.running,true);assert.equal(ui.menuVisible,false);}
+ console.log('PASS: shared overlays toggle closed without reopening; menu/map/settings exits resume game');
+}
+
+// The menu lenses a moving sky without advancing or replacing the saved world.
+{
+ const calls=[],world={time:123,matter:456};
+ const ui={W:1366,H:900,frameCanvas:{width:1366,height:900},g:world,menuBackdrop:null,menuBackdropKey:'',menuLensMap:null,menuLensKey:'',menuLensRetryAt:0,lensPixelMap:{world:true},lensPixelMapKey:'world',
+ ctx:{fillRect(){calls.push('sky')},drawImage(){calls.push('tile')}},makeSkyDepthTexture(){calls.push('bake');return{};},paintGalaxy(...args){calls.push(['galaxy',args[0],args[1]])},renderBlackHoleLensing(t){calls.push('lens');ui.lensPixelMap={menu:true};ui.lensPixelMapKey='menu';if(ui.fail)throw Error('lens unavailable');},paintBlackHole(){calls.push('horizon')},update(){throw Error('Menu must not simulate gameplay')}};
+ vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function menuBlackHoleGeometry(){'),game.indexOf('function render(time){')),ui);
+ const saved=ui.lensPixelMap;ui.renderMenuScene(1);const a=calls.find(x=>Array.isArray(x));ui.renderMenuScene(2);
+ assert.equal(calls.filter(x=>x==='bake').length,1);assert.equal(ui.lensPixelMap,saved);assert.equal(ui.lensPixelMapKey,'world');assert.equal(world.time,123);assert.equal(world.matter,456);assert.ok(calls.indexOf('lens')<calls.indexOf('horizon'));
+ const positions=calls.filter(x=>Array.isArray(x));assert.notDeepEqual(positions[0],positions[2]);
+ ui.fail=true;ui.renderMenuScene(3);assert.equal(calls.at(-1),'horizon');assert.equal(ui.lensPixelMap,saved);
+ for(const [w,h] of [[390,844],[1920,1080],[2560,1440]]){ui.W=w;ui.H=h;const t=ui.menuBlackHoleGeometry();assert.ok(t.R>0&&t.p.x<w&&t.p.y<h);}
+ console.log('PASS: cached moving menu sky, real lens before opaque horizon, failure isolation and untouched save');
 }

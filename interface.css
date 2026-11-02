@@ -53,3 +53,12 @@ button{transition:background .16s,border-color .16s,box-shadow .16s,transform .1
 @media(max-width:800px){.topbar{padding:8px 12px;gap:7px}.topbar .brand{min-width:0;padding:7px 9px}.topbar .stat{min-width:0;padding:7px 9px;border-radius:10px}.square-button{width:32px;height:35px;border-radius:10px!important}.square-button .ui-icon{width:18px;height:18px}.top-actions{gap:4px}.top-stats{gap:5px}.ability-icon .ui-icon{width:23px;height:23px}}
 @media(max-width:560px){.topbar{height:112px;padding:8px 12px}.topbar .brand{height:39px;padding:6px 9px;border-radius:11px}.top-actions{padding-top:2px;gap:4px}.top-actions .square-button{width:32px;height:35px;font-size:15px}.top-stats{top:57px;gap:6px}.topbar .stat,.topbar .stat:first-child,.topbar .stat:last-child{padding:7px 9px;justify-content:flex-start;min-width:0;border-radius:10px}.topbar .stat strong{font-size:13px}.topbar .stat small{font-size:6px}.world-label{top:115px}.topbar .stat-icon{font-size:15px}.topbar .timer-stat{flex:.85}.menu-nav>button:not(.primary-button){padding:9px 12px}.menu-nav .ui-icon{width:18px;height:18px}.menu-nav{gap:6px}}
 @media(max-width:370px){.topbar{padding-left:7px;padding-right:7px}.top-actions{gap:3px}.top-actions .square-button{width:29px}.brand-logo{display:none}.top-stats{left:7px;right:7px}.topbar .stat{gap:5px}.topbar .stat strong{font-size:12px}}
+
+/* v3.34: one continuous live background for the start menu and pause. */
+#modal[data-screen=menu]{padding:0;background:transparent;backdrop-filter:none}
+#modal[data-screen=menu] .menu-card{height:100%;background:linear-gradient(90deg,#060e20f5 0%,#060e20cd 32%,#060e2040 59%,#060e2008 85%,transparent);padding:76px 0 0}
+.menu-scene-label{position:absolute;left:68%;top:79%;color:#b8c8e0;font-size:8px;letter-spacing:4px;pointer-events:none}
+.top-actions button[aria-pressed=true]{border-color:#8ffff0!important;background:linear-gradient(145deg,#245567,#123444)!important;box-shadow:inset 0 1px #b6fff033,0 0 18px #46e8e52c;color:#d0fff7}
+.brand[aria-pressed=true]{border-color:#79d9d566}
+@media(max-width:800px){#modal[data-screen=menu] .menu-card{padding-top:64px}}
+@media(max-width:560px){#modal[data-screen=menu] .menu-card{padding-top:105px;background:linear-gradient(90deg,#060e20ec,#060e20b8 45%,#060e2050)}.menu-scene-label{display:none}.menu-card h1{letter-spacing:4px}}

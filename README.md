@@ -1,4 +1,4 @@
-# Cosmic Evolution — From Dust to Infinity
+# Infiniti Space — From Dust to Infinity
 
 A complete **2D HTML5 Canvas** cosmic growth game. The old Garage Evolution source files have been replaced on the main branch, as requested. No 3D models, no build step, no heavy engine, no external gameplay dependencies.
 

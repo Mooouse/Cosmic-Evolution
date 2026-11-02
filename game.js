@@ -1,4 +1,4 @@
-/* Cosmic Evolution — dependency-free 2D Canvas game. No 3D / external game engines. */
+/* Infiniti Space — dependency-free 2D Canvas game. No 3D / external game engines. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -121,7 +121,7 @@ g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.1,10):1;
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
-let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,uiTimer=0,saveTimer=0,eventTimer=0;
+let W=innerWidth,H=innerHeight,dpr=1,last=performance.now(),running=false,menuVisible=false,uiTimer=0,saveTimer=0,eventTimer=0;
 // Physical size is continuous across all stages, including save/load and evolution.
 // Stage boundaries are continuous: end of tier N equals start of tier N+1.
 function stageFraction(){return clamp(g.matter/TA[g.tier].required,0,1);}
@@ -232,7 +232,7 @@ function scheduleMusic(){
 }
 function startMusic(){initAudio();setMusicVolume();}
 function save(){g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAVE_KEY,JSON.stringify(g));}catch(_){toastStorageWarning();}}
-let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Cosmic Evolution: сохранение мира не помещается в localStorage');}}
+let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Infiniti Space: сохранение мира не помещается в localStorage');}}
 
 function makeSky(){
  skyLayer=null;skyDepthLayers=[];
@@ -1646,7 +1646,7 @@ function initGpuLens(){
  if(gpuLensUnavailable)return null;
  const surface=document.createElement('canvas');
  const gl=surface.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:false});
- if(!gl){gpuLensUnavailable=true;console.warn('Cosmic Evolution: WebGL unavailable, using Canvas lens');return null;}
+ if(!gl){gpuLensUnavailable=true;console.warn('Infiniti Space: WebGL unavailable, using Canvas lens');return null;}
  const shader=(type,source)=>{
   const sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);
   if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){const message=gl.getShaderInfoLog(sh);gl.deleteShader(sh);throw new Error('Lens shader: '+message);}
@@ -1726,7 +1726,7 @@ function renderGpuLens(p,R,outer){
   // Consume the WebGL drawing buffer synchronously, before the browser can
   // discard it. The opaque horizon is still painted afterwards on frameCtx.
   ctx.drawImage(surface,0,0,W,H);lensBackend='gpu';return true;
- }catch(error){gpuLensUnavailable=true;gpuLens=null;console.warn('Cosmic Evolution: Canvas lens fallback',error.message);return false;}
+ }catch(error){gpuLensUnavailable=true;gpuLens=null;console.warn('Infiniti Space: Canvas lens fallback',error.message);return false;}
 }
 // True gravitational lensing of the existing stars/galaxies. No gas or disk.
 let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
@@ -2039,6 +2039,32 @@ function renderGatherFlow(time){
 }
 function renderParticles(){for(const a of energyArcs){const q=project(a.x,a.y),target=project(a.toX??a.x,a.toY??a.y);ctx.save();ctx.globalAlpha=clamp(a.life/a.max,0,1)*.7;ctx.strokeStyle=a.color;ctx.lineWidth=1.25;ctx.beginPath();if(a.toX!==undefined){ctx.moveTo(q.x,q.y);let mx=(q.x+target.x)*.5,my=(q.y+target.y)*.5;ctx.quadraticCurveTo(mx+Math.sin(a.life*40)*14,my-14,target.x,target.y);}else{ctx.arc(q.x,q.y,a.r*camera.zoom*(1.4+(1-a.life/a.max)*4),0,TAU);}ctx.stroke();ctx.restore();}
 for(const p of particles){const q=project(p.x,p.y);ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(.5,p.r*camera.zoom),0,TAU);ctx.fill();}ctx.globalAlpha=1;for(const s of shockwaves){let q=project(s.x,s.y);ctx.save();ctx.globalAlpha=clamp(s.life/s.max,0,1)*.7;ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=18;ctx.lineWidth=4*camera.zoom;ctx.beginPath();ctx.arc(q.x,q.y,s.r*camera.zoom,0,TAU);ctx.stroke();ctx.restore();}for(const p of texts){let q=project(p.x,p.y);ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.font='800 13px "Exo 2",sans-serif';ctx.textAlign='center';ctx.shadowBlur=8;ctx.shadowColor=p.color;ctx.fillStyle=p.color;ctx.fillText(p.text,q.x,q.y);ctx.restore();}}
+// The menu has its own cached sky and lens geometry; it never advances gameplay.
+let menuBackdrop=null,menuBackdropKey='',menuLensMap=null,menuLensKey='',menuLensRetryAt=0;
+function menuBlackHoleGeometry(){
+ const p={x:W*(W<=560?.77:.76),y:H*(W<=560?.36:.54)};
+ const R=Math.min(W*.48,H*.72),outer=Math.min(R*2.30,W*.63);
+ return {p,R,outer};
+}
+function renderMenuScene(time){
+ const key=[frameCanvas.width,frameCanvas.height,W,H].join(':');
+ if(menuBackdropKey!==key){menuBackdrop=makeSkyDepthTexture(0x638ab,1.2);menuBackdropKey=key;}
+ ctx.fillStyle='#02040b';ctx.fillRect(0,0,W,H);
+ const dx=(time*4)%W,dy=(time*1.3)%H;
+ for(let y=-dy;y<H;y+=H)for(let x=-dx;x<W;x+=W)ctx.drawImage(menuBackdrop,x,y,W,H);
+ const target=menuBlackHoleGeometry(),{p,R}=target;
+ // Two slowly moving distant galaxies reveal the curved and duplicated light.
+ paintGalaxy(p.x+Math.cos(time*.045)*R*.7,p.y+Math.sin(time*.045)*R*.43,Math.min(65,H*.065),'#b990ff',time);
+ paintGalaxy(p.x+Math.cos(time*.032+2)*R*.85,p.y+Math.sin(time*.032+2)*R*.48,Math.min(45,H*.045),'#76dfff',time+40);
+ const previousMap=lensPixelMap,previousKey=lensPixelMapKey;
+ lensPixelMap=menuLensMap;lensPixelMapKey=menuLensKey;
+ try{
+  if(time>=menuLensRetryAt){renderBlackHoleLensing(target);menuLensMap=lensPixelMap;menuLensKey=lensPixelMapKey;}
+ }catch(_){menuLensRetryAt=time+2;}
+ finally{lensPixelMap=previousMap;lensPixelMapKey=previousKey;}
+ // The horizon remains opaque even if the browser temporarily loses its lens.
+ paintBlackHole(p.x,p.y,R,time);
+}
 function render(time){
  // The public Canvas retains the previous complete frame throughout every
  // expensive readback, galaxy repaint, and lensing pass.
@@ -2047,6 +2073,7 @@ function render(time){
  // Restore the compositing baseline every frame; otherwise a previous
  // effect can accidentally carry semi-transparency onto the next frame.
  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+ if(menuVisible){renderMenuScene(time);}else{
  sky(time);renderBackgroundComets();
  ctx.save();renderDistantBodies();renderMacroField(time);ctx.restore();
  ctx.save();
@@ -2074,6 +2101,7 @@ function render(time){
   ctx.restore();
  }
  renderAbysses();renderWaypoint();
+ }
  // Atomic presentation: the screen never sees a partially completed frame.
  // Do not reset canvas.width/height or use a desynchronized front context.
  screenCtx.save();
@@ -2088,7 +2116,7 @@ function render(time){
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
- if(!running&&now-idleLast<70)return;idleLast=now;
+ if(!running&&now-idleLast<(menuVisible?33:70))return;idleLast=now;
  const elapsed=clamp((now-last)/1000,.001,.08);last=now;
  if(running){
   update(Math.min(elapsed,.05));
@@ -2108,9 +2136,16 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 // One shared shell keeps navigation and resume behavior consistent across every screen.
-function resumeGame(){clearFlightInput();atlasVisible=false;running=true;startMusic();$('modal').classList.add('off');last=performance.now();}
+function setNavigationState(screen){
+ for(const [id,name] of [['btn-menu','menu'],['btn-pause','menu'],['btn-map','map'],['btn-settings','settings']])$(id).setAttribute('aria-pressed',String(screen===name));
+}
+function toggleOverlay(screen,open){
+ const modal=$('modal');
+ if(!modal.classList.contains('off')&&modal.dataset.screen===screen)resumeGame();else open();
+}
+function resumeGame(){clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=true;startMusic();$('modal').classList.add('off');last=performance.now();}
 function show(html){
- clearFlightInput();atlasVisible=false;running=false;
+ clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=false;
  $('evolution-panel').classList.add('hidden');
  $('modal').dataset.screen='panel';
  $('modal').innerHTML=`<div class="modal-card"><button id="panel-close" class="panel-close" aria-label="Вернуться в игру">${uiIcon('close')}</button>${html}</div>`;
@@ -2119,6 +2154,7 @@ function show(html){
 function continueButton(label='ПРОДОЛЖИТЬ'){return `<button class="primary-button" id="btn-continue">${label} <span>${uiIcon('arrow')}</span></button>`;}
 function attachContinue(){const b=$('btn-continue');if(b)b.onclick=resumeGame;}
 function openEvolution(){
+ if(!$('evolution-panel').classList.contains('hidden')){$('evolution-panel').classList.add('hidden');return;}
  resumeGame();renderUI();$('evolution-panel').classList.remove('hidden');
  if(W<=800)$('sidebar').classList.remove('mobile-open');
 }
@@ -2129,9 +2165,9 @@ function showAchievements(){
  const milestones=[['Первая искра','Поглоти первый объект',g.collects>=1],['Космический странник','Исследуй 100 св. лет²',exploredCount()>=100],['Охотник за реликвиями','Найди 10 реликвий',g.rare>=10],['Тысяча миров','Поглоти 1 000 объектов',g.collects>=1000],['За горизонтом','Достигни последней формы',g.tier===TA.length-1]];
  show(`<div class="eyebrow">ВЕХИ ТВОЕГО ПУТЕШЕСТВИЯ</div><div class="overlay-title">ДОСТИЖЕНИЯ</div><div class="achievement-list">${milestones.map(([name,desc,done])=>`<div class="achievement ${done?'earned':''}"><span>${done?'✦':'◇'}</span><div><strong>${name}</strong><small>${desc}</small></div><b>${done?'ОТКРЫТО':'—'}</b></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();
 }
-function showMainMenu(){
- show(`<div class="menu-art" aria-hidden="true"><div class="menu-orbit"></div><div class="menu-hole"></div><span class="menu-coordinate">SINGULARITY / ∞</span></div><div class="menu-content"><div class="hero-kicker">ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ</div><h1>COSMIC<br><span>EVOLUTION</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${g.time>10?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.33 / COSMIC EVOLUTION</span></div>`);
- $('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
+function showMainMenu(paused=false){
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.34 / INFINITI SPACE</span></div>`);
+ menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=resumeGame;$('menu-map').onclick=showMap;
  $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};
  $('menu-achievements').onclick=showAchievements;$('menu-statistics').onclick=showStatistics;$('menu-settings').onclick=showSettings;
@@ -2369,7 +2405,7 @@ function showMap(){
  <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">${uiIcon('plus')}</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">${uiIcon('minus')}</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">${uiIcon('center')}</button></div></div>
  <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ МЕНЬШЕ ТЕБЯ — ДОБЫЧА · БОЛЬШЕ — ОПАСНОСТЬ</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Расстояния и диаметры — в световых годах. Площадь — в квадратных световых годах.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
- $('modal').dataset.screen='map';$('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
+ setNavigationState('map');$('modal').dataset.screen='map';$('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
  cv.addEventListener('pointerdown',ev=>{atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
  cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;if(Math.hypot(ev.clientX-atlas.downX,ev.clientY-atlas.downY)>6)atlas.moved=true;if(atlas.placingPin||!atlas.moved)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
@@ -2390,8 +2426,9 @@ function showMap(){
  requestAnimationFrame(drawAtlas);
 }
 
-function showPause(){show(`<div class="hero-kicker">ПУТЕШЕСТВИЕ ПРИОСТАНОВЛЕНО</div><div class="overlay-title">ПАУЗА</div><p class="overlay-copy">Твоё место во Вселенной сохранено. Материя и улучшения останутся с тобой.</p><div class="stat-list"><div><strong>${fmt(g.total)}</strong><small>Всего материи</small></div><div><strong>${timeFmt(g.time)}</strong><small>Игровое время</small></div><div><strong>${g.collects}</strong><small>Поглощено объектов</small></div><div><strong>${g.rare}</strong><small>Реликвий найдено</small></div></div><div class="modal-actions">${continueButton()}<button id="pause-map" class="secondary-button">Карта</button></div>`);attachContinue();$('pause-map').onclick=showMap;}
-function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
+function showPause(){showMainMenu(true);}
+
+function showSettings(){show(`<div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><div class="settings-line"><span>Качество эффектов</span><select id="set-quality"><option value="1" ${g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions">${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('modal').dataset.screen='settings';setNavigationState('settings');attachContinue();$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function resetCampaignState(resetModifiers=false){
  const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,quality:g.quality,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel};
  cosmicAbsorptions.length=0;absorbingMacroKeys.clear();
@@ -2503,10 +2540,10 @@ function panelValue(key,v){
 testerInit();
 $('btn-new-game').onclick=restartCampaign;
 function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Теперь горизонт событий растёт бесконечно.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поглощай материю и продолжай увеличиваться без предела!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('btn-new-universe').onclick=restartCampaign;}
-$('btn-menu').onclick=showMainMenu;
+$('btn-menu').onclick=()=>toggleOverlay('menu',showMainMenu);
 $('btn-evolution').onclick=openEvolution;$('btn-stage-details').onclick=openEvolution;$('btn-evolution-close').onclick=()=>{$('evolution-panel').classList.add('hidden');};
 showMainMenu();
-$('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=showMap;$('btn-pause').onclick=()=>running?showPause():resumeGame();$('btn-settings').onclick=showSettings;
+$('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=()=>toggleOverlay('map',showMap);$('btn-pause').onclick=()=>toggleOverlay('menu',showPause);$('btn-settings').onclick=()=>toggleOverlay('settings',showSettings);
 $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
 $('btn-sidebar').onclick=()=>{if(W<=800){$('sidebar').classList.remove('mobile-open')}else $('sidebar').classList.add('collapsed');$('btn-show-sidebar').classList.remove('hidden');};
 $('btn-show-sidebar').onclick=()=>{if(W<=800)$('sidebar').classList.add('mobile-open');else $('sidebar').classList.remove('collapsed');$('btn-show-sidebar').classList.add('hidden');};
@@ -2540,7 +2577,7 @@ canvas.addEventListener('pointerleave',()=>{if(!pointer.down){pointer.active=fal
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();
  if(k==='f2'&&TEST_MODE){e.preventDefault();testerToggle();return;}
  if(e.target instanceof HTMLElement&&e.target.closest('input, select, textarea'))return;
- if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();keys.add(k);if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p'||k==='escape'){if(running)showPause();else resumeGame();}if(k==='m')showMap();}});
+ if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();keys.add(k);if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p')toggleOverlay('menu',showPause);if(k==='escape'){if(running)showPause();else resumeGame();}if(k==='m')toggleOverlay('map',showMap);}});
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
