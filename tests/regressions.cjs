@@ -724,11 +724,12 @@ const cometBox={g:{time:0},W:1920,H:1080,ctx:cometCtx,document:{createElement(){
 vm.createContext(cometBox);
 vm.runInContext(game.match(/function chunkRandom\([^]*?\n\}/)[0]+game.slice(game.indexOf('let backgroundComets='),game.indexOf('\nlet skyCameraX=')),cometBox);
 cometBox.renderBackgroundComets();assert.equal(cometAllocations,0);
-cometBox.g.time=12;cometBox.renderBackgroundComets();assert.equal(cometAllocations,1);
+cometBox.g.time=4;cometBox.renderBackgroundComets();assert.equal(cometAllocations,1);
 assert.equal(vm.runInContext('backgroundComets.length',cometBox),1);
-const nextComet=vm.runInContext('nextBackgroundComet',cometBox);assert.ok(nextComet>=37&&nextComet<=67);
-cometBox.g.time=24;cometBox.renderBackgroundComets();assert.equal(vm.runInContext('backgroundComets.length',cometBox),0);
+const nextComet=vm.runInContext('nextBackgroundComet',cometBox);assert.ok(nextComet>=12&&nextComet<=20);
 cometBox.g.time=nextComet;cometBox.renderBackgroundComets();assert.equal(cometAllocations,1);
+for(let time=Math.ceil(nextComet)+1;time<120;time++){cometBox.g.time=time;cometBox.renderBackgroundComets();assert.ok(vm.runInContext('backgroundComets.length',cometBox)<=2);}
+assert.equal(cometAllocations,1,'More frequent comets still reuse one texture');
 cometBox.g.time=0;cometBox.renderBackgroundComets();assert.equal(vm.runInContext('backgroundComets.length',cometBox),0);
 console.log('PASS: fourfold gravity, fractional one-tenth loot, rare cached comets and restart cleanup');
 

@@ -1483,15 +1483,15 @@ function ensureSkyLayer(){
  }
  c.globalAlpha=1;skyLayerEpoch=g.tier;
 }
-let backgroundComets=[],nextBackgroundComet=12,lastCometTime=0,cometSequence=0,cometSprite=null;
+let backgroundComets=[],nextBackgroundComet=4,lastCometTime=0,cometSequence=0,cometSprite=null;
 function renderBackgroundComets(){
- if(g.time<lastCometTime){backgroundComets=[];nextBackgroundComet=g.time+12;}
+ if(g.time<lastCometTime){backgroundComets=[];nextBackgroundComet=g.time+4;}
  lastCometTime=g.time;
  if(g.time>=nextBackgroundComet){
   const rng=chunkRandom(0x7c09+cometSequence++*7919),direction=rng()<.5?1:-1;
   const duration=7+rng()*4,fromX=direction>0?-.2*W:1.2*W,fromY=H*(.1+rng()*.7);
   backgroundComets.push({born:g.time,duration,fromX,fromY,dx:direction*W*1.4,dy:H*(rng()-.5)*.6,length:110+rng()*130});
-  nextBackgroundComet=g.time+25+rng()*30;
+  nextBackgroundComet=g.time+8+rng()*8;
  }
  backgroundComets=backgroundComets.filter(c=>g.time-c.born<c.duration);
  if(!backgroundComets.length)return;
