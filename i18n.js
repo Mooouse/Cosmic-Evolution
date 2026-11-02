@@ -298,7 +298,10 @@ const rows=`Космическая пыль|Cosmic dust|Polvo cósmico
 областей|regions|regiones
 объекты / координаты|objects / coordinates|objetos / coordenadas
 РАЗРАБОТКА /|DEVELOPMENT /|DESARROLLO /
-Вход|Entry|Entrada`;
+Вход|Entry|Entrada
+масштаб|zoom|zoom
+реальный масштаб, горизонт событий и видимая область|true scale, event horizon and visible area|escala real, horizonte y área visible
+из |of |de `;
 const dictionary=new Map();
 for(const line of rows.split('\n')){const [ru,en,es]=line.split('|');dictionary.set(ru,{en,es});dictionary.set(ru.toUpperCase(),{en:en.toUpperCase(),es:es.toUpperCase()});}
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -315,7 +318,7 @@ function refresh(root=document.body){
   originals.set(node,{raw,output});if(node.nodeValue!==output)node.nodeValue=output;
  }
  for(const el of root.querySelectorAll('[title],[aria-label],[placeholder]')){
-  if(el.closest('[data-no-translate]'))continue;let state=attributes.get(el)||{};
+  let state=attributes.get(el)||{};
   for(const attr of ['title','aria-label','placeholder'])if(el.hasAttribute(attr)){const current=el.getAttribute(attr),old=state[attr],raw=old&&current===old.output?old.raw:current,output=t(raw);state[attr]={raw,output};if(current!==output)el.setAttribute(attr,output);}
   attributes.set(el,state);
  }

@@ -73,3 +73,5 @@ button{transition:background .16s,border-color .16s,box-shadow .16s,transform .1
 
 @media(max-width:600px){.topbar .brand{min-width:0;width:138px;padding:7px}.topbar .stat{min-width:0;padding:8px 10px}.topbar .timer-stat{display:none!important}.top-actions{margin-left:auto}.world-label{left:12px;top:118px;max-width:55%;transform:none;text-align:left;letter-spacing:.7px}.center-abilities{top:auto;transform:none;right:12px;bottom:125px}.ability{width:74px;height:64px;padding:8px;grid-template-columns:23px 1fr}.ability .ui-icon{width:22px}.ability>span:nth-child(2){font-size:7px;letter-spacing:0}.ability small{font-size:7px}.achievement.earned>span,.achievement.earned b{color:var(--rarity)}}
 .achievement.earned>span,.achievement.earned b{color:var(--rarity)}
+
+@media(max-width:600px){.flight-stick{display:block}.panel-close{width:40px;height:40px}.topbar .brand{max-width:138px}.topbar .stat small{white-space:normal;min-height:16px;display:flex;align-items:center}.body-measure strong{max-width:42vw;overflow-wrap:anywhere}}
