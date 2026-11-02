@@ -765,3 +765,17 @@ const farSky={canvas:{},x:500,y:300,depth:.035,brightness:.6},nearSky={...farSky
 skyDepthBox.drawSkyDepthLayer(farSky,100,0);skyDepthBox.drawSkyDepthLayer(nearSky,100,0);
 assert.ok(500-nearSky.x>(500-farSky.x)*5,'Near clusters must shift visibly faster than distant clusters');
 console.log('PASS: independent sky depth, bounded scrolling and seamless viewport coverage at 10–1000%');
+
+// Every way out of an overlay must release the atlas and resume one simulation.
+{
+ const nodes=new Map();
+ const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{dataset:{},innerHTML:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}});}return nodes.get(id);};
+ const ui={$:el,running:true,atlasVisible:true,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
+ ui.clearFlightInput=()=>ui.clears++;ui.startMusic=()=>ui.music++;ui.save=()=>ui.saves++;
+ vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function resumeGame(){'),game.indexOf('function openEvolution(){')),ui);
+ ui.show('<p>Settings</p>');assert.equal(ui.running,false);assert.equal(ui.atlasVisible,false);assert.equal(el('modal').dataset.screen,'panel');assert.ok(el('evolution-panel').classList.contains('hidden'));
+ for(const close of [()=>ui.resumeGame(),()=>el('panel-close').onclick(),()=>{ui.attachContinue();el('btn-continue').onclick();}]){
+  ui.running=false;ui.atlasVisible=true;close();assert.equal(ui.running,true);assert.equal(ui.atlasVisible,false);assert.ok(el('modal').classList.contains('off'));assert.equal(ui.last,123);
+ }
+ console.log('PASS: shared menu/map/settings exit clears atlas, releases input and resumes game');
+}
