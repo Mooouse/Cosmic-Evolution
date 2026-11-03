@@ -74,7 +74,7 @@ function stageRecipe(t=g.tier){
  const types=['ore'];if(t>=4)types.push('crystal');if(t>=8)types.push('ice');
  if(t>=12)types.push('gas');if(t>=17)types.push('plasma');if(t>=22)types.push('exotic');
  const recent=types.slice(-Math.min(3,types.length));
- return recent.map((type,i)=>({type,amount:Math.round((3+t*1.25)*(i===0?1:.64))}));
+ return recent.map((type,i)=>({type,amount:Math.max(1,Math.round((2+t*.18)*(i===0?1:.64)))}));
 }
 const TEST_MODE = new URLSearchParams(location.search).get('tester')==='1';
 const SAVE_KEY = TEST_MODE?'cosmic-evolution-tester-save-v1':'cosmic-evolution-save-v1';
@@ -282,9 +282,9 @@ function resize(){W=innerWidth;H=innerHeight;applyResolution();makeSky();if(atla
 
 addEventListener('resize',resize);resize();
 function toast(message,kind=''){let el=document.createElement('div');el.className=`toast ${kind}`;el.textContent=message;$('toast-root').append(el);setTimeout(()=>el.remove(),3100);}
-// The campaign is tuned for many hours of exploring fresh, non-respawning sectors.
+// Campaign target: roughly one minute of active gathering per form.
 // Requirements are distance and discovery goals, not artificial AFK timers.
-function missionReq(){return {rare:0,explore:Math.round(3+Math.min(24,g.tier*1.1)),collect:Math.round(TA[g.tier].required*.45)};}
+function missionReq(){return {rare:0,explore:Math.min(3,1+Math.floor(g.tier/10)),collect:Math.round(TA[g.tier].required*.45)};}
 function recipeDone(){return stageRecipe().every(({type,amount})=>(g.materials[type]||0)>=amount);}
 function missionsDone(){const m=missionReq();return g.stageCollects>=m.collect&&recipeDone()&&g.stageExplored>=m.explore;}
 function spendRecipe(){for(const r of stageRecipe())g.materials[r.type]=Math.max(0,(g.materials[r.type]||0)-r.amount);}
@@ -1316,9 +1316,9 @@ function testerVisitAbyss(){
 
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
-function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const val=Math.max(1,Math.round((g.endless?blackHoleBodyValue(e):player.r>radiusAt(6,0)?Math.min(e.value??Infinity,ordinaryBodyValue(e)):(e.value??ordinaryBodyValue(e)))*(1+upgradePower('harvest')*.075)*tester.loot))*.1;g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
+function absorb(e){advanceHarvestChain();const mat=resourceOf(e);let val=Math.max(1,Math.round((g.endless?blackHoleBodyValue(e):player.r>radiusAt(6,0)?Math.min(e.value??Infinity,ordinaryBodyValue(e)):(e.value??ordinaryBodyValue(e)))*(1+upgradePower('harvest')*.075)*tester.loot))*(g.endless?.1:1);if(!g.endless)val=Math.max(val,TA[g.tier].required/30);g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
- g.materials[mat]=(g.materials[mat]||0)+gain*.1;
+ g.materials[mat]=(g.materials[mat]||0)+gain*(g.endless?.1:1);
  if(!g.endless&&(mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
  let credits=val*(e.kind==='relic'?1.7:.75);g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+.1;g.stageRare++;g.rare++;if(!g.endless&&player.r<CHUNK*4)burst(e.x,e.y,22,'#f9d797',.9);pickupFeedback(val,true);}else if(!g.endless&&player.r<CHUNK*4&&Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.

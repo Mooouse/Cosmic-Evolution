@@ -706,14 +706,14 @@ assert.ok(Math.abs(rivalProbe.x+1417.5)<1e-8,'Rival holes must receive the same 
 
 // Fractional rewards must accumulate, not round small catches back up to old yields.
 const lootBox={g:{endless:false,complete:false,tier:0,matter:0,total:0,stageCollects:0,collects:0,credits:0,materials:{ore:0},upgrade:{harvest:0},particles:false},
- player:{x:0,y:0,r:13},tester:{loot:1},CHUNK:480,TA:[{required:1e9}],
+ player:{x:0,y:0,r:13},tester:{loot:1},CHUNK:480,TA:[{required:280}],
  advanceHarvestChain(){},resourceOf:()=> 'ore',radiusAt:()=>1000,ordinaryBodyValue:()=>100,blackHoleBodyValue:()=>100,
  currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
 vm.createContext(lootBox);vm.runInContext(upgradePrelude+absorbCode,lootBox);
 for(let i=0;i<100;i++)lootBox.absorb({value:1,kind:'matter'});
-assert.ok(Math.abs(lootBox.g.matter-10)<1e-8);
-assert.ok(Math.abs(lootBox.g.credits-7.5)<1e-8);
-assert.ok(Math.abs(lootBox.g.materials.ore-10)<1e-8);
+assert.ok(Math.abs(lootBox.g.matter-100*280/30)<1e-8);
+assert.ok(Math.abs(lootBox.g.credits-100*280/30*.75)<1e-8);
+assert.ok(Math.abs(lootBox.g.materials.ore-100)<1e-8);
 lootBox.g.endless=true;const beforeLoot=lootBox.g.matter;lootBox.absorb({kind:'matter'});
 assert.ok(Math.abs(lootBox.g.matter-beforeLoot-10)<1e-8,'Black-hole catches also yield one tenth');
 
