@@ -116,3 +116,9 @@ body.ui-v15 [hidden]{display:none!important}
 @media(max-height:500px) and (max-width:1000px){
  .ui-v15 #hud .hud-top{left:14px;right:14px;max-width:none}.ui-v15 #hud .hud-resources{flex:0 1 260px;margin-left:auto}.ui-v15 #hud .evo-status{left:50%;transform:translateX(-50%);width:40%;top:66px}.ui-v15 #hud .flight-stick{width:122px;height:122px;bottom:14px!important}.ui-v15 #hud .abilities{flex-direction:row;bottom:22px}.ui-v15 #hud .upgrade-pull{top:66px}.ui-v15 #hud .v15-camera-toggle{top:66px;left:64px}.ui-v15 #hud .camera-buttons{top:116px;left:64px}.ui-v15 #hud .upgrade-drawer{top:116px;max-height:calc(100dvh - 132px)}
 }
+
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ .ui-v15 #hud .hud-left{width:42px;max-width:42px;height:42px;flex:0 0 42px}
+ .ui-v15 #hud .v15-camera-toggle{padding:0!important;white-space:nowrap;font-size:14px}
+ .ui-v15 #hud .ability-btn small{display:block;position:absolute;right:-5px;top:-10px;padding:2px 4px;border-radius:5px;background:#211335;color:#ddc6ff;font-size:9px;line-height:14px}
+}
