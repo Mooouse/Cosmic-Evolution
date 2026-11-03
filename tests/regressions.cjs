@@ -257,11 +257,11 @@ console.log('PASS: map fits real viewport and horizon; readable scale at four ex
 // second copy of the same sector slot.
 {
  const active=new Set(),entities=[];
- const sim={W:1920,H:1080,CHUNK:480,camera:{zoom:.08,x:0,y:0},player:{x:0,y:0},
+ const sim={W:1920,H:1080,CHUNK:480,camera:{zoom:.08,x:0,y:0},player:{x:0,y:0,r:100},
   resourceViews:()=>[{x:0,y:0,stream:0}],g:{endless:true,depleted:{}},abyssPhysical:[],loadedChunks:new Set(),absorbingMacroKeys:active,entities,
   seedHash:()=>0,chunkKey:(x,y)=>`${x},${y}`,chunkInfo:()=>({}),sectorQuota:()=>1,
   blackHoleGravityRadius:()=>1e8,absorptionKey:e=>`${e.chunk}:${e.index}`,
-  distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:8,index:0,chunk:`${cx},${cy}`,material:'ore',value:10}]};
+  distantSamples:(cx,cy)=>[{x:(cx+.5)*480,y:(cy+.5)*480,r:10,index:0,chunk:`${cx},${cy}`,material:'ore',value:10}]};
  vm.createContext(sim);vm.runInContext(game.slice(dustStart,dustEnd),sim);
  for(let i=0;i<10;i++)vm.runInContext('promoteCosmicDust()',sim);
  assert.ok(entities.length>64,'Particles outside the local streaming square must be promoted');
@@ -931,3 +931,42 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  assert.deepEqual(readback,[2800,2800],'CPU fallback keeps native pixel density too');
 }
 console.log('PASS: graphics reduction can be fully disabled; low FPS cannot override native resolution on GPU or CPU');
+
+// Drawing and gravity must enumerate the same LOD identities at manual zooms
+// and viewport sizes, without deriving force/range from the display zoom.
+{
+ const viewCode=game.slice(game.indexOf('function cosmicViewAt('),game.indexOf('function blackHoleGravityRadius('));
+ const harvestCode=game.slice(game.indexOf('function harvestCosmicLOD('),game.indexOf('function promoteAbyssMatter('));
+ const renderCode=game.slice(game.indexOf('function renderMacroBackground('),game.indexOf('// Freeze the distant scene'));
+ for(const r of [1e5,1e30,1e110])for(const [W,H] of [[1920,1080],[3840,2160],[390,844]])for(const manual of [.1,1,10]){
+  const nominal=(83+27*Math.log2(1+r/100))/r,zoom=nominal*manual,drawn=new Set();
+  const key=e=>`${e.level}:${e.gx}:${e.gy}:${e.index}`;
+  const b={W,H,MACRO_SIZE:3200,player:{x:0,y:0,r},camera:{x:0,y:0,zoom},g:{endless:true,depletedMacro:{},depletedCosmic:{}},
+   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),cosmicHarvestTimer:0,cosmicAbsorptions:[],absorbingMacroKeys:new Set(),macroLoaded:new Set(),
+   blackHoleCoreWorldRadius:()=>r*.245,blackHoleGravityRadius:()=>r*2,blackHoleTouchDistance:e=>r*.245+e.r,
+   canAbsorbBody:()=>true,physicsZoom:()=>nominal,absorptionKey:key,macroKey:(x,y)=>`${x},${y}`,
+   ctx:{save(){},restore(){}},drawMacro(e,t,z,opacity){if(opacity>=.025)drawn.add(key(e));return true;},
+   macroLODNodes:(gx,gy,level)=>gx===0&&gy===0?[{x:r*.3,y:0,r:r*.05,level,gx,gy,index:0}]:[],
+   macroNodes:(gx,gy)=>gx===0&&gy===0?[{x:r*.3,y:0,r:r*.05,level:0,gx,gy,index:0,chunk:'0,0'}]:[]};
+  vm.createContext(b);vm.runInContext(viewCode+harvestCode+renderCode,b);
+  b.renderMacroBackground(0);b.harvestCosmicLOD(.1);b.harvestCosmicLOD(.1);
+  assert.ok(drawn.size>0);
+  assert.deepEqual(new Set(b.cosmicAbsorptions.map(key)),drawn,`Unresponsive drawn LOD at radius ${r}, zoom ${manual}, viewport ${W}x${H}`);
+  assert.equal(b.cosmicAbsorptions.length,drawn.size,'No duplicate physical copies');
+ }
+}
+// A visibly enlarged small resource, and already captured debris that becomes
+// small as the player grows, must both continue through the real update loop.
+{
+ const start=game.indexOf(' for(const e of nearbyObjects){',game.indexOf('function update(dt){'));
+ const code=game.slice(start,game.indexOf(' entities=entities.filter',start));
+ const tinyVisible={x:10,y:0,r:3,index:0,originX:10,originY:0};
+ const captured={x:10,y:0,r:1,gravityBound:true};
+ const calls=[];
+ const b={g:{endless:true,time:1,flightEpoch:0},player:{r:100},nearbyObjects:[tinyVisible,captured],dt:.016,physicsZoom:()=>.1,
+  RESOURCE_STREAMS:[{x:0,y:0}],gatherBody:()=>false,pullBodyIntoAbyss:()=>false,animateAbsorption:()=>false,
+  applyBlackHoleGravity(e){calls.push(e);}};
+ vm.createContext(b);vm.runInContext(code,b);
+ assert.deepEqual(calls,[tinyVisible,captured]);
+}
+console.log('PASS: every rendered LOD is eligible for gravity across zooms and screens; visible small and captured debris stay simulated');

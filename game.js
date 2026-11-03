@@ -755,8 +755,9 @@ function harvestCosmicLOD(dt){
  if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
  if(cosmicAbsorptions.length>=160)return;
- const core=g.endless?blackHoleCoreWorldRadius():player.r,gravity=g.endless?blackHoleGravityRadius():ordinaryGravityRadius(),view=cosmicViewAt(player.x,player.y,1920,1080,physicsZoom());
+ const core=g.endless?blackHoleCoreWorldRadius():player.r,gravity=g.endless?blackHoleGravityRadius():ordinaryGravityRadius(),view=cosmicVisibleLOD();
  const contacts=[];
+ // Select exactly the rendered LOD levels; only force/range use physicsZoom.
  // Promote visible LOD proxies when they enter the gravitational field,
  // before their rendered silhouette reaches the event horizon.
  for(const level of view.levels){
@@ -982,6 +983,7 @@ function promoteCosmicDust(){
   for(const e of distantSamples(cx,cy)){
    if(budget<=0)break;
    if(e.index%4!==source.stream||e.index>=quota||(mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
+   if(e.r/player.r<.025||e.r*zoom<.65)continue;
    if(Math.hypot(e.x-player.x,e.y-player.y)*zoom>range+e.r*zoom&&!abyssPhysical.some(h=>Math.hypot(e.x-h.x,e.y-h.y)<h.r*5))continue;
    const body={...e,vx:0,vy:0,gravityBound:true};
    absorbingMacroKeys.add(absorptionKey(body));entities.push(body);budget--;
@@ -1381,7 +1383,7 @@ function update(dt){
  // simulated; objects jumped when their turn in the queue arrived.
  for(const e of nearbyObjects){
   if(e.dead)continue;
-  if(!e.absorbing&&!e.gathering&&(e.r/player.r<.025||e.r*physicsZoom()<.65))continue;
+  if(!e.absorbing&&!e.gathering&&!e.gravityBound&&e.r/player.r<.025)continue;
   if(gatherBody(e,dt))continue;
   if(!e.absorbing&&!e.rivalBound&&!(g.endless&&e.gravityBound)){
    if(e.freeFlight)Object.assign(e,freeFlightAt(g.freeFlights[flightKey(e)]||{...e,flightTime:g.time}));
@@ -2313,7 +2315,7 @@ function showMusicShop(){
  show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('First Light is included. Seven future tracks will be added later. Preview prices are in stardust; unavailable tracks cannot be purchased.','First Light уже доступен. Ещё семь треков будут добавлены позже. Цены указаны в звёздной пыли; недоступные треки пока нельзя купить.','First Light está incluido. Se añadirán siete pistas más. Los precios son en polvo estelar; las pistas no disponibles no se pueden comprar.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===0?L('Included · original ambient','Включено · оригинальный эмбиент','Incluida · ambiente original'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${t.id!==0&&!t.src?'disabled':''}>${t.id!==0&&!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.36.5 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.36.6 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
  $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};
