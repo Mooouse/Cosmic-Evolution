@@ -63,3 +63,14 @@ body.ui-v15 [hidden]{display:none!important}
 .ui-v15 #screen-map button.secondary-button,.ui-v15 .pin-editor button{background:linear-gradient(180deg,#392354,#211432)!important;border:1px solid #8866be!important;border-bottom:3px solid #4d297b!important;border-radius:5px!important;box-shadow:none!important;color:#f0e4ff!important}
 .ui-v15 .pin-editor button.primary-button{background:#4d22c6!important}.ui-v15 .pin-editor input{background:#140d21;border:1px solid #8866be;color:#f0e4ff}
 .ui-v15 .track-row.music-track-card .secondary-button{background:linear-gradient(180deg,#392354,#211432)!important;border:1px solid #8866be!important;border-bottom:3px solid #4d297b!important;border-radius:5px!important;box-shadow:none!important;color:#f0e4ff!important}
+.ui-v15 .br-ach-summary{overflow:auto}.ui-v15 .br-ach-big{white-space:nowrap;font-size:clamp(36px,5.5vw,75px)}
+@media(max-width:800px){.ui-v15 .v15-tester{top:3px;right:3px;width:25px;height:25px;font-size:10px;opacity:.8}}
+@media(max-height:520px){
+ .ui-v15 .br-head{height:72px!important;min-height:0;padding-top:8px;padding-bottom:8px}.ui-v15 .br-head h2{font-size:22px!important}
+ .ui-v15 #screen-achievements .br-ach-layout{top:90px!important;bottom:16px!important;grid-template-columns:190px minmax(0,1fr)}
+ .ui-v15 #screen-achievements .br-ach-big{font-size:36px;margin:16px 0}.ui-v15 .br-ach-summary>strong{font-size:12px}.ui-v15 .br-ach-summary p{font-size:11px}
+ .ui-v15 #screen-settings .br-settings-layout{top:88px!important;bottom:72px!important}.ui-v15 .br-settings-nav{overflow:auto}.ui-v15 .br-settings-foot{height:62px!important}.ui-v15 .br-tab{padding:8px!important}
+ .ui-v15 .br-best-layout,.ui-v15 .br-simple{top:88px;bottom:16px;overflow:auto}.ui-v15 .br-best-details{overflow:auto}
+ .ui-v15 #screen-tutorial .br-tutorial{top:88px!important;bottom:76px!important;overflow:auto}.ui-v15 .br-tutorial-done{bottom:12px!important}
+ .ui-v15 #screen-upgrades .wide-content,.ui-v15 #screen-evolution .evolution-content{top:90px!important;bottom:15px;transform:none;overflow:auto}
+}
