@@ -704,15 +704,15 @@ assert.ok(Math.abs(forceProbe.motionVX+5.04)<1e-9,'Ordinary pull must be four ti
 const rivalProbe=abyssBox.abyssPull({x:0,y:0,r:1000},2000,0,100);
 assert.ok(Math.abs(rivalProbe.x+1417.5)<1e-8,'Rival holes must receive the same fourfold increase');
 
-// Fractional rewards must accumulate, not round small catches back up to old yields.
+// Campaign yield tracks relative area; black-hole economy keeps fractional rewards.
 const lootBox={g:{endless:false,complete:false,tier:0,matter:0,total:0,stageCollects:0,collects:0,credits:0,materials:{ore:0},upgrade:{harvest:0},particles:false},
  player:{x:0,y:0,r:13},tester:{loot:1},CHUNK:480,TA:[{required:280}],
  advanceHarvestChain(){},resourceOf:()=> 'ore',radiusAt:()=>1000,ordinaryBodyValue:()=>100,blackHoleBodyValue:()=>100,
- currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
-vm.createContext(lootBox);vm.runInContext(upgradePrelude+absorbCode,lootBox);
-for(let i=0;i<100;i++)lootBox.absorb({value:1,kind:'matter'});
-assert.ok(Math.abs(lootBox.g.matter-100*280/30)<1e-8);
-assert.ok(Math.abs(lootBox.g.credits-100*280/30*.75)<1e-8);
+ clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
+vm.createContext(lootBox);vm.runInContext(upgradePrelude+game.slice(game.indexOf('const CAMPAIGN_YIELD='),game.indexOf('function absorb(e)'))+absorbCode,lootBox);
+for(let i=0;i<100;i++)lootBox.absorb({value:1,r:6.5,kind:'matter'});
+assert.ok(Math.abs(lootBox.g.matter-100*280*.05*.25)<1e-8);
+assert.ok(Math.abs(lootBox.g.credits-100*280*.05*.25*.75)<1e-8);
 assert.ok(Math.abs(lootBox.g.materials.ore-100)<1e-8);
 lootBox.g.endless=true;const beforeLoot=lootBox.g.matter;lootBox.absorb({kind:'matter'});
 assert.ok(Math.abs(lootBox.g.matter-beforeLoot-10)<1e-8,'Black-hole catches also yield one tenth');
@@ -1011,3 +1011,11 @@ console.log('PASS: every rendered LOD is eligible for gravity across zooms and s
  assert.deepEqual(JSON.parse(JSON.stringify(b.buildAbyssCatalogue())),JSON.parse(JSON.stringify(b.list)));
 }
 console.log('PASS: endless upgrades, exact bulk quotes, MAX affordability, diminished gains, 10x base black-hole flight and unique permanent names');
+
+// A tiny body cannot buy the same progress as a near-peer at any campaign tier.
+for(let tier=0;tier<27;tier++){
+ lootBox.g.tier=tier;lootBox.TA[tier]={required:1000};lootBox.g.endless=false;
+ const tiny=lootBox.campaignBodyValue({r:.13}),peer=lootBox.campaignBodyValue({r:6.5});
+ assert.ok(peer>tiny*2000);assert.ok(peer<1000*.25);assert.ok(Number.isFinite(tiny)&&tiny>0);
+}
+console.log('PASS: all 27 campaign forms have size-weighted rewards without a flat progress floor');

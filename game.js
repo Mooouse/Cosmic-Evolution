@@ -1316,7 +1316,14 @@ function testerVisitAbyss(){
 
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
-function absorb(e){advanceHarvestChain();const mat=resourceOf(e);let val=Math.max(1,Math.round((g.endless?blackHoleBodyValue(e):player.r>radiusAt(6,0)?Math.min(e.value??Infinity,ordinaryBodyValue(e)):(e.value??ordinaryBodyValue(e)))*(1+upgradePower('harvest')*.075)*tester.loot))*(g.endless?.1:1);if(!g.endless)val=Math.max(val,TA[g.tier].required/30);g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
+// Per-form calibration: comparable-sized bodies matter; dust never grants a flat
+// percentage of a planet/galaxy. No elapsed-time gate or passive mass income.
+const CAMPAIGN_YIELD=[.05,.065,.12,.19,.25,.31,.30,.4,.65,.20,.14,.14,.14,.17,.15,.16,.20,.13,.14,.13,.15,.12,.13,.13,.12,.14,.12];
+function campaignBodyValue(e){
+ const ratio=clamp(e.r/Math.max(1,player.r),0,.95);
+ return TA[g.tier].required*CAMPAIGN_YIELD[g.tier]*ratio*ratio;
+}
+function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const boost=(1+upgradePower('harvest')*.075)*tester.loot;const val=g.endless?Math.max(1,Math.round(blackHoleBodyValue(e)*boost))*.1:campaignBodyValue(e)*boost;g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
  g.materials[mat]=(g.materials[mat]||0)+gain*(g.endless?.1:1);
  if(!g.endless&&(mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
