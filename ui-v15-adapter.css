@@ -58,3 +58,8 @@ body.ui-v15 [hidden]{display:none!important}
 .ui-v15 .pin-editor{z-index:80;background:#211333;border:1px solid #8866be;color:#f2eaff;box-shadow:0 10px 40px #0009}
 .ui-v15 #screen-tutorial .br-tutorial article p{line-height:1.7}
 @media(max-width:800px){.ui-v15 #screen-map .map-corner.left{width:180px;max-height:calc(100% - 85px)}.ui-v15 #screen-map .map-threat{display:none}.ui-v15 #screen-map .map-big,.ui-v15 #screen-map .map-sub{display:none}.ui-v15 #screen-map .atlas-stats{font-size:9px}.ui-v15 #screen-map .atlas-legend{font-size:7px;gap:6px}.ui-v15 #screen-map .atlas-legend .abyss-key{display:none}}
+@media(max-width:800px) and (min-height:521px){.ui-v15 #screen-menu .menu-main{top:100px!important}.ui-v15 #screen-menu .eyeline{display:none}}
+.ui-v15 #screen-map .map-threat{right:110px!important}
+.ui-v15 #screen-map button.secondary-button,.ui-v15 .pin-editor button{background:linear-gradient(180deg,#392354,#211432)!important;border:1px solid #8866be!important;border-bottom:3px solid #4d297b!important;border-radius:5px!important;box-shadow:none!important;color:#f0e4ff!important}
+.ui-v15 .pin-editor button.primary-button{background:#4d22c6!important}.ui-v15 .pin-editor input{background:#140d21;border:1px solid #8866be;color:#f0e4ff}
+.ui-v15 .track-row.music-track-card .secondary-button{background:linear-gradient(180deg,#392354,#211432)!important;border:1px solid #8866be!important;border-bottom:3px solid #4d297b!important;border-radius:5px!important;box-shadow:none!important;color:#f0e4ff!important}
