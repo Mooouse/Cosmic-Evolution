@@ -43,3 +43,18 @@ body.ui-v15 [hidden]{display:none!important}
  .ui-v15 .v15-atlas{padding:12px 3%}.ui-v15 .v15-atlas .atlas-pins{flex-wrap:wrap}.ui-v15 .v15-atlas .atlas-measures{gap:8px}.ui-v15 .v15-atlas .atlas-measures strong{font-size:13px}.ui-v15 .v15-atlas .atlas-legend{font-size:8px}.ui-v15 .v15-atlas .atlas-footer small{display:none}
 }
 @media(max-height:520px){.ui-v15 #screen-menu{overflow:auto}.ui-v15 #screen-menu .menu-main{position:relative;top:80px;left:6%;padding-bottom:100px}.ui-v15 #screen-menu .menu-foot{display:none}.ui-v15 #screen-menu .hero-title{font-size:52px}.ui-v15 #screen-menu .hero-desc{display:none}.ui-v15 .hud-bottom{bottom:8px}.ui-v15 .player-label,.ui-v15 .world-coords{display:none}}
+.ui-v15 #screen-map #atlas-canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.ui-v15 #screen-map .map-corner.left{max-height:calc(100% - 100px);overflow:auto}
+.ui-v15 #screen-map .atlas-stats{display:grid;gap:10px;font-size:11px;padding:12px 0;color:#dbc7ff}
+.ui-v15 #screen-map .atlas-pin-hint{font-size:10px;line-height:1.5;margin:10px 0}
+.ui-v15 #screen-map .v15-map-details summary{cursor:pointer;font-size:11px;padding:10px 0;color:#ddcaff}
+.ui-v15 #screen-map .atlas-measures{display:grid;gap:12px;margin:12px 0}
+.ui-v15 #screen-map .atlas-measures strong{font-size:14px}
+.ui-v15 #screen-map .atlas-pins{display:flex;flex-wrap:wrap;gap:6px}
+.ui-v15 #screen-map .atlas-pins>*{max-width:100%;min-width:0;flex:1 1 42%;font-size:10px}
+.ui-v15 #screen-map button.secondary-button{background:#291941;border:1px solid #795abb;color:#e4d8ff;border-radius:5px;padding:10px}
+.ui-v15 #screen-map .map-threat{max-width:40%;line-height:1.6;display:grid;gap:10px;justify-items:end}
+.ui-v15 #screen-map .atlas-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:9px}
+.ui-v15 .pin-editor{z-index:80;background:#211333;border:1px solid #8866be;color:#f2eaff;box-shadow:0 10px 40px #0009}
+.ui-v15 #screen-tutorial .br-tutorial article p{line-height:1.7}
+@media(max-width:800px){.ui-v15 #screen-map .map-corner.left{width:180px;max-height:calc(100% - 85px)}.ui-v15 #screen-map .map-threat{display:none}.ui-v15 #screen-map .map-big,.ui-v15 #screen-map .map-sub{display:none}.ui-v15 #screen-map .atlas-stats{font-size:9px}.ui-v15 #screen-map .atlas-legend{font-size:7px;gap:6px}.ui-v15 #screen-map .atlas-legend .abyss-key{display:none}}

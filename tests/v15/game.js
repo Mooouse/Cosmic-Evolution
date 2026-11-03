@@ -2813,6 +2813,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const lang=window.SpaceI18n?.language||'en';if(lang==='ru')return;
   const dictionary=window.SpaceUIv15Dictionary||{};const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
   while((node=walker.nextNode())){const key=node.nodeValue.trim(),entry=dictionary[key];if(entry)node.nodeValue=node.nodeValue.replace(key,entry[lang==='es'?1:0]);}
+  qa(root,'[aria-label],[title]').forEach(e=>['aria-label','title'].forEach(a=>{const v=e.getAttribute(a),entry=dictionary[v];if(entry)e.setAttribute(a,entry[lang==='es'?1:0]);}));
   window.SpaceI18n?.refresh();
  }
  function decorate(root){
@@ -2829,11 +2830,16 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  }
  showMainMenu=function(paused=false){legacy.menu(paused);const {root}=mount('menu');
   q(root,'.primary.big-play').onclick=()=>g.tutorialDone?resumeGame():showTutorial();q(root,'.quiet-btn').onclick=restartCampaign;
+  q(root,'.quiet-btn').removeAttribute('aria-label');
   text(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   text(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
   text(root,'.menu-foot',`${TA[g.tier].name} · ${timeFmt(g.time)} · v3.38.0`);
-  const lang=q(root,'#language-control');lang.innerHTML=languageSelect();q(lang,'select').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);showMainMenu(paused);};
-  const sound=q(root,'[data-toggle="sound"]');if(sound)sound.onclick=()=>{g.sound=!g.sound;save();sound.setAttribute('aria-pressed',String(g.sound));};
+  const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
+  const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
+  toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
+  lang.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();popup.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();}};
+  qa(lang,'[data-lang]').forEach(b=>{b.setAttribute('aria-selected',String(b===selected));b.onclick=()=>{window.SpaceI18n.setLanguage(b.dataset.lang);showMainMenu(paused);};});
+  const sound=q(root,'[data-toggle="sound"]');if(sound)sound.setAttribute('aria-pressed',String(g.sound));if(sound)sound.onclick=()=>{g.sound=!g.sound;save();sound.setAttribute('aria-pressed',String(g.sound));};
  };
  showSettings=function(){legacy.settings();const {root,old}=mount('settings');
   const move=(target,id)=>{const n=q(old,'#'+id);q(root,target).replaceWith(n);return n;};
@@ -2844,6 +2850,8 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   qa(root,'.br-switch').forEach((button,i)=>{const input=q(old,'#'+['set-music','set-sound','set-particles','set-auto-quality'][i]);button.classList.toggle('active',input.checked);button.setAttribute('aria-checked',String(input.checked));input.hidden=true;button.after(input);button.onclick=()=>{input.checked=!input.checked;input.dispatchEvent(new Event('change',{bubbles:true}));button.classList.toggle('active',input.checked);button.setAttribute('aria-checked',String(input.checked));};});
   qa(root,'[data-settings-tab]').forEach(b=>b.onclick=()=>{qa(root,'[data-settings-tab]').forEach(n=>n.classList.toggle('active',n===b));qa(root,'[data-settings-pane]').forEach(n=>n.classList.toggle('active',n.dataset.settingsPane===b.dataset.settingsTab));});
   q(root,'#br-new-game').onclick=restartCampaign;
+  q(root,'[data-settings-pane="graphics"] .br-warning').remove();
+  text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
   text(root,'.br-readout-foot','INFINITI SPACE · v3.38.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   decorate(root);
@@ -2870,7 +2878,21 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   decorate(root);
  };
  // Keep the atlas renderer and all marker editing controls in their live DOM.
- showMap=function(){legacy.map();const old=$('modal').firstElementChild;old.classList.add('v15-atlas');};
+ showMap=function(){legacy.map();const {root,old}=mount('map');
+  q(root,'#atlas').replaceWith(q(old,'#atlas-canvas'));
+  q(root,'#atlas-pin-menu').remove();q(root,'.map-scale').remove();
+  const left=q(root,'.map-corner.left');q(left,'.map-stats').replaceWith(q(old,'.atlas-stats'));
+  q(left,'#pin-add').replaceWith(q(old,'#atlas-pin-add'));q(left,'#pin-status').replaceWith(q(old,'#atlas-pin-hint'));
+  const details=document.createElement('details');details.className='v15-map-details';const summary=document.createElement('summary');summary.textContent=L('Scale & saved markers','Масштаб и сохранённые метки','Escala y marcas guardadas');details.append(summary,q(old,'.atlas-measures'),q(old,'.atlas-pins'));left.append(details);
+  [['#zoom-in','#atlas-zoom-in'],['#zoom-out','#atlas-zoom-out'],['#map-center','#atlas-center']].forEach(([to,from])=>q(root,to).replaceWith(q(old,from)));
+  q(root,'.map-threat').replaceChildren(q(old,'#atlas-threat'),q(old,'#atlas-abyss'));
+  q(root,'.map-footer .legend').replaceWith(q(old,'.atlas-legend'));atlasFitPlayer();atlas.dirty=true;translate(root);
+ };
+ showTutorial=function(){show('');const {root}=mount('tutorial');
+  const articles=qa(root,'.br-tutorial article');
+  text(articles[2],'p',L('Gather mass and the materials in your evolution recipe. M opens the atlas. Right-click to name and colour a marker; on a phone use + Marker. A larger black hole ends your run.','Собирай массу и материалы из рецепта эволюции. M открывает карту. ПКМ создаёт метку с именем и цветом; на телефоне — + Метка. Большая чёрная дыра завершит прохождение.','Reúne masa y los materiales de tu receta. M abre el atlas. Clic derecho crea una marca con nombre y color; en móvil usa + Marca. Un agujero negro mayor termina tu partida.'));
+  q(root,'.br-tutorial-done').onclick=()=>{g.tutorialDone=true;save();resumeGame();};
+ };
  const oldOpenEvolution=openEvolution;openEvolution=()=>{if($('modal').dataset.screen==='evolution'&&!$('modal').classList.contains('off'))resumeGame();else showV15Evolution();};
  $('btn-evolution').onclick=openEvolution;$('btn-stage-details').onclick=openEvolution;
  const holder=document.createElement('template');holder.innerHTML=tpl.play;const hud=holder.content.firstElementChild;hud.classList.add('active','v15-hud');$('hud').append(hud);decorate(hud);
@@ -2880,7 +2902,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const visible=$('modal').classList.contains('off');hud.style.display=visible?'block':'none';
   const resources=qa(hud,'.hud-resources strong');resources[0].textContent=$('matter-value').textContent;resources[1].textContent=fmt(g.credits);resources[2].textContent=timeFmt(g.time);
   text(hud,'.hud-resources small',$('matter-label').textContent);text(hud,'.hud-sub',TA[g.tier].epoch);text(hud,'.world-coords',$('world-subtitle').textContent);
-  text(hud,'#mass-number',$('matter-value').textContent);text(hud,'#radius-number',$('radius-value').textContent);text(hud,'.mass-details .mass-detail:last-child strong',Math.round(g.viewZoom*100)+'%');
+  text(hud,'#mass-number',$('matter-value').textContent+(g.endless?' M☉':''));text(hud,'#radius-number',$('radius-value').textContent);text(hud,'.mass-details .mass-detail:last-child strong',Math.round(g.viewZoom*100)+'%');
   text(hud,'.evo-title>span:first-child',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(hud,'.evo-title>span:nth-child(2)',g.endless?'∞':TA[Math.min(27,g.tier+1)].name);text(hud,'.evo-aux b',Math.round(stageFraction()*100)+'%');q(hud,'.progress-bar span').style.width=stageFraction()*100+'%';text(hud,'#player-label-text',TA[g.tier].name);text(hud,'.player-label small',`${g.tier+1} / 28`);text(hud,'#pulse small',$('pulse-cooldown').textContent);text(hud,'#dash small',$('boost-cooldown').textContent);text(hud,'#upgrades-open b',Object.values(g.upgrade).reduce((a,b)=>a+b,0));
  }
  const originalResume=resumeGame;resumeGame=function(){originalResume();refreshV15();};
