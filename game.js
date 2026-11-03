@@ -89,7 +89,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[0],activeTrack:0,controlMode:'follow',flightFeel:'smooth',viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[0],activeTrack:0,controlMode:'follow',flightFeel:'smooth',viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -112,6 +112,8 @@ try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
   }
  }
 }catch(_){/* storage may be unavailable */}
+for(const u of upgrades)g.upgrade[u.id]=Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,Math.floor(Number(g.upgrade[u.id])||0)));
+g.buyAmount=g.buyAmount==='max'?'max':Math.max(1,Math.min(Number.MAX_SAFE_INTEGER,Math.floor(Number(g.buyAmount)||1)));
 function normaliseMapPins(value){
  if(!Array.isArray(value))return [];
  const ids=new Set();
@@ -119,7 +121,8 @@ function normaliseMapPins(value){
   .map(p=>({id:p.id,x:p.x,y:p.y,zoom:clamp(Number(p.zoom)||1,1e-155,12),name:String(p.name||'Метка').slice(0,32),color:/^#[0-9a-f]{6}$/i.test(p.color)?p.color:'#7ddcff'}));
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
-g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.1,10):1;
+g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
+
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
@@ -177,7 +180,7 @@ function advanceHarvestChain(){
  }
  return chainMultiplier();
 }
-function ordinaryGravityRadius(){return Math.max((g.tier<4?165:116.4)+g.upgrade.gravity*7,player.r*3.36)*tester.gravity;}
+function ordinaryGravityRadius(){const power=upgradePower('gravity');return Math.max((g.tier<4?165:116.4)+power*7,player.r*3.36)*tester.gravity*(1+Math.max(0,power-80)*.01);}
 function pickupFeedback(value,rare=false){
  pickupCount++;pickupValue+=value;
  const now=performance.now();
@@ -287,14 +290,67 @@ function missionsDone(){const m=missionReq();return g.stageCollects>=m.collect&&
 function spendRecipe(){for(const r of stageRecipe())g.materials[r.type]=Math.max(0,(g.materials[r.type]||0)-r.amount);}
 function resourceOf(e){return e.material||'ore';}
 
-function upgradeCost(u){return Math.round(u.base*Math.pow(u.growth,g.upgrade[u.id]));}
-function buy(id){const u=upgrades.find(x=>x.id===id);if(!u)return;const cost=upgradeCost(u);if(g.upgrade[id]>=u.max||g.credits<cost){toast('Недостаточно звёздной пыли');return;}g.credits-=cost;g.upgrade[id]++;sound(590,'triangle',.13);burst(player.x,player.y,20,'#81e5ec',1);renderUI(true);save();}
+function upgradePower(id){
+ const level=g.upgrade[id]||0,limit=upgrades.find(u=>u.id===id).max;
+ return level<=limit?level:limit+.1*Math.log2(1+level-limit);
+}
+function upgradeCost(u,level=g.upgrade[u.id]){
+ if(level<u.max)return Math.round(u.base*Math.pow(u.growth,level));
+ const log=Math.log(u.base)+u.max*Math.log(u.growth)+Math.log(8)+(level-u.max)*Math.log(u.growth*1.6);
+ return log>Math.log(Number.MAX_VALUE)?Infinity:Math.exp(log);
+}
+function upgradeTotalCost(u,start,count){
+ if(!Number.isSafeInteger(count)||count<1||start+count>Number.MAX_SAFE_INTEGER)return Infinity;
+ let cost=0;
+ const ordinary=Math.min(count,Math.max(0,u.max-start));
+ for(let i=0;i<ordinary;i++)cost+=upgradeCost(u,start+i);
+ const extra=count-ordinary;
+ if(extra){
+  const level=start+ordinary,logRatio=Math.log(u.growth*1.6),n=extra*logRatio;
+  const logSum=Math.log(u.base)+u.max*Math.log(u.growth)+Math.log(8)+(level-u.max)*logRatio+(n>50?n:Math.log(Math.expm1(n)))-Math.log(Math.expm1(logRatio));
+  if(logSum>Math.log(Number.MAX_VALUE))return Infinity;
+  cost+=Math.exp(logSum);
+ }
+ return cost;
+}
+function upgradeQuote(u,amount=g.buyAmount){
+ const start=g.upgrade[u.id];
+ if(amount!=='max'){
+  const count=Number(amount);
+  return {count:Number.isSafeInteger(count)&&count>0?count:0,cost:upgradeTotalCost(u,start,count)};
+ }
+ let lo=0,hi=1,limit=Number.MAX_SAFE_INTEGER-start;
+ while(hi<limit&&upgradeTotalCost(u,start,hi)<=g.credits){lo=hi;hi=Math.min(limit,hi*2);}
+ if(hi&&upgradeTotalCost(u,start,hi)<=g.credits)lo=hi;
+ else while(hi-lo>1){const mid=lo+Math.floor((hi-lo)/2);if(upgradeTotalCost(u,start,mid)<=g.credits)lo=mid;else hi=mid;}
+ return {count:lo,cost:lo?upgradeTotalCost(u,start,lo):0};
+}
+function setBuyAmount(amount){
+ if(amount!=='max'&&(!Number.isSafeInteger(Number(amount))||Number(amount)<1))return;
+ g.buyAmount=amount==='max'?'max':Number(amount);save();renderUI(true);
+}
+function buy(id){
+ const u=upgrades.find(x=>x.id===id);if(!u)return;
+ const quote=upgradeQuote(u);
+ if(!quote.count||!Number.isFinite(quote.cost)||quote.cost>g.credits){toast('Недостаточно звёздной пыли');return;}
+ g.credits=Math.max(0,g.credits-quote.cost);g.upgrade[id]+=quote.count;
+ sound(590,'triangle',.13);burst(player.x,player.y,20,'#81e5ec',1);renderUI(true);save();
+}
+function flightSpeed(){
+ const power=upgradePower('speed');
+ const ordinarySpeed=(230+Math.min(190,power*5.2))*(1+Math.log2(1+player.r/25)*.38);
+ const cosmicSpeed=player.r>CHUNK*5?Math.min(1e290,Math.max(ordinarySpeed,140/physicsZoom())):ordinarySpeed;
+ return tester.speed*cosmicSpeed*(g.endless?10*(1+power*.01):1+Math.max(0,power-60)*.01);
+}
 function uiIcon(name){
  const shapes={"map": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"m16 8-2.5 5.5L8 16l2.5-5.5Z\"/>", "gravity": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><ellipse cx=\"12\" cy=\"12\" rx=\"10\" ry=\"6\" transform=\"rotate(-35 12 12)\"/>", "speed": "<path d=\"m13 3-9 11h7l-1 7 10-12h-8Z\"/>", "harvest": "<path d=\"m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z\"/>", "shield": "<path d=\"m12 3 8 3v6c0 4-5 7-8 9-3-2-8-5-8-9V6Z\"/><path d=\"m8 12 3 3 5-6\"/>", "music": "<path d=\"M9 18V5l11-2v13M9 9l11-2\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/><ellipse cx=\"17\" cy=\"16\" rx=\"3\" ry=\"2\"/>", "mute": "<path d=\"M9 18v-5m0-6V5l11-2v13M13 8l7-1M3 3l18 18\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/>", "pause": "<path d=\"M8 5v14M16 5v14\" stroke-width=\"3\"/>", "settings": "<path d=\"M4 7h16M4 17h16\"/><circle cx=\"9\" cy=\"7\" r=\"3\" fill=\"#0b2031\"/><circle cx=\"16\" cy=\"17\" r=\"3\" fill=\"#0b2031\"/>", "tester": "<path d=\"m8 4-5 8 5 8M16 4l5 8-5 8M14 4l-4 16\"/>", "arrow": "<path d=\"M4 12h16m-6-6 6 6-6 6\"/>", "close": "<path d=\"m6 6 12 12M6 18 18 6\"/>", "chevron": "<path d=\"m14 6-6 6 6 6\"/>", "expand": "<path d=\"M7 17 18 6M7 6h11v11\"/>", "plus": "<path d=\"M12 5v14M5 12h14\"/>", "minus": "<path d=\"M5 12h14\"/>", "center": "<circle cx=\"12\" cy=\"12\" r=\"6\"/><path d=\"M12 2v5m0 10v5M2 12h5m10 0h5\"/>", "achievements": "<path d=\"M8 3h8v5a4 4 0 0 1-8 0ZM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 12v6m-4 3h8m-6-3h4\"/>", "statistics": "<path d=\"M4 20V4m0 16h17M9 16v-5m5 5V7m5 9V3\"/>", "upgrades": "<path d=\"M5 19v-6m7 6V5m7 14v-9M2 13h6m1-8h6m1 5h6\"/>"};
  return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[name]||shapes.arrow}</svg>`;
 }
 function populateUpgrades(){const root=$('upgrades');root.textContent='';for(const u of upgrades){let b=document.createElement('button');b.className='upgrade';b.dataset.upgrade=u.id;b.addEventListener('click',()=>buy(u.id));b.innerHTML=`<span class="upgrade-icon">${uiIcon(u.id)}</span><span class="upgrade-description"><strong>${u.name}</strong><small>${u.label} · <span class="upgrade-level"></span></small></span><span class="upgrade-cost"><span class="upgrade-price"></span><small>✦ цена</small></span>`;root.append(b);}}
 populateUpgrades();
+for(const button of document.querySelectorAll('[data-buy-amount]'))button.onclick=()=>setBuyAmount(button.dataset.buyAmount);
+$('upgrade-amount').oninput=e=>{if(e.target.value.trim())setBuyAmount(e.target.value);};
+$('upgrade-amount').onblur=e=>{e.target.value=g.buyAmount==='max'?'':String(g.buyAmount);};
 function renderUI(force=false){
  $('matter-value').textContent=g.endless?fmt(solarMass())+' M☉':fmt(g.total);$('matter-label').textContent=g.endless?L('BLACK HOLE MASS','МАССА ЧЁРНОЙ ДЫРЫ','MASA DEL AGUJERO NEGRO'):L('MATTER','МАТЕРИЯ','MATERIA');$('radius-value').textContent=lightYears(g.endless?blackHoleCoreWorldRadius():player.r);$('credit-value').textContent=fmt(g.credits);$('time-value').textContent=timeFmt(g.time);
  const t=TA[g.tier],next=TA[g.tier+1],progress=clamp(g.matter/t.required,0,1);
@@ -321,7 +377,20 @@ function renderUI(force=false){
   $('resource-hint').textContent=g.endless?'Все виды материи поглощаются автоматически':stageRecipe().map(r=>MATERIALS[r.type].label).join(' · ');
  }
  cs.forEach((ok,i)=>{const e=$(`mission-${i+1}`);e.classList.toggle('done',ok);e.querySelector('.mission-mark').textContent=ok?'✓':'◇';});$('mission-done').textContent=cs.filter(Boolean).length+'/3';
- for(const u of upgrades){let b=$('upgrades').querySelector(`[data-upgrade="${u.id}"]`),lvl=g.upgrade[u.id],c=upgradeCost(u);b.querySelector('.upgrade-level').textContent=`ур. ${lvl}/${u.max}`;b.querySelector('.upgrade-price').textContent=lvl>=u.max?'MAX':fmt(c);b.disabled=g.credits<c||lvl>=u.max;}
+ $('upgrade-bulk-label').textContent=L('Levels per purchase','Уровней за покупку','Niveles por compra');
+ $('upgrade-bulk-help').textContent=L('Beyond the former caps: ×8 price, faster cost growth and smaller bonuses.','После прежних максимумов: цена ×8, далее быстрый рост цен и меньшие прибавки.','Tras los límites anteriores: precio ×8, costes crecientes y mejoras menores.');
+ $('upgrade-amount').setAttribute('aria-label',L('Number of levels to buy','Количество уровней для покупки','Cantidad de niveles para comprar'));
+ if(document.activeElement!==$('upgrade-amount'))$('upgrade-amount').value=g.buyAmount==='max'?'':String(g.buyAmount);
+ for(const button of document.querySelectorAll('[data-buy-amount]'))button.setAttribute('aria-pressed',String(String(g.buyAmount)===button.dataset.buyAmount));
+ for(const u of upgrades){
+  const b=$('upgrades').querySelector(`[data-upgrade="${u.id}"]`),lvl=g.upgrade[u.id],q=upgradeQuote(u);
+  b.querySelector('.upgrade-level').textContent=L('lv. ','ур. ','niv. ')+fmt(lvl)+' / ∞';
+  b.querySelector('.upgrade-price').textContent=Number.isFinite(q.cost)?fmt(q.cost):'∞';
+  b.querySelector('.upgrade-cost small').textContent=q.count?'+'+fmt(q.count)+' '+L('levels','ур.','niv.')+' · ✦':L('Not enough ✦','Не хватает ✦','Faltan ✦');
+  b.title=(lvl>=u.max?L('Endless upgrade · smaller bonus per level','Бесконечное улучшение · меньшая прибавка за уровень','Mejora infinita · menor aumento por nivel'):L('Standard levels up to ','Обычные уровни до ','Niveles normales hasta ')+u.max);
+  b.disabled=!q.count||!Number.isFinite(q.cost)||g.credits<q.cost;
+ }
+
  $('pulse-cooldown').textContent=pulseCd>0?pulseCd.toFixed(1)+'с':'E · ГОТОВ';$('boost-cooldown').textContent=boostCd>0?boostCd.toFixed(1)+'с':'SHIFT · ГОТОВ';
  $('pulse-fill').style.transform=`scaleX(${clamp(1-pulseCd/13,0,1)})`;$('boost-fill').style.transform=`scaleX(${clamp(1-boostCd/6,0,1)})`;
  $('zoom-label').textContent=`ДИАМЕТР ${lightYears(2*(g.endless?blackHoleCoreWorldRadius():player.r))} · КАМЕРА ${camera.zoom<.01?camera.zoom.toExponential(2):camera.zoom.toFixed(2)}× · ОБЗОР ${Math.round((g.viewZoom||1)*100)}%`;
@@ -733,7 +802,7 @@ function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
 }
 function blackHoleGravityRadius(){
  const zoom=physicsZoom(),core=blackHoleCoreWorldRadius();
- return core+Math.max(216,core*zoom*2.64)*(1+g.upgrade.gravity*.012)*tester.gravity/zoom;
+ return core+Math.max(216,core*zoom*2.64)*(1+upgradePower('gravity')*.012)*tester.gravity/zoom;
 }
 function applyBlackHoleGravity(e,dt){
  if(e.freeFlight&&g.freeFlights[flightKey(e)])Object.assign(e,freeFlightAt(g.freeFlights[flightKey(e)]));
@@ -825,7 +894,7 @@ function finishCosmicAbsorption(e){
  if(mask&(1<<e.index)){e.dead=true;delete g.freeFlights[flightKey(e)];return;}
  bag[key]=(mask|(1<<e.index))>>>0;
  const value=blackHoleBodyValue(e);
- const amount=value*(1+g.upgrade.harvest*.075)*tester.loot*.1;
+ const amount=value*(1+upgradePower('harvest')*.075)*tester.loot*.1;
  g.matter=Math.min(1e290,g.matter+amount);g.total=Math.min(1e290,g.total+amount);
  g.stageCollects=Math.min(1e290,g.stageCollects+amount);
  g.credits=Math.min(1e290,g.credits+amount*.4);g.collects++;
@@ -1063,7 +1132,9 @@ let abyssPhysical=[],abyssVisual=[],abyssTimer=0,abyssNotice='';
 // A small fixed catalogue, not a grid or a zoom-dependent set of proxies.
 // There are only 1–3 irregularly placed landmarks per vast logarithmic band.
 function buildAbyssCatalogue(){
- const catalogue=[],names=['ЭРЕБ','НИКТА','БЕЗДНА','ЛЕВИАФАН','ГОЛИАФ','ХАОС'];
+ const catalogue=[];
+ const names=['ЭРЕБ','НИКТА','ЛЕВИАФАН','НЕМЕЗИДА','ТАРТАР','ХАОС','КРОНОС','АНАНКЕ','МОРОС','ГИПЕРИОН','ОБЛИВИОН','АХЕРОН','СТИГИЯ','ТЕНЕБРИС','НОКС','УМБРА','АБАДДОН','АПОФИС','ЭРРА','ФОБОС','ДЕЙМОС','ОФИОН','АСТРЕЙ','КЕРБЕР','ЛЕТА','ФЛЕГЕТОН','ОРКУС','МОРФЕЙ','КТОН','СИГИЛ','НИХИЛЬ','ЭХО'];
+ const titles=['ТИХИЙ ПРЕДЕЛ','ПАДШИЙ СВЕТ','ПОСЛЕДНИЙ РАССВЕТ','ВЕЧНАЯ НОЧЬ','ТЁМНЫЙ ВЕНЕЦ','ЗАБЫТАЯ ЭПОХА','ПУСТОЕ НЕБО','КРАЙ БЕСКОНЕЧНОСТИ'];
  for(let level=0;level<=80;level++){
   const rng=chunkRandom(seedHash(level+917,314159)^0x62b9d14f),base=ABYSS_BASE*ABYSS_STEP**level;
   const count=level===0?3:1+Math.floor(rng()*3),band=[];
@@ -1072,7 +1143,7 @@ function buildAbyssCatalogue(){
    for(let attempt=0;attempt<32;attempt++){
     const angle=rng()*TAU,distance=base*(18+rng()*39),r=base*(.65+rng()*1.25);
     h={x:Math.cos(angle)*distance,y:Math.sin(angle)*distance,r,level,id:`abyss:${level}:${i}`,
-     name:names[Math.floor(rng()*names.length)]+' '+(level+1)+' · '+(i+1)};
+     name:(rng(),names[((level*3+i)*17)%names.length]+' — '+titles[Math.floor((level*3+i)/names.length)])};
     if(band.every(other=>Math.hypot(other.x-h.x,other.y-h.y)>Math.max(other.r,h.r)*12))break;
    }
    band.push(h);catalogue.push(Object.freeze(h));
@@ -1245,7 +1316,7 @@ function testerVisitAbyss(){
 
 function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,n):Math.min(5,n);for(let i=0;i<cap;i++){const a=rand(0,TAU),sp=rand(35,180)*scale;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.3,.9),max:.9,r:rand(1,3.4)*scale,color});}if(particles.length>420)particles.splice(0,particles.length-420);}
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
-function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const val=Math.max(1,Math.round((g.endless?blackHoleBodyValue(e):player.r>radiusAt(6,0)?Math.min(e.value??Infinity,ordinaryBodyValue(e)):(e.value??ordinaryBodyValue(e)))*(1+g.upgrade.harvest*.075)*tester.loot))*.1;g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
+function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const val=Math.max(1,Math.round((g.endless?blackHoleBodyValue(e):player.r>radiusAt(6,0)?Math.min(e.value??Infinity,ordinaryBodyValue(e)):(e.value??ordinaryBodyValue(e)))*(1+upgradePower('harvest')*.075)*tester.loot))*.1;g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
  g.materials[mat]=(g.materials[mat]||0)+gain*.1;
  if(!g.endless&&(mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
@@ -1277,7 +1348,7 @@ function collideWithGiant(e,dx,dy,dist){
  popText(player.x,player.y-player.r,'СЛИШКОМ БОЛЬШОЙ','#ffaba9');
  sound(135,'triangle',.16,.022);
 }
-function impact(e){if(g.tier===TA.length-1){e.kind='matter';e.material='plasma';e.value=Math.max(15,e.value||0);absorb(e);return;}if(player.shield>0){respawn(e);return;}const reduction=Math.max(.15,1-g.upgrade.shield*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
+function impact(e){if(g.tier===TA.length-1){e.kind='matter';e.material='plasma';e.value=Math.max(15,e.value||0);absorb(e);return;}if(player.shield>0){respawn(e);return;}const reduction=(1-Math.min(g.upgrade.shield,45)*.018)/(1+Math.max(0,upgradePower('shield')-45)*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
 function evolve(){
  if(g.complete)return;
  if(g.tier===TA.length-1){g.complete=true;g.endless=true;save();return;}
@@ -1297,7 +1368,7 @@ function evolve(){
 }
 function activatePulse(){
  if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;
- const range=Math.max(270+g.upgrade.gravity*7,ordinaryGravityRadius()*1.25);
+ const range=Math.max(270+upgradePower('gravity')*7,ordinaryGravityRadius()*1.25);
  shockwaves.push({x:player.x,y:player.y,r:player.r,max:1.2,life:1.2,color:'#84dfff',range});
  for(const e of [...entities,...macroEntities,...cosmicAbsorptions]){
   if(e.dead||e.absorbing||e.gathering||!canAbsorbBody(e))continue;
@@ -1351,14 +1422,7 @@ function update(dt){
  }
  player.targetR=currentRadius();
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
- const ordinarySpeed=(230+Math.min(190,g.upgrade.speed*5.2))*(1+Math.log2(1+player.r/25)*.38);
- // In the endless universe, movement must be based on *screen pixels*, not a
- // fixed count of world units. Previously the player became effectively
- // stationary once the camera zoom fell below 1e-12.
- const cosmicSpeed=player.r>CHUNK*5
-  ? Math.min(1e290,Math.max(ordinarySpeed,140/physicsZoom()))
-  : ordinarySpeed;
- const speed=tester.speed*cosmicSpeed*(boostTime>0?2.5:1);
+ const speed=flightSpeed()*(boostTime>0?2.5:1);
  // Direct flight stops almost immediately; "smooth" gives optional controlled inertia.
  const response=g.flightFeel==='smooth'?(ax||ay?7:11):(ax||ay?23:34),lerp=1-Math.exp(-dt*response);
  player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
@@ -2315,7 +2379,7 @@ function showMusicShop(){
  show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('First Light is included. Seven future tracks will be added later. Preview prices are in stardust; unavailable tracks cannot be purchased.','First Light уже доступен. Ещё семь треков будут добавлены позже. Цены указаны в звёздной пыли; недоступные треки пока нельзя купить.','First Light está incluido. Se añadirán siete pistas más. Los precios son en polvo estelar; las pistas no disponibles no se pueden comprar.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===0?L('Included · original ambient','Включено · оригинальный эмбиент','Incluida · ambiente original'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${t.id!==0&&!t.src?'disabled':''}>${t.id!==0&&!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.36.6 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.37.0 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
  $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};
@@ -2614,7 +2678,7 @@ function showPause(){showMainMenu(true);}
 function showSettings(){show(`<label class="settings-line"><span>Language / Язык / Idioma</span>${languageSelect()}</label><div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><label class="settings-line"><span>${L('Effects volume','Громкость эффектов','Volumen de efectos')}</span><input id="set-sound-volume" type="range" min="0" max="100" value="${Math.round((g.soundVolume??.7)*100)}"></label><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><label class="settings-line"><span>${L('Automatic graphics reduction','Автоматическое снижение графики','Reducción gráfica automática')}</span><input id="set-auto-quality" type="checkbox" ${g.autoQuality!==false?'checked':''}></label><p class="overlay-copy" style="text-align:left">${L('Off: full screen resolution and full-resolution black hole distortion, even at low FPS.','Выключено: полное разрешение экрана и искажения чёрных дыр, даже при низком FPS.','Desactivado: resolución completa de pantalla y distorsión de agujeros negros, incluso con pocos FPS.')}</p><div class="settings-line"><span>Качество эффектов</span><select id="set-quality" ${g.autoQuality===false?'disabled':''}><option value="1" ${g.autoQuality===false||g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.autoQuality!==false&&g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions"><button id="settings-music" class="secondary-button">${L('Music collection','Коллекция музыки','Colección de música')}</button><button id="settings-tutorial" class="secondary-button">${L('Flight tutorial','Обучение','Tutorial de vuelo')}</button>${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('modal').dataset.screen='settings';setNavigationState('settings');attachContinue();$('set-language').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);renderUI();showSettings();};$('settings-music').onclick=showMusicShop;$('settings-tutorial').onclick=()=>showTutorial();$('set-sound-volume').oninput=e=>{g.soundVolume=+e.target.value/100;save();};$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-auto-quality').onchange=e=>{setAutoQuality(e.target.checked);$('set-quality').disabled=!e.target.checked;$('set-quality').value=String(e.target.checked?g.quality:1);};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function resetCampaignState(resetModifiers=false){
  achievementQueue=[];achievementToastAt=-10;requirementNotice='';requirementNoticeAt=-100;if(externalMusic){externalMusic.pause();externalMusic=null;}
- const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,soundVolume:g.soundVolume,tutorialDone:g.tutorialDone,quality:g.quality,autoQuality:g.autoQuality,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel};
+ const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,soundVolume:g.soundVolume,tutorialDone:g.tutorialDone,quality:g.quality,autoQuality:g.autoQuality,buyAmount:g.buyAmount,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel};
  cosmicAbsorptions.length=0;absorbingMacroKeys.clear();
  const next=fresh();Object.assign(g,next,preferences);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
  if(resetModifiers&&TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
@@ -2715,7 +2779,7 @@ function testerInit(){
   try{const data=localStorage.getItem('cosmic-evolution-save-v1');if(!data){toast('Основное сохранение не найдено');return;}localStorage.setItem(SAVE_KEY,data);location.reload();}
   catch(_){toast('Не удалось скопировать сохранение');}
  };
- $('camera-minus').onclick=()=>{g.viewZoom=clamp(g.viewZoom/1.25,.1,10);save();};$('camera-plus').onclick=()=>{g.viewZoom=clamp(g.viewZoom*1.25,.1,10);save();};
+ $('camera-minus').onclick=()=>{g.viewZoom=clamp(g.viewZoom/1.25,.05,10);save();};$('camera-plus').onclick=()=>{g.viewZoom=clamp(g.viewZoom*1.25,.05,10);save();};
 $('btn-new-game').onclick=restartCampaign;
 }
 function panelValue(key,v){
@@ -2723,7 +2787,7 @@ function panelValue(key,v){
  if(label)label.textContent=key==='density'?`${v}/32`:`${v}×`;
 }
 testerInit();
-$('camera-minus').onclick=()=>{g.viewZoom=clamp(g.viewZoom/1.25,.1,10);save();};$('camera-plus').onclick=()=>{g.viewZoom=clamp(g.viewZoom*1.25,.1,10);save();};
+$('camera-minus').onclick=()=>{g.viewZoom=clamp(g.viewZoom/1.25,.05,10);save();};$('camera-plus').onclick=()=>{g.viewZoom=clamp(g.viewZoom*1.25,.05,10);save();};
 $('btn-new-game').onclick=restartCampaign;
 function showFinal(){show(`<div class="hero-kicker">28 / 28 ФОРМ ОТКРЫТО</div><div class="overlay-title">БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА</div><p class="overlay-copy">От одинокой частицы до бесконечного космоса. Теперь горизонт событий растёт бесконечно.</p><div class="stat-list"><div><strong>${timeFmt(g.time)}</strong><small>Время прохождения</small></div><div><strong>${fmt(g.total)}</strong><small>Поглощено материи</small></div><div><strong>${fmt(g.collects)}</strong><small>Космических объектов</small></div><div><strong>${g.rare}</strong><small>Найдено реликвий</small></div></div><p class="overlay-copy">Поглощай материю и продолжай увеличиваться без предела!</p><div class="modal-actions"><button class="primary-button" id="btn-endless">ИССЛЕДОВАТЬ ДАЛЬШЕ →</button><button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('btn-endless').onclick=()=>{g.complete=true;g.endless=true;running=true;save();startMusic();$('modal').classList.add('off');last=performance.now();toast('∞ БЕСКОНЕЧНОЕ ИССЛЕДОВАНИЕ');};$('set-language').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);renderUI();showSettings();};$('settings-music').onclick=showMusicShop;$('settings-tutorial').onclick=()=>showTutorial();$('set-sound-volume').oninput=e=>{g.soundVolume=+e.target.value/100;save();};$('btn-new-universe').onclick=restartCampaign;}
 $('btn-menu').onclick=()=>toggleOverlay('menu',showMainMenu);
@@ -2738,7 +2802,7 @@ function onWorldWheel(ev){
  if(!running||atlasVisible||ev.ctrlKey||!Number.isFinite(ev.deltaY))return;
  ev.preventDefault();
  const pixels=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?H:1);
- g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.002),.1,10);
+ g.viewZoom=clamp((g.viewZoom||1)*Math.exp(-clamp(pixels,-240,240)*.002),.05,10);
  // The normal camera follows this target smoothly; autosave/pagehide persist it.
 }
 canvas.addEventListener('wheel',onWorldWheel,{passive:false});

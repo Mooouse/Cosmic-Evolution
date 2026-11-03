@@ -7,8 +7,8 @@
   <meta name="description" content="Infiniti Space — 2D космическая игра про гравитацию, рост и эволюцию от пылинки до Вселенной." />
   <title>Infiniti Space — From Dust to Infinity</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="styles.css?v=3.36.6" />
-  <link rel="stylesheet" href="interface.css?v=3.36.6" />
+  <link rel="stylesheet" href="styles.css?v=3.37.0" />
+  <link rel="stylesheet" href="interface.css?v=3.37.0" />
 </head>
 <body>
   <canvas id="universe" aria-label="Игровое поле Infiniti Space"></canvas>
@@ -25,7 +25,7 @@
     </header>
     <aside class="sidebar" id="sidebar">
       <div class="side-header"><span>УЛУЧШЕНИЯ</span><button id="btn-sidebar" aria-label="Свернуть улучшения"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button></div>
-      <div id="upgrades" class="upgrades"></div>
+      <div class="upgrade-bulk"><label id="upgrade-bulk-label" for="upgrade-amount">Levels per purchase</label><div class="upgrade-bulk-row"><input id="upgrade-amount" type="number" inputmode="numeric" min="1" step="1" value="1" aria-label="Number of levels to buy"><button data-buy-amount="max" type="button">MAX</button></div><div class="upgrade-presets"><button data-buy-amount="1" type="button">×1</button><button data-buy-amount="10" type="button">×10</button><button data-buy-amount="100" type="button">×100</button></div><p id="upgrade-bulk-help"></p></div><div id="upgrades" class="upgrades"></div>
       <button id="btn-evolution" class="details-button">ЭВОЛЮЦИЯ И РЕЦЕПТ <span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 18 6M7 6h11v11"/></svg></span></button>
     </aside>
     <section id="evolution-panel" class="evolution-panel hidden" aria-label="Эволюция и рецепт">
@@ -65,8 +65,8 @@
     <p class="tester-note">Тестовые параметры сохраняются отдельно. Изменения стадии и валюты влияют на текущее сохранение. Исследованные области и собранная материя остаются постоянными.</p>
   </section>
   <div id="modal" class="modal-backdrop" data-screen="menu" role="dialog" aria-modal="true" aria-label="Меню игры"></div>
-  <script src="i18n.js?v=3.36.6" defer></script>
-  <script src="platform.js?v=3.36.6" defer></script>
-  <script src="game.js?v=3.36.6" defer></script>
+  <script src="i18n.js?v=3.37.0" defer></script>
+  <script src="platform.js?v=3.37.0" defer></script>
+  <script src="game.js?v=3.37.0" defer></script>
 </body>
 </html>

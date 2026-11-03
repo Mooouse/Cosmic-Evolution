@@ -123,3 +123,15 @@ button{transition:background .16s,border-color .16s,box-shadow .16s,transform .1
  .zoom-indicator{display:none;}
  .sidebar,.evolution-panel{max-height:calc(100dvh - 150px);}
 }
+
+/* Bulk upgrades share one quantity selector and always show the total price. */
+.upgrade-bulk{margin:0 0 12px;padding:10px;border:1px solid var(--line);border-radius:9px;background:#071321;}
+.upgrade-bulk label{display:block;font-size:10px;color:#abc7d8;margin-bottom:7px;}
+.upgrade-bulk-row{display:flex;gap:6px;}
+.upgrade-bulk input{width:100%;min-width:0;flex:1;background:#10263a;border:1px solid #3b6179;border-radius:6px;padding:7px 9px;color:#eefaff;font-size:16px;}
+.upgrade-bulk button{min-height:36px;border:1px solid #3b6179;border-radius:6px;background:#132b40;color:#c5e3eb;padding:6px 10px;font-size:10px;font-weight:700;}
+.upgrade-bulk button[aria-pressed=true]{background:#245466;border-color:#71e4d8;color:#efffff;}
+.upgrade-presets{display:flex;gap:6px;margin-top:6px;}.upgrade-presets button{flex:1;}
+.upgrade-bulk p{font-size:9px;line-height:1.5;color:#859eb6;margin:8px 0 0;}
+.upgrade-cost{min-width:67px;}.upgrade-cost small{white-space:normal;line-height:1.4;}
+@media(max-width:600px){.upgrade-bulk button{min-height:40px;}.upgrade-bulk input{min-height:40px;}}

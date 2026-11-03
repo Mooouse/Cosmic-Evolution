@@ -200,7 +200,8 @@ console.log('PASS: galaxies travel fully inside the horizon before reward/remova
 
 // Gravity must act before contact and have identical screen-space motion at
 // ordinary and astronomical scales, including the former x9 cutoff.
-const gravityCode=game.slice(game.indexOf('function blackHoleGravityRadius(){'),game.indexOf('\nfunction harvestCosmicLOD'));
+const upgradePrelude=game.slice(game.indexOf('const upgrades ='),game.indexOf('const MATERIALS='))+game.slice(game.indexOf('function upgradePower('),game.indexOf('function upgradeCost('));
+const gravityCode=upgradePrelude+game.slice(game.indexOf('function blackHoleGravityRadius(){'),game.indexOf('\nfunction harvestCosmicLOD'));
 let firstMotion;
 for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
  const e={x:400/zoom,y:0,r:80/zoom,cosmic:true,index:0,level:2,gx:0,gy:0};
@@ -655,7 +656,7 @@ let prevented=0;
 const wheel=(deltaY,deltaMode=0,ctrlKey=false)=>wheelBox.onWorldWheel({deltaY,deltaMode,ctrlKey,preventDefault(){prevented++}});
 wheel(-100);assert.ok(wheelBox.g.viewZoom>1&&wheelBox.g.viewZoom<1.25);
 for(let i=0;i<40;i++)wheel(-100);assert.equal(wheelBox.g.viewZoom,10);
-for(let i=0;i<40;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.1);
+for(let i=0;i<40;i++)wheel(100);assert.equal(wheelBox.g.viewZoom,.05);
 wheelBox.g.viewZoom=1;wheel(-5,1);const lineZoom=wheelBox.g.viewZoom;
 wheelBox.g.viewZoom=1;wheel(-80);assert.equal(wheelBox.g.viewZoom,lineZoom,'Line/pixel wheels agree');
 for(const mode of ['paused','map','browser']){
@@ -667,7 +668,7 @@ for(const tier of [0,10,22]){
  for(const offset of [.1,.4,1.25,2.5,10]){scaleBox.g.viewZoom=offset;assert.ok(Math.abs(scaleBox.campaignZoom(scaleBox.radiusAt(tier,0))/normal-offset)<1e-10);}
 }
 scaleBox.g.viewZoom=1;
-vm.runInContext(game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback(')),scaleBox);
+vm.runInContext(upgradePrelude+game.slice(game.indexOf('function ordinaryGravityRadius('),game.indexOf('function pickupFeedback(')),scaleBox);
 scaleBox.g.upgrade={gravity:0};scaleBox.tester.gravity=1;
 scaleBox.g.tier=5;for(const radius of [13,500,1e8]){scaleBox.player.r=radius;assert.ok(Math.abs(scaleBox.ordinaryGravityRadius()/(Math.max(97,radius*2.8))-1.2)<1e-10);}
 const brightBox={g:{endless:true},player:{r:1e8},clamp:scaleBox.clamp};vm.createContext(brightBox);
@@ -708,7 +709,7 @@ const lootBox={g:{endless:false,complete:false,tier:0,matter:0,total:0,stageColl
  player:{x:0,y:0,r:13},tester:{loot:1},CHUNK:480,TA:[{required:1e9}],
  advanceHarvestChain(){},resourceOf:()=> 'ore',radiusAt:()=>1000,ordinaryBodyValue:()=>100,blackHoleBodyValue:()=>100,
  currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
-vm.createContext(lootBox);vm.runInContext(absorbCode,lootBox);
+vm.createContext(lootBox);vm.runInContext(upgradePrelude+absorbCode,lootBox);
 for(let i=0;i<100;i++)lootBox.absorb({value:1,kind:'matter'});
 assert.ok(Math.abs(lootBox.g.matter-10)<1e-8);
 assert.ok(Math.abs(lootBox.g.credits-7.5)<1e-8);
@@ -847,7 +848,7 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  const pulse=game.slice(game.indexOf('function activatePulse('),game.indexOf('function activateBoost('));
  assert.ok(pulse.includes('!canAbsorbBody(e)'));assert.ok(!pulse.includes('camera.zoom'));
  const update=game.slice(game.indexOf('function update(dt)'),game.indexOf('function project('));
- assert.ok(update.includes('140/physicsZoom()'));assert.ok(!update.includes('140/Math.max(camera.zoom'));
+ assert.ok(update.includes('flightSpeed()'));assert.ok(game.slice(game.indexOf('function flightSpeed('),game.indexOf('function uiIcon(')).includes('140/physicsZoom()'));assert.ok(!update.includes('140/Math.max(camera.zoom'));
  assert.ok(game.includes('boostTime=2.5'));
  console.log('PASS: real forces and horizon identical at 10%, 100%, 1000% zoom; giants pull player and pulse ignores inedible bodies');
 }
@@ -970,3 +971,43 @@ console.log('PASS: graphics reduction can be fully disabled; low FPS cannot over
  assert.deepEqual(calls,[tinyVisible,captured]);
 }
 console.log('PASS: every rendered LOD is eligible for gravity across zooms and screens; visible small and captured debris stay simulated');
+
+// Endless upgrade pricing, bulk atomicity and softened returns.
+{
+ const code=game.slice(game.indexOf('const upgrades ='),game.indexOf('const MATERIALS='))+game.slice(game.indexOf('function upgradePower('),game.indexOf('function uiIcon('));
+ let saves=0;const b={g:{upgrade:{gravity:0,speed:0,harvest:0,shield:0},credits:0,buyAmount:1,endless:false},player:{r:1e8},CHUNK:480,tester:{speed:1},physicsZoom:()=>.00001,
+ toast(){},sound(){},burst(){},renderUI(){},save(){saves++;}};
+ vm.createContext(b);vm.runInContext(code+'\nitems=upgrades;',b);
+ for(const u of b.items){
+  for(const level of [0,u.max-1,u.max,u.max+10]){
+   b.g.upgrade[u.id]=level;
+   for(const count of [1,3,10,100]){
+    let sum=0;for(let i=0;i<count;i++)sum+=b.upgradeCost(u,level+i);
+    assert.ok(Math.abs(b.upgradeTotalCost(u,level,count)/sum-1)<1e-11,'Bulk price equals all successive level prices');
+   }
+  }
+  b.g.upgrade[u.id]=u.max;const p0=b.upgradePower(u.id);
+  b.g.upgrade[u.id]++;const p1=b.upgradePower(u.id);b.g.upgrade[u.id]++;const p2=b.upgradePower(u.id);
+  assert.ok(p1>p0&&p1-p0<.11&&p2>p1&&p2-p1<p1-p0,'Small diminishing gains beyond old cap');
+  assert.ok(b.upgradeCost(u,u.max)>b.upgradeCost(u,u.max-1)*8,'Price jump at endless boundary');
+  b.g.upgrade[u.id]=u.max-2;b.g.buyAmount=7;b.g.credits=b.upgradeTotalCost(u,u.max-2,7);
+  b.buy(u.id);assert.equal(b.g.upgrade[u.id],u.max+5);assert.equal(b.g.credits,0);
+  b.g.buyAmount=100;const before=b.g.upgrade[u.id];b.buy(u.id);assert.equal(b.g.upgrade[u.id],before,'Unaffordable bundle never partly charges');
+  b.g.credits=b.upgradeTotalCost(u,before,12)*1.001;b.g.buyAmount='max';
+  assert.equal(b.upgradeQuote(u).count,12);b.buy(u.id);assert.equal(b.g.upgrade[u.id],before+12);assert.ok(b.g.credits>=0);
+  const costly=b.upgradeTotalCost(u,1000000000,1000000000);assert.equal(costly,Infinity,'Huge requests exit immediately without overflow/loops');
+  b.g.upgrade[u.id]=u.max;b.g.credits=1e290;const q=b.upgradeQuote(u);assert.ok(q.count>100&&Number.isFinite(q.cost)&&q.cost<=b.g.credits);
+  assert.ok(b.upgradeTotalCost(u,u.max,q.count+1)>b.g.credits);
+ }
+ b.g.upgrade.speed=0;b.g.endless=false;const oldBase=b.flightSpeed();b.g.endless=true;assert.equal(b.flightSpeed(),oldBase*10);
+ b.g.upgrade.speed=60;const atCap=b.flightSpeed();b.g.upgrade.speed=61;assert.ok(b.flightSpeed()>atCap);
+ assert.ok(saves>=8);
+}
+// Catalogue names are unique and deterministic; the world identities stay stable.
+{
+ const b={g:{abyssConsumed:{},abyssPositions:{}},CHUNK:480,TAU:Math.PI*2,WORLD_SEED:0x17aba37,player:{x:0,y:0,r:300},clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};
+ vm.createContext(b);vm.runInContext(game.slice(seedStart,seedStop)+game.slice(abyssStart,abyssStop)+'\nlist=ABYSS_CATALOGUE;',b);
+ assert.equal(new Set(b.list.map(h=>h.name)).size,b.list.length);
+ assert.deepEqual(JSON.parse(JSON.stringify(b.buildAbyssCatalogue())),JSON.parse(JSON.stringify(b.list)));
+}
+console.log('PASS: endless upgrades, exact bulk quotes, MAX affordability, diminished gains, 10x base black-hole flight and unique permanent names');
