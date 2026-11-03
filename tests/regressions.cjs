@@ -346,7 +346,7 @@ console.log('PASS: permanent giant landmarks, safe origin, attraction and swept 
 const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction testerRefresh()',resetStart);
 const freshStart=game.indexOf('const fresh ='),freshStop=game.indexOf('\nlet g =',freshStart);
 const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='';
-const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,g:{tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,particles:false,controlMode:'keys',flightFeel:'direct'},
+const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,g:{tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,autoQuality:false,particles:false,controlMode:'keys',flightFeel:'direct'},
  cosmicAbsorptions:[{}],absorbingMacroKeys:new Set(['taken']),visitedChunks:new Set(['1,1']),loadedChunks:new Set(['1,1']),distantChunkCache:new Map(),macroLoaded:new Set(),macroCache:new Map(),macroLODCache:new Map(),macroBackdrop:null,macroBackdropOld:null,macroEntities:[{}],entities:[{}],
  TEST_MODE:false,tester:{ring:1.5},player:{x:123,y:456,r:1e20,vx:200,vy:300},camera:{x:123,y:456,zoom:1e-10},particles:[{}],shockwaves:[{}],energyArcs:[{}],texts:[{}],radiusAt:()=>13,
  $:()=>resetNode,visitPosition(){},streamField(){},renderUI(){},testerRefresh(){},testerToggle(){},clearFlightInput(){},
@@ -360,7 +360,7 @@ assert.equal(savedDeath.upgrade.gravity,0);assert.equal(savedDeath.materials.exo
 assert.equal(Object.keys(savedDeath.depleted).length,0);assert.equal(resetBox.cosmicAbsorptions.length,0);
 assert.equal(resetBox.player.x,0);assert.equal(resetBox.player.vx,0);assert.equal(resetBox.camera.zoom,1);
 assert.equal(resetBox.running,false);assert.equal(resetBox.boostCd,0);
-assert.equal(savedDeath.music,false);assert.equal(savedDeath.controlMode,'keys');
+assert.equal(savedDeath.autoQuality,false);assert.equal(savedDeath.music,false);assert.equal(savedDeath.controlMode,'keys');
 assert.equal(resetBox.tester.ring,1.5);assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
 console.log('PASS: death resets and saves all progression, retains preferences and pauses simulation');
 
@@ -901,3 +901,33 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  b.CrazyGames.SDK.game.listener({muteAudio:false});assert.equal(b.SpacePlatform.muted,false);
  console.log('PASS: CrazyGames initializes before lifecycle calls, deduplicates events and honours platform mute');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+// Full fidelity must survive slow frames, economy presets and a reload.
+{
+ let saved=null;
+ const surface=()=>({width:0,height:0,setTransform(){},drawImage(){}});
+ const q={g:{quality:.5,autoQuality:true},performanceScale:.55,perfSample:1,perfFrames:15,W:2560,H:1440,devicePixelRatio:2,dpr:1,canvas:surface(),frameCanvas:surface(),screenCtx:surface(),frameCtx:surface(),ctx:surface(),atlasVisible:false,save(){saved=JSON.parse(JSON.stringify(q.g));}};
+ vm.createContext(q);
+ vm.runInContext(game.slice(game.indexOf('function updateAdaptiveQuality('),game.indexOf('function resize(){')),q);
+ q.setAutoQuality(false);
+ assert.equal(q.dpr,2);assert.equal(q.canvas.width,5120);assert.equal(q.performanceScale,1);assert.equal(q.perfSample,0);
+ for(let i=0;i<100;i++)q.updateAdaptiveQuality(12);
+ assert.equal(q.performanceScale,1,'Low FPS must not override the user');
+ q.g=JSON.parse(JSON.stringify(saved));q.applyResolution();assert.equal(q.dpr,2,'Full fidelity persists through save/reload');
+ for(const density of [1,2,3]){q.devicePixelRatio=density;q.applyResolution();assert.equal(q.dpr,density);}
+ q.setAutoQuality(true);q.updateAdaptiveQuality(20);assert.ok(q.performanceScale<1,'Opting back in restores adaptation');
+ q.setAutoQuality(false);q.devicePixelRatio=2;q.applyResolution();
+ // Execute GPU rendering against a recording GL facade.
+ const gl={isContextLost:()=>false,viewport(){},texImage2D(){},texSubImage2D(){},uniform2f(){},uniform1f(){},drawArrays(){}};
+ Object.assign(q,{gpuLens:{gl,surface:surface(),maxSize:16384,width:0,height:0,upload:surface(),uploadCtx:surface()},einsteinRingScale:()=>1.5,console});
+ vm.runInContext(game.slice(game.indexOf('function renderGpuLens('),game.indexOf('// True gravitational lensing')),q);
+ assert.equal(q.renderGpuLens({x:1280,y:720},200,500),true);
+ assert.equal(q.gpuLens.width,5120);assert.equal(q.gpuLens.height,2880);
+ // Capture the actual CPU readback dimensions before allocating pixel arrays.
+ let readback;const stop=new Error('captured CPU dimensions');
+ Object.assign(q,{renderGpuLens:()=>false,clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),lensInput:surface(),lensOutput:surface(),lensInputCtx:{drawImage(){},getImageData(x,y,w,h){readback=[w,h];throw stop;}}});
+ vm.runInContext(game.slice(game.indexOf('function renderBlackHoleLensing('),game.indexOf('let rivalLensRetryAt=')),q);
+ assert.throws(()=>q.renderBlackHoleLensing({p:{x:1280,y:720},R:400,outer:700}),e=>e===stop);
+ assert.deepEqual(readback,[2800,2800],'CPU fallback keeps native pixel density too');
+}
+console.log('PASS: graphics reduction can be fully disabled; low FPS cannot override native resolution on GPU or CPU');
