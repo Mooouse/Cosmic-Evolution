@@ -1,7 +1,8 @@
 /* Infiniti Space v3.41 — in-game controls, compact upgrades, readable atlas. */
-.ui-v15 #hud .v15-hud .upgrade-pull{display:none!important}
-.ui-v15 #hud .v15-hud .always-open-upgrades{
- display:block!important;position:absolute!important;
+.ui-v15 #hud .v15-hud .upgrade-pull{display:flex!important;cursor:pointer;z-index:14}
+.ui-v15 #hud .v15-hud .upgrade-pull[aria-expanded="true"]{border-color:#b59aff!important;color:#fff!important;background:linear-gradient(160deg,#52338c,#261845)!important}
+.ui-v15 #hud .v15-hud .quick-upgrades{
+ display:none!important;position:absolute!important;
  left:clamp(12px,2.4vw,38px)!important;top:clamp(125px,17vh,174px)!important;
  width:288px!important;max-width:calc(100vw - 24px)!important;
  max-height:calc(100dvh - 310px)!important;overflow-y:auto!important;
@@ -13,41 +14,42 @@
  scrollbar-width:thin;scrollbar-color:#6e4ac1 transparent;
  pointer-events:auto!important;
 }
-.ui-v15 #hud .always-open-upgrades .drawer-head{margin:0 0 8px}
-.ui-v15 #hud .always-open-upgrades .drawer-head strong{
+.ui-v15 #hud .v15-hud .quick-upgrades.open{display:block!important}
+.ui-v15 #hud .quick-upgrades .drawer-head{margin:0 0 8px}
+.ui-v15 #hud .quick-upgrades .drawer-head strong{
  color:#eee3ff;font-size:12px;font-weight:950;letter-spacing:.11em;
 }
-.ui-v15 #hud .always-open-upgrades .quick-upgrade-qty{
+.ui-v15 #hud .quick-upgrades .quick-upgrade-qty{
  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:0 0 10px;
 }
-.ui-v15 #hud .always-open-upgrades .quick-upgrade-qty button{
+.ui-v15 #hud .quick-upgrades .quick-upgrade-qty button{
  padding:6px 2px;min-height:29px;min-width:0;border-radius:5px;
  border:1px solid #674a94;color:#c8b6e5;background:#27173c;
  font:850 10px/1.1 system-ui,sans-serif;
 }
-.ui-v15 #hud .always-open-upgrades .quick-upgrade-qty button[aria-pressed=true]{
+.ui-v15 #hud .quick-upgrades .quick-upgrade-qty button[aria-pressed=true]{
  color:#fff;border-color:#b99aff;background:#5635a0;box-shadow:inset 0 0 0 1px #9c7ce777;
 }
-.ui-v15 #hud .always-open-upgrades .drawer-up{
+.ui-v15 #hud .quick-upgrades .drawer-up{
  display:flex;align-items:center;justify-content:space-between;gap:8px;
  min-height:51px;padding:8px 2px;text-align:left;width:100%;
  border-top:1px solid rgba(150,117,204,.32);
 }
-.ui-v15 #hud .always-open-upgrades .drawer-up span{
+.ui-v15 #hud .quick-upgrades .drawer-up span{
  flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;
  font-size:11px;font-weight:850;color:#f2eaff;line-height:1.2;
 }
-.ui-v15 #hud .always-open-upgrades .drawer-up small{
+.ui-v15 #hud .quick-upgrades .drawer-up small{
  display:block;color:#a99acb;font-size:9px;font-weight:750;
 }
-.ui-v15 #hud .always-open-upgrades .drawer-up b{
+.ui-v15 #hud .quick-upgrades .drawer-up b{
  flex:0 0 auto;max-width:102px;white-space:nowrap;text-align:right;
  font-size:11px;font-weight:900;color:#eccd8b;
 }
-.ui-v15 #hud .always-open-upgrades .drawer-up:hover:not(:disabled){
+.ui-v15 #hud .quick-upgrades .drawer-up:hover:not(:disabled){
  background:rgba(119,76,192,.21);color:#fff;
 }
-.ui-v15 #hud .always-open-upgrades .drawer-up:disabled{opacity:.55;cursor:default}
+.ui-v15 #hud .quick-upgrades .drawer-up:disabled{opacity:.55;cursor:default}
 .ui-v15 #hud .hud-commands .quick-audio{
  position:relative;display:flex;align-items:center;gap:6px;
  pointer-events:auto;z-index:18;
@@ -97,12 +99,12 @@
 .ui-v15 #screen-map .map-footer .atlas-legend>span{flex:0 0 auto}
 .ui-v15 #screen-map .map-stage{bottom:58px}
 @media (max-width:1150px){
- .ui-v15 #hud .v15-hud .always-open-upgrades{top:125px!important;width:255px!important}
+ .ui-v15 #hud .v15-hud .quick-upgrades{top:125px!important;width:255px!important}
  .ui-v15 #hud .hud-commands .quick-audio{gap:3px}
  .ui-v15 #abyss-warning{max-width:calc(100vw - 300px)}
 }
 @media (max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
- .ui-v15 #hud .v15-hud .always-open-upgrades{
+ .ui-v15 #hud .v15-hud .quick-upgrades{
   top:calc(max(8px,env(safe-area-inset-top)) + 148px)!important;
   left:9px!important;width:min(190px,51vw)!important;
   max-width:51vw!important;
@@ -110,14 +112,14 @@
   padding:8px!important;border-radius:8px!important;
   backdrop-filter:blur(8px);
  }
- .ui-v15 #hud .always-open-upgrades .drawer-head{margin-bottom:5px}
- .ui-v15 #hud .always-open-upgrades .drawer-head strong{font-size:10px}
- .ui-v15 #hud .always-open-upgrades .quick-upgrade-qty{gap:3px;margin-bottom:5px}
- .ui-v15 #hud .always-open-upgrades .quick-upgrade-qty button{font-size:9px;min-height:26px;padding:5px 1px}
- .ui-v15 #hud .always-open-upgrades .drawer-up{min-height:40px;padding:5px 1px;gap:4px}
- .ui-v15 #hud .always-open-upgrades .drawer-up span{font-size:9px}
- .ui-v15 #hud .always-open-upgrades .drawer-up small{font-size:8px}
- .ui-v15 #hud .always-open-upgrades .drawer-up b{font-size:9px;max-width:65px}
+ .ui-v15 #hud .quick-upgrades .drawer-head{margin-bottom:5px}
+ .ui-v15 #hud .quick-upgrades .drawer-head strong{font-size:10px}
+ .ui-v15 #hud .quick-upgrades .quick-upgrade-qty{gap:3px;margin-bottom:5px}
+ .ui-v15 #hud .quick-upgrades .quick-upgrade-qty button{font-size:9px;min-height:26px;padding:5px 1px}
+ .ui-v15 #hud .quick-upgrades .drawer-up{min-height:40px;padding:5px 1px;gap:4px}
+ .ui-v15 #hud .quick-upgrades .drawer-up span{font-size:9px}
+ .ui-v15 #hud .quick-upgrades .drawer-up small{font-size:8px}
+ .ui-v15 #hud .quick-upgrades .drawer-up b{font-size:9px;max-width:65px}
  .ui-v15 #hud .hud-commands .quick-audio{
   position:fixed!important;top:calc(max(8px,env(safe-area-inset-top)) + 112px)!important;
   right:10px!important;left:auto!important;z-index:35;
@@ -143,6 +145,42 @@
  .ui-v15 #screen-map .map-footer .atlas-legend{font-size:9px;gap:9px}
 }
 @media(max-height:540px){
- .ui-v15 #hud .v15-hud .always-open-upgrades{max-height:calc(100dvh - 232px)!important}
+ .ui-v15 #hud .v15-hud .quick-upgrades{max-height:calc(100dvh - 232px)!important}
  .ui-v15 #abyss-warning{top:128px!important;font-size:10px}
+}
+
+/* The legacy upgrade trigger is kept visible, including on narrow displays. */
+.ui-v15 #hud .v15-hud .upgrade-pull{
+ min-width:0!important;min-height:47px;position:absolute;
+ top:clamp(125px,17vh,174px)!important;left:clamp(12px,2.4vw,38px)!important;
+ padding:10px 13px!important;border-radius:9px!important;
+ box-shadow:0 5px 0 #0a0715,0 10px 27px #0008!important;
+}
+.ui-v15 #hud .v15-hud .upgrade-pull:focus-visible{
+ outline:2px solid #d9c2ff;outline-offset:4px;
+}
+.ui-v15 #hud .v15-hud .quick-upgrades{top:clamp(180px,calc(17vh + 55px),230px)!important}
+.ui-v15 #hud .quick-upgrades .drawer-head button{
+ width:28px;min-height:27px;display:grid;place-items:center;
+ font-size:19px;line-height:1;border:1px solid #7154a2;border-radius:5px;
+ color:#d9c7f6;background:#271737;
+}
+@media(max-width:1150px) and (min-width:801px){
+ .ui-v15 #hud .v15-hud .upgrade-pull{top:125px!important}
+ .ui-v15 #hud .v15-hud .quick-upgrades{top:182px!important}
+}
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ .ui-v15 #hud .v15-hud .upgrade-pull{
+  top:calc(max(8px,env(safe-area-inset-top)) + 103px)!important;
+  left:12px!important;width:44px!important;height:44px!important;
+  min-width:44px!important;min-height:44px!important;padding:8px!important;
+  display:flex!important;justify-content:center;align-items:center;
+ }
+ .ui-v15 #hud .v15-hud .upgrade-pull>span:nth-child(2){display:none!important}
+ .ui-v15 #hud .v15-hud .quick-upgrades{top:calc(max(8px,env(safe-area-inset-top)) + 153px)!important}
+ .ui-v15 #hud .hud-commands .quick-audio{gap:7px}
+}
+@media(max-height:500px) and (max-width:1000px){
+ .ui-v15 #hud .v15-hud .upgrade-pull{top:66px!important}
+ .ui-v15 #hud .v15-hud .quick-upgrades{top:116px!important}
 }
