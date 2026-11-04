@@ -2557,6 +2557,7 @@ function renderWaypoint(){
  ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+4,y);ctx.lineTo(x,y+5);ctx.lineTo(x-4,y);ctx.closePath();ctx.stroke();
  ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(pin.name+' · '+lightYears(Math.hypot(pin.x-player.x,pin.y-player.y)),x,y+19);ctx.restore();
 }
+let atlasExplorationSurface=null;
 function drawAtlas(){
  const surface=$('atlas-canvas');if(!surface)return;
  const bounds=surface.getBoundingClientRect();if(bounds.width<10)return;
@@ -2567,21 +2568,28 @@ function drawAtlas(){
  c.setTransform(pixelRatio,0,0,pixelRatio,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';
  c.fillStyle='#0b0a1c';c.fillRect(0,0,w,h);
  // Exploration footprints stay in their real world coordinates at every scale.
- c.fillStyle='rgba(102,67,155,.10)';
+ // Paint exploration onto one opaque mask, then composite it ONCE. Overlapping
+ // discovered discs used to stack hundreds of translucent purple fills and wash
+ // out the entire map (particularly near the infinite black-hole stage).
+ const explored=atlasExplorationSurface??(atlasExplorationSurface=document.createElement('canvas'));
+ if(explored.width!==w||explored.height!==h){explored.width=w;explored.height=h;}
+ const mc=explored.getContext('2d');mc.clearRect(0,0,w,h);
+ mc.fillStyle='#76519c';
  for(const d of g.discoveryDiscs){
   const q=projectMap(d[0]*CHUNK,d[1]*CHUNK),r=d[2]*CHUNK*scale;
-  if(q.x+r<0||q.x-r>w||q.y+r<0||q.y-r>h)continue;
-  if(r>Math.hypot(w,h)+Math.hypot(q.x-w/2,q.y-h/2)){c.fillRect(0,0,w,h);continue;}
-  c.beginPath();c.arc(q.x,q.y,r,0,TAU);c.fill();
+  if(!Number.isFinite(r)||r<=0||q.x+r<0||q.x-r>w||q.y+r<0||q.y-r>h)continue;
+  if(r>Math.hypot(w,h)+Math.hypot(q.x-w/2,q.y-h/2)){mc.fillRect(0,0,w,h);continue;}
+  mc.beginPath();mc.arc(q.x,q.y,r,0,TAU);mc.fill();
  }
  const sectorPx=CHUNK*scale;
- c.fillStyle='rgba(133,93,185,.18)';
+ mc.fillStyle='#9a77be';
  for(const key of visitedChunks){
   const comma=key.indexOf(','),cx=Number(key.slice(0,comma)),cy=Number(key.slice(comma+1));
   const p=projectMap(cx*CHUNK,cy*CHUNK);
   if(p.x+sectorPx<0||p.y+sectorPx<0||p.x>w||p.y>h)continue;
-  c.fillRect(p.x,p.y,Math.max(1,sectorPx),Math.max(1,sectorPx));
+  mc.fillRect(p.x,p.y,Math.max(1,sectorPx),Math.max(1,sectorPx));
  }
+ c.globalAlpha=.16;c.drawImage(explored,0,0,w,h);c.globalAlpha=1;
  // Adaptive grid uses fixed world units and bounded local loop counters.
  const gridWorld=atlasNiceDistance(105/scale/CHUNK)*CHUNK,gridPx=gridWorld*scale;
  const gridX=Math.floor((atlas.x-w/2/scale)/gridWorld),gridY=Math.floor((atlas.y-h/2/scale)/gridWorld);
@@ -2672,7 +2680,12 @@ function drawAtlas(){
  }
  // The rectangular frame is the actual camera footprint, not a fixed inset.
  const viewCenter=projectMap(camera.x,camera.y),viewW=W/camera.zoom*scale,viewH=H/camera.zoom*scale;
- c.strokeStyle='rgba(179,143,241,.8)';c.lineWidth=1;c.strokeRect(viewCenter.x-viewW/2,viewCenter.y-viewH/2,viewW,viewH);
+ c.strokeStyle='rgba(179,143,241,.7)';c.lineWidth=1;
+ if(Number.isFinite(viewW)&&Number.isFinite(viewH)&&viewW<5*w&&viewH<5*h){
+  c.strokeRect(viewCenter.x-viewW/2,viewCenter.y-viewH/2,viewW,viewH);
+ }else{
+  c.setLineDash([4,7]);c.strokeRect(1,1,w-2,h-2);c.setLineDash([]);
+ }
  if(playerPoint.x>=0&&playerPoint.y>=0&&playerPoint.x<=w&&playerPoint.y<=h){
   c.font='800 11px Inter,sans-serif';c.fillStyle='#fff3d6';
   const markerLabel=L('YOU','ТЫ','TÚ')+' · '+TA[g.tier].name;
