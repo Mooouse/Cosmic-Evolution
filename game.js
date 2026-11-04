@@ -2989,7 +2989,20 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  refreshV15();
 }
 
-showMainMenu();window.SpacePlatform?.loaded();
+showMainMenu();
+// Start the selected (free by default) soundtrack on the main menu.
+// Browsers can reject audible autoplay until a real input event; retry on
+// user activation so the first click/tap/keypress starts the music.
+startMusic();
+function unlockMusicFromGesture(){
+ if(!g.music||window.SpacePlatform?.muted||musicPreview)return;
+ if(!externalMusic)startMusic();
+ else if(externalMusic.paused)setMusicVolume();
+}
+document.addEventListener('pointerdown',unlockMusicFromGesture,{capture:true,passive:true});
+document.addEventListener('pointerup',unlockMusicFromGesture,{capture:true,passive:true});
+document.addEventListener('keydown',unlockMusicFromGesture,{capture:true});
+window.SpacePlatform?.loaded();
 $('btn-music').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();renderUI(true);};$('btn-map').onclick=()=>toggleOverlay('map',showMap);$('btn-pause').onclick=()=>toggleOverlay('menu',showPause);$('btn-settings').onclick=()=>toggleOverlay('settings',showSettings);
 $('btn-pulse').onclick=activatePulse;$('btn-boost').onclick=activateBoost;
 $('btn-sidebar').onclick=()=>{if(W<=800){$('sidebar').classList.remove('mobile-open')}else $('sidebar').classList.add('collapsed');$('btn-show-sidebar').classList.remove('hidden');};
