@@ -2989,9 +2989,14 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
     sound.onclick=()=>{const on=!(g.music||g.sound);g.music=on;g.sound=on;initAudio();setMusicVolume();save();sync();refreshV15();};
    }
  };
- function phoneModeLabel(mode){return ({fixed:L('Fixed joystick','Обычный стик','Joystick fijo'),floating:L('Floating joystick','Плавающий стик','Joystick flotante'),gyro:L('Gyroscope','Гироскоп','Giroscopio')})[mode];}
+ function phoneModeLabel(mode){return ({fixed:L('Fixed joystick','Фиксированный стик','Joystick fijo'),floating:L('Floating joystick','Плавающий стик','Joystick flotante'),gyro:L('Gyroscope','Гироскоп','Giroscopio'),direction:L('Cruise arrow','Стрелка направления','Flecha de rumbo')})[mode];}
+ // Compact animated diagrams show what each steering option really does.
+ function controlMini(mode){
+  return '<span class="control-mini" data-preview-mode="'+mode+'" aria-hidden="true"><i class="control-mini-orbit"></i><i class="control-mini-path"></i><i class="control-mini-ship"></i><i class="control-mini-arrow"></i><i class="control-mini-touch"></i></span>';
+ }
  function phoneStatus(){return ({off:L('Tap Enable, then hold your phone comfortably.','Нажми «Включить» и держи телефон в удобном положении.','Pulsa Activar y sujeta el teléfono cómodamente.'),permission:L('Waiting for sensor permission…','Ожидается разрешение на датчики…','Esperando permiso de sensores…'),calibrating:L('Hold still for calibration…','Держи телефон неподвижно для калибровки…','Mantén el teléfono quieto para calibrar…'),ready:L('Ready. Tilt gently to fly; return to neutral to stop steering.','Готово. Наклоняй телефон для полёта; верни в исходное положение, чтобы перестать разгоняться.','Listo. Inclina suavemente para volar y vuelve al centro para dejar de acelerar.'),denied:L('Sensor permission denied. Joystick restored.','Доступ к датчикам не разрешён. Включён обычный стик.','Permiso denegado. Joystick restaurado.'),unavailable:L('No sensor data. Joystick restored.','Данные датчиков недоступны. Включён обычный стик.','No hay datos de sensores. Joystick restaurado.')})[mobileControls?.status||'off'];}
  function refreshPhoneSettings(){
+  syncHeadingControl();
   const root=$('modal');qa(root,'[data-phone-mode]').forEach(b=>{const on=b.dataset.phoneMode===g.mobileMode;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on));});
   const panel=q(root,'.phone-gyro-settings');if(panel)panel.hidden=g.mobileMode!=='gyro';text(root,'.phone-sensor-status',phoneStatus());
   const enable=q(root,'#phone-gyro-enable');if(enable){enable.disabled=mobileControls?.status==='permission';enable.textContent=mobileControls?.enabled?L('Calibrate','Калибровать','Calibrar'):L('Enable gyroscope','Включить гироскоп','Activar giroscopio');}
@@ -3002,7 +3007,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const pane=q(root,'[data-settings-pane=control]');q(pane,'#set-control-mode').closest('.br-option').hidden=true;q(pane,'.br-controls').hidden=true;
   text(root,'[data-settings-tab=control] small',L('TOUCH · TILT','КАСАНИЯ · НАКЛОН','TÁCTIL · INCLINACIÓN'));
   text(pane,'.br-pane-title p',L('Phone controls are saved separately from desktop controls.','Управление телефоном настраивается отдельно от компьютера.','Los controles del móvil se guardan por separado.'));
-  const section=document.createElement('section');section.className='phone-mode-settings';section.innerHTML=`<h4>${L('PHONE FLIGHT','ПОЛЁТ НА ТЕЛЕФОНЕ','VUELO EN MÓVIL')}</h4><div class="phone-mode-grid">${['fixed','floating','gyro'].map((mode,i)=>`<button type="button" data-phone-mode="${mode}"><span>${icon(['compass','orbit','star'][i])}</span><strong>${phoneModeLabel(mode)}</strong><small>${[L('Steer with the lower-left stick.','Стик внизу слева.','Joystick abajo a la izquierda.'),L('Touch empty space and drag to steer.','Коснись свободного места и веди пальцем.','Toca el espacio libre y arrastra.'),L('Tilt your phone to steer.','Управляй наклоном телефона.','Inclina el teléfono para dirigir.')][i]}</small></button>`).join('')}</div><div class="phone-gyro-settings"><label for="phone-gyro-sensitivity">${L('Tilt sensitivity','Чувствительность наклона','Sensibilidad')} <span id="phone-sensitivity-value"></span></label><input id="phone-gyro-sensitivity" type="range" min="50" max="200" step="5" value="${Math.round(g.mobileSensitivity*100)}"><button id="phone-gyro-enable" type="button"></button><p class="phone-sensor-status" role="status" aria-live="polite"></p></div>`;
+  const section=document.createElement('section');section.className='phone-mode-settings';section.innerHTML=`<h4>${L('PHONE FLIGHT','ПОЛЁТ НА ТЕЛЕФОНЕ','VUELO EN MÓVIL')}</h4><div class="phone-mode-grid">${['fixed','floating','gyro','direction'].map((mode,i)=>`<button type="button" data-phone-mode="${mode}"><span>${icon(['compass','orbit','star','arrow-right'][i])}</span><strong>${phoneModeLabel(mode)}</strong><small>${[L('Steer with the lower-right stick.','Стик внизу справа.','Joystick abajo a la derecha.'),L('Touch empty space and drag to steer.','Коснись свободного места и веди пальцем.','Toca el espacio libre y arrastra.'),L('Tilt your phone to steer.','Управляй наклоном телефона.','Inclina el teléfono para dirigir.'),L('Set the arrow once; keep flying until you turn it.','Поверни стрелку — полёт продолжается, пока не сменишь направление.','Gira la flecha: seguirás volando hasta cambiar el rumbo.')][i]}</small>${controlMini(mode)}</button>`).join('')}</div><div class="phone-gyro-settings"><label for="phone-gyro-sensitivity">${L('Tilt sensitivity','Чувствительность наклона','Sensibilidad')} <span id="phone-sensitivity-value"></span></label><input id="phone-gyro-sensitivity" type="range" min="50" max="200" step="5" value="${Math.round(g.mobileSensitivity*100)}"><button id="phone-gyro-enable" type="button"></button><p class="phone-sensor-status" role="status" aria-live="polite"></p></div>`;
   pane.querySelector('.br-pane-title').after(section);
   qa(section,'[data-phone-mode]').forEach(b=>b.onclick=()=>{g.mobileMode=b.dataset.phoneMode;clearFlightInput();mobileControls.configure();save();refreshPhoneSettings();});
   const sensitivity=q(section,'#phone-gyro-sensitivity'),sync=()=>{g.mobileSensitivity=+sensitivity.value/100;text(section,'#phone-sensitivity-value',g.mobileSensitivity.toFixed(2)+'×');sensitivity.style.setProperty('--val',((+sensitivity.value-50)/150*100)+'%');save();};sensitivity.oninput=sync;sync();
@@ -3012,7 +3017,19 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
 
  showSettings=function(){enterScreen('settings');legacy.settings();const {root,old}=mount('settings');
   const move=(target,id)=>{const n=q(old,'#'+id);q(root,target).replaceWith(n);return n;};
-  move('[data-settings-pane="control"] select:nth-of-type(1)','set-control-mode');
+  const controlSelect=move('[data-settings-pane="control"] select:nth-of-type(1)','set-control-mode');
+  const cruiseOption=document.createElement('option');cruiseOption.value='direction';cruiseOption.textContent=L('Cruise arrow · continuous flight','Стрелка · постоянный полёт','Flecha · vuelo continuo');
+  controlSelect.append(cruiseOption);controlSelect.value=g.controlMode;
+  const controlPreview=document.createElement('div');controlPreview.className='control-selection-preview';controlPreview.setAttribute('aria-live','polite');
+  controlSelect.closest('.br-option').append(controlPreview);
+  const controlDescriptions={
+   hold:L('Hold the mouse button to steer. Release to slow down.','Удерживай кнопку мыши для полёта, отпусти — остановишься.','Mantén pulsado el ratón para avanzar, suelta para parar.'),
+   follow:L('The object follows the cursor smoothly.','Объект плавно следует за курсором.','El objeto sigue suavemente al cursor.'),
+   keys:L('Use WASD or the arrow keys in any keyboard layout.','WASD и стрелки работают при любой раскладке.','Usa WASD o las flechas con cualquier idioma.'),
+   direction:L('Turn the arrow or click the game field. Flight never stops until you change direction.','Поверни стрелку или щёлкни по полю. Полёт продолжается без удержания.','Gira la flecha o pulsa el campo. Vuelas sin mantener el botón.')
+  };
+  const previewControl=()=>{const mode=controlSelect.value;controlPreview.innerHTML=controlMini(mode)+'<div class="control-selection-desc"><strong>'+L('CONTROL PREVIEW','ПРЕДПРОСМОТР УПРАВЛЕНИЯ','VISTA PREVIA')+'</strong><small>'+controlDescriptions[mode]+'</small></div>';syncHeadingControl();};
+  controlSelect.addEventListener('change',previewControl);previewControl();
   const controls=qa(root,'[data-settings-pane="control"] .br-option select');const feel=q(old,'#set-flight-feel');controls[1].replaceWith(feel);
   move('#br-quality','set-quality');
   const ranges=qa(root,'.br-slider input');['set-music-volume','set-sound-volume'].forEach((id,i)=>ranges[i].replaceWith(q(old,'#'+id)));
