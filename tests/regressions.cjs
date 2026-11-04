@@ -356,7 +356,7 @@ const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',re
  running:true,pulseCd:13,boostCd:6,boostTime:1};
 vm.createContext(resetBox);vm.runInContext(game.slice(freshStart,freshStop)+game.slice(resetStart,resetStop),resetBox);
 resetBox.dieInAbyss({name:'ЭРЕБ'});
-assert.equal(savedDeath.tier,0);assert.equal(savedDeath.matter,0);assert.equal(savedDeath.credits,0);
+assert.equal(savedDeath.tier,0);assert.equal(savedDeath.matter,0);assert.equal(savedDeath.credits,999999);
 assert.equal(savedDeath.upgrade.gravity,0);assert.equal(savedDeath.materials.exotic,0);
 assert.equal(Object.keys(savedDeath.depleted).length,0);assert.equal(resetBox.cosmicAbsorptions.length,0);
 assert.equal(resetBox.player.x,0);assert.equal(resetBox.player.vx,0);assert.equal(resetBox.camera.zoom,1);
@@ -364,8 +364,8 @@ assert.equal(resetBox.running,false);assert.equal(resetBox.boostCd,0);
 assert.equal(savedDeath.autoQuality,false);assert.equal(savedDeath.music,false);assert.equal(savedDeath.controlMode,'keys');
 assert.equal(resetBox.tester.ring,1.5);assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
 assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);assert.deepEqual(savedDeath.achievements,{first:123});assert.deepEqual(savedDeath.bestiary,{planet:true});
-resetBox.resetCampaignState(true);assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
-console.log('PASS: death and restart reset run progression but preserve purchased music, achievements, bestiary and preferences');
+resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new universe also retains stardust');assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
+console.log('PASS: death and restart reset run progression but preserve stardust, purchased music, achievements, bestiary and preferences');
 
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
