@@ -1,0 +1,148 @@
+/* Infiniti Space v3.41 — in-game controls, compact upgrades, readable atlas. */
+.ui-v15 #hud .v15-hud .upgrade-pull{display:none!important}
+.ui-v15 #hud .v15-hud .always-open-upgrades{
+ display:block!important;position:absolute!important;
+ left:clamp(12px,2.4vw,38px)!important;top:clamp(125px,17vh,174px)!important;
+ width:288px!important;max-width:calc(100vw - 24px)!important;
+ max-height:calc(100dvh - 310px)!important;overflow-y:auto!important;
+ padding:12px 13px!important;z-index:12;
+ border:1px solid #7959bd!important;border-bottom:3px solid #4d2a83!important;
+ border-radius:10px!important;background:rgba(20,12,38,.91)!important;
+ box-shadow:0 12px 36px rgba(3,0,14,.68)!important;
+ backdrop-filter:blur(14px);
+ scrollbar-width:thin;scrollbar-color:#6e4ac1 transparent;
+ pointer-events:auto!important;
+}
+.ui-v15 #hud .always-open-upgrades .drawer-head{margin:0 0 8px}
+.ui-v15 #hud .always-open-upgrades .drawer-head strong{
+ color:#eee3ff;font-size:12px;font-weight:950;letter-spacing:.11em;
+}
+.ui-v15 #hud .always-open-upgrades .quick-upgrade-qty{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:0 0 10px;
+}
+.ui-v15 #hud .always-open-upgrades .quick-upgrade-qty button{
+ padding:6px 2px;min-height:29px;min-width:0;border-radius:5px;
+ border:1px solid #674a94;color:#c8b6e5;background:#27173c;
+ font:850 10px/1.1 system-ui,sans-serif;
+}
+.ui-v15 #hud .always-open-upgrades .quick-upgrade-qty button[aria-pressed=true]{
+ color:#fff;border-color:#b99aff;background:#5635a0;box-shadow:inset 0 0 0 1px #9c7ce777;
+}
+.ui-v15 #hud .always-open-upgrades .drawer-up{
+ display:flex;align-items:center;justify-content:space-between;gap:8px;
+ min-height:51px;padding:8px 2px;text-align:left;width:100%;
+ border-top:1px solid rgba(150,117,204,.32);
+}
+.ui-v15 #hud .always-open-upgrades .drawer-up span{
+ flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;
+ font-size:11px;font-weight:850;color:#f2eaff;line-height:1.2;
+}
+.ui-v15 #hud .always-open-upgrades .drawer-up small{
+ display:block;color:#a99acb;font-size:9px;font-weight:750;
+}
+.ui-v15 #hud .always-open-upgrades .drawer-up b{
+ flex:0 0 auto;max-width:102px;white-space:nowrap;text-align:right;
+ font-size:11px;font-weight:900;color:#eccd8b;
+}
+.ui-v15 #hud .always-open-upgrades .drawer-up:hover:not(:disabled){
+ background:rgba(119,76,192,.21);color:#fff;
+}
+.ui-v15 #hud .always-open-upgrades .drawer-up:disabled{opacity:.55;cursor:default}
+.ui-v15 #hud .hud-commands .quick-audio{
+ position:relative;display:flex;align-items:center;gap:6px;
+ pointer-events:auto;z-index:18;
+}
+.ui-v15 #hud .hud-commands .quick-audio .icon-btn{flex:none}
+.ui-v15 #hud .hud-commands .quick-audio .icon-btn[aria-pressed=false]{
+ color:#9f91b9;border-color:#59436f;background:#170f27;
+}
+.ui-v15 #hud .hud-commands .quick-audio .icon-btn[aria-pressed=false]:hover{color:#eedcff}
+.ui-v15 #abyss-warning{
+ top:106px!important;bottom:auto!important;left:50%!important;right:auto!important;
+ transform:translateX(-50%)!important;
+ width:max-content;max-width:min(600px,calc(100vw - 340px));
+ padding:10px 15px;border-radius:7px;
+ font-size:12px;font-weight:800;line-height:1.5;
+ border:2px solid #d78ca2;background:rgba(39,12,31,.95);
+ color:#ffe0e9;box-shadow:0 8px 32px #000b,0 0 15px #ca668844;
+ z-index:33;text-align:center;
+}
+.ui-v15 #screen-map .map-corner.left{
+ width:clamp(216px,22vw,300px);left:2.5%;top:20px;
+ max-height:calc(100% - 92px);overflow:auto;scrollbar-width:thin;
+ background:rgba(17,12,33,.96);padding:18px;
+ border:1px solid #6d509d;z-index:6;
+}
+.ui-v15 #screen-map .map-corner.left .v15-map-details{
+ overflow-wrap:anywhere;max-width:100%;
+}
+.ui-v15 #screen-map .map-corner.left .v15-map-details summary{
+ font-size:11px;line-height:1.5;white-space:normal;
+}
+.ui-v15 #screen-map .map-threat{
+ top:16px!important;right:18px!important;max-width:min(385px,calc(100% - 360px));
+ z-index:5;padding:8px 12px;border-radius:6px;
+ background:rgba(15,9,30,.82);line-height:1.4;font-size:10px;
+}
+.ui-v15 #screen-map .map-corner.right{z-index:6}
+.ui-v15 #screen-map .map-footer{
+ overflow:hidden;min-height:58px;height:58px;
+ padding:7px 2.5%;z-index:7;
+}
+.ui-v15 #screen-map .map-footer .atlas-legend{
+ display:flex;flex-wrap:nowrap!important;gap:14px;min-width:0;width:100%;
+ white-space:nowrap;overflow-x:auto;overflow-y:hidden;
+ scrollbar-width:thin;scrollbar-color:#7654af transparent;padding:4px 0;
+}
+.ui-v15 #screen-map .map-footer .atlas-legend>span{flex:0 0 auto}
+.ui-v15 #screen-map .map-stage{bottom:58px}
+@media (max-width:1150px){
+ .ui-v15 #hud .v15-hud .always-open-upgrades{top:125px!important;width:255px!important}
+ .ui-v15 #hud .hud-commands .quick-audio{gap:3px}
+ .ui-v15 #abyss-warning{max-width:calc(100vw - 300px)}
+}
+@media (max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ .ui-v15 #hud .v15-hud .always-open-upgrades{
+  top:calc(max(8px,env(safe-area-inset-top)) + 148px)!important;
+  left:9px!important;width:min(190px,51vw)!important;
+  max-width:51vw!important;
+  max-height:calc(100dvh - 355px)!important;
+  padding:8px!important;border-radius:8px!important;
+  backdrop-filter:blur(8px);
+ }
+ .ui-v15 #hud .always-open-upgrades .drawer-head{margin-bottom:5px}
+ .ui-v15 #hud .always-open-upgrades .drawer-head strong{font-size:10px}
+ .ui-v15 #hud .always-open-upgrades .quick-upgrade-qty{gap:3px;margin-bottom:5px}
+ .ui-v15 #hud .always-open-upgrades .quick-upgrade-qty button{font-size:9px;min-height:26px;padding:5px 1px}
+ .ui-v15 #hud .always-open-upgrades .drawer-up{min-height:40px;padding:5px 1px;gap:4px}
+ .ui-v15 #hud .always-open-upgrades .drawer-up span{font-size:9px}
+ .ui-v15 #hud .always-open-upgrades .drawer-up small{font-size:8px}
+ .ui-v15 #hud .always-open-upgrades .drawer-up b{font-size:9px;max-width:65px}
+ .ui-v15 #hud .hud-commands .quick-audio{
+  position:fixed!important;top:calc(max(8px,env(safe-area-inset-top)) + 112px)!important;
+  right:10px!important;left:auto!important;z-index:35;
+  display:flex;gap:5px;background:rgba(17,10,31,.74);
+  border:1px solid #644899;border-radius:7px;padding:4px;
+ }
+ .ui-v15 #hud .v15-hud .hud-commands .quick-audio .icon-btn{
+  width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;
+  max-width:31px!important;max-height:31px!important;flex-basis:31px!important;
+  padding:4px!important;border-radius:5px!important;
+ }
+ .ui-v15 #hud .hud-commands .quick-audio svg{width:19px!important;height:19px!important}
+ .ui-v15 #abyss-warning{
+  left:auto!important;right:9px!important;transform:none!important;
+  top:calc(max(8px,env(safe-area-inset-top)) + 170px)!important;
+  bottom:auto!important;width:min(43vw,205px);max-width:min(43vw,205px);
+  padding:8px 7px;font-size:10px;line-height:1.35;
+ }
+ .ui-v15 #screen-map .map-corner.left{width:min(190px,48vw);top:12px;left:10px;padding:11px;max-height:calc(100% - 78px)}
+ .ui-v15 #screen-map .map-threat{display:none!important}
+ .ui-v15 #screen-map .map-footer{height:48px;min-height:48px;padding:4px 10px}
+ .ui-v15 #screen-map .map-stage{bottom:48px}
+ .ui-v15 #screen-map .map-footer .atlas-legend{font-size:9px;gap:9px}
+}
+@media(max-height:540px){
+ .ui-v15 #hud .v15-hud .always-open-upgrades{max-height:calc(100dvh - 232px)!important}
+ .ui-v15 #abyss-warning{top:128px!important;font-size:10px}
+}
