@@ -2967,7 +2967,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.41.1';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.42.0';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
@@ -2975,7 +2975,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.41.1`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.42.0`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -3009,6 +3009,9 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   text(pane,'.br-pane-title p',L('Phone controls are saved separately from desktop controls.','Управление телефоном настраивается отдельно от компьютера.','Los controles del móvil se guardan por separado.'));
   const section=document.createElement('section');section.className='phone-mode-settings';section.innerHTML=`<h4>${L('PHONE FLIGHT','ПОЛЁТ НА ТЕЛЕФОНЕ','VUELO EN MÓVIL')}</h4><div class="phone-mode-grid">${['fixed','floating','gyro','direction'].map((mode,i)=>`<button type="button" data-phone-mode="${mode}"><span>${icon(['compass','orbit','star','arrow-right'][i])}</span><strong>${phoneModeLabel(mode)}</strong><small>${[L('Steer with the lower-right stick.','Стик внизу справа.','Joystick abajo a la derecha.'),L('Touch empty space and drag to steer.','Коснись свободного места и веди пальцем.','Toca el espacio libre y arrastra.'),L('Tilt your phone to steer.','Управляй наклоном телефона.','Inclina el teléfono para dirigir.'),L('Set the arrow once; keep flying until you turn it.','Поверни стрелку — полёт продолжается, пока не сменишь направление.','Gira la flecha: seguirás volando hasta cambiar el rumbo.')][i]}</small>${controlMini(mode)}</button>`).join('')}</div><div class="phone-gyro-settings"><label for="phone-gyro-sensitivity">${L('Tilt sensitivity','Чувствительность наклона','Sensibilidad')} <span id="phone-sensitivity-value"></span></label><input id="phone-gyro-sensitivity" type="range" min="50" max="200" step="5" value="${Math.round(g.mobileSensitivity*100)}"><button id="phone-gyro-enable" type="button"></button><p class="phone-sensor-status" role="status" aria-live="polite"></p></div>`;
   pane.querySelector('.br-pane-title').after(section);
+  const gestureTip=document.createElement('p');gestureTip.className='phone-gesture-tip';
+  gestureTip.textContent=L('Pinch two fingers on empty space to zoom the camera. This works with every steering mode.','Своди или разводи два пальца на свободном месте для масштабирования камеры. Работает при любом управлении.','Junta o separa dos dedos en el espacio libre para acercar o alejar la cámara. Funciona con todos los modos.');
+  section.querySelector('.phone-mode-grid').after(gestureTip);
   qa(section,'[data-phone-mode]').forEach(b=>b.onclick=()=>{g.mobileMode=b.dataset.phoneMode;clearFlightInput();mobileControls.configure();save();refreshPhoneSettings();});
   const sensitivity=q(section,'#phone-gyro-sensitivity'),sync=()=>{g.mobileSensitivity=+sensitivity.value/100;text(section,'#phone-sensitivity-value',g.mobileSensitivity.toFixed(2)+'×');sensitivity.style.setProperty('--val',((+sensitivity.value-50)/150*100)+'%');save();};sensitivity.oninput=sync;sync();
   q(section,'#phone-gyro-enable').onclick=()=>{if(mobileControls.enabled)mobileControls.calibrate();else mobileControls.enable();refreshPhoneSettings();};refreshPhoneSettings();
@@ -3039,7 +3042,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.41.1');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.42.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{
