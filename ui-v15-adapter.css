@@ -141,3 +141,5 @@ body.ui-v15 [hidden]{display:none!important}
 .ui-v15 .music-cover img,.ui-v15 .music-player-art img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .ui-v15 .music-track-preview[aria-pressed=true]{border-color:#cba7ff;box-shadow:0 0 12px #a36bea66}
 @media(max-width:800px){.ui-v15 #screen-map .map-corner.right{right:12px!important;bottom:16px!important}.ui-v15 #screen-map .map-threat{display:none}}
+
+.ui-v15 .music-track-grid{padding-top:5px;padding-bottom:5px}

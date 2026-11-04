@@ -2729,7 +2729,7 @@ function restartCampaign(){
 function testerRefresh(){
  const panel=$('tester-panel');if(!panel)return;
  $('tester-tier').value=String(g.tier);
- $('tester-credits').value=String(Math.round(g.credits));
+ if(document.activeElement!==$('tester-credits'))$('tester-credits').value=String(Math.round(g.credits));
  const progress=panel.querySelector('[data-test="progress"]');progress.value=String(Math.round(stageFraction()*100));
  $('test-progress-val').textContent=progress.value+'%';
  for(const k of ['speed','gravity','loot','zoom','ring','density']){
