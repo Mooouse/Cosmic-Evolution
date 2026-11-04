@@ -2,7 +2,7 @@ window.SpaceMusicTracks = [
   {
     "id": 1,
     "title": "Five Billion Years Ago",
-    "price": 1000000,
+    "price": 0,
     "src": "assets/music/track-01.mp3",
     "cover": "assets/music/track-01.jpg",
     "duration": 228.0,
