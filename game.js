@@ -2402,10 +2402,9 @@ function showMusicShop(){
  show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('Unlock tracks with stardust to listen. Purchased tracks remain yours after death and in a new universe.','Купи треки за звёздную пыль, чтобы слушать их. Покупки сохраняются после смерти и в новой Вселенной.','Compra pistas con polvo estelar para escucharlas. Se conservan tras morir y en un nuevo universo.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===STARTER_TRACK?.id?L('Free · base soundtrack','Бесплатно · базовый трек','Gratis · pista básica'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${!t.src?'disabled':''}>${!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.37.0 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.37.0 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
- $('menu-upgrades').onclick=()=>{resumeGame();$('sidebar').classList.remove('collapsed');$('sidebar').classList.add('mobile-open');$('btn-show-sidebar').classList.add('hidden');};
  $('menu-bestiary').onclick=showBestiary;$('menu-achievements').onclick=showAchievements;$('menu-statistics').onclick=showStatistics;$('menu-settings').onclick=showSettings;
 }
 // The atlas reads the exact same deterministic sector data as gameplay; it is not an evolution-level menu.
@@ -2859,7 +2858,12 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   root.addEventListener('pointerdown',e=>{if(!lang.contains(e.target)){popup.hidden=true;toggle.setAttribute('aria-expanded','false');}});
   lang.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();popup.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();}};
   qa(lang,'[data-lang]').forEach(b=>{b.setAttribute('aria-selected',String(b===selected));b.onclick=()=>{window.SpaceI18n.setLanguage(b.dataset.lang);hud.remove();hud=buildHud();showMainMenu(paused);};});
-  const sound=q(root,'[data-toggle="sound"]');if(sound)sound.setAttribute('aria-pressed',String(g.sound));if(sound)sound.onclick=()=>{g.sound=!g.sound;save();sound.setAttribute('aria-pressed',String(g.sound));};
+  const sound=q(root,'[data-toggle="sound"]');
+   if(sound){
+    const sync=()=>{const on=g.music||g.sound;sound.setAttribute('aria-pressed',String(on));sound.setAttribute('aria-label',on?L('Mute all audio','Выключить весь звук','Silenciar todo'):L('Enable all audio','Включить весь звук','Activar audio'));sound.innerHTML=uiIcon(on?'music':'mute');};
+    sync();
+    sound.onclick=()=>{const on=!(g.music||g.sound);g.music=on;g.sound=on;initAudio();setMusicVolume();save();sync();refreshV15();};
+   }
  };
  function phoneModeLabel(mode){return ({fixed:L('Fixed joystick','Обычный стик','Joystick fijo'),floating:L('Floating joystick','Плавающий стик','Joystick flotante'),gyro:L('Gyroscope','Гироскоп','Giroscopio')})[mode];}
  function phoneStatus(){return ({off:L('Tap Enable, then hold your phone comfortably.','Нажми «Включить» и держи телефон в удобном положении.','Pulsa Activar y sujeta el teléfono cómodamente.'),permission:L('Waiting for sensor permission…','Ожидается разрешение на датчики…','Esperando permiso de sensores…'),calibrating:L('Hold still for calibration…','Держи телефон неподвижно для калибровки…','Mantén el teléfono quieto para calibrar…'),ready:L('Ready. Tilt gently to fly; return to neutral to stop steering.','Готово. Наклоняй телефон для полёта; верни в исходное положение, чтобы перестать разгоняться.','Listo. Inclina suavemente para volar y vuelve al centro para dejar de acelerar.'),denied:L('Sensor permission denied. Joystick restored.','Доступ к датчикам не разрешён. Включён обычный стик.','Permiso denegado. Joystick restaurado.'),unavailable:L('No sensor data. Joystick restored.','Данные датчиков недоступны. Включён обычный стик.','No hay datos de sensores. Joystick restaurado.')})[mobileControls?.status||'off'];}
@@ -2964,8 +2968,25 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  const oldOpenEvolution=openEvolution;openEvolution=()=>{if($('modal').dataset.screen==='evolution'&&!$('modal').classList.contains('off'))resumeGame();else showV15Evolution();};
  $('btn-evolution').onclick=openEvolution;$('btn-stage-details').onclick=openEvolution;
  function buildHud(){const holder=document.createElement('template');holder.innerHTML=tpl.play;const hud=holder.content.firstElementChild;hud.classList.add('active','v15-hud');$('hud').append(hud);decorate(hud);
- const drawer=q(hud,'#upgrade-drawer');q(hud,'#upgrades-open').onclick=()=>{drawer.classList.toggle('open');q(hud,'#upgrades-open').setAttribute('aria-expanded',String(drawer.classList.contains('open')));};q(hud,'#upgrades-close').onclick=()=>{drawer.classList.remove('open');q(hud,'#upgrades-open').setAttribute('aria-expanded','false');};q(hud,'#upgrades-open').setAttribute('aria-expanded','false');
- qa(drawer,'.drawer-up').forEach(n=>n.remove());upgrades.forEach(u=>{const b=document.createElement('button');b.type='button';b.className='drawer-up';b.dataset.quickUpgrade=u.id;b.onclick=()=>{buy(u.id);refreshV15();};drawer.insertBefore(b,q(drawer,'.drawer-more'));});
+ const drawer=q(hud,'#upgrade-drawer');
+ q(hud,'#upgrades-open').remove();q(drawer,'#upgrades-close').remove();q(drawer,'.drawer-more').remove();
+ drawer.classList.add('open','always-open-upgrades');
+ q(drawer,'.drawer-head strong').textContent=L('UPGRADES','УЛУЧШЕНИЯ','MEJORAS');
+ const bulk=document.createElement('div');bulk.className='quick-upgrade-qty';bulk.setAttribute('role','group');bulk.setAttribute('aria-label',L('Purchase quantity','Количество уровней','Cantidad de compra'));
+ bulk.innerHTML=['1','10','100','max'].map(v=>'<button type="button" data-quick-qty="'+v+'">'+(v==='max'?'MAX':'×'+v)+'</button>').join('');
+ drawer.insertBefore(bulk,q(drawer,'.drawer-head').nextSibling);
+ qa(bulk,'[data-quick-qty]').forEach(b=>b.onclick=()=>{setBuyAmount(b.dataset.quickQty);refreshV15();});
+ qa(drawer,'.drawer-up').forEach(n=>n.remove());
+ upgrades.forEach(u=>{const b=document.createElement('button');b.type='button';b.className='drawer-up';b.dataset.quickUpgrade=u.id;b.onclick=()=>{buy(u.id);refreshV15();};drawer.append(b);});
+ const soundControls=document.createElement('div');soundControls.className='quick-audio';
+ soundControls.innerHTML=
+  '<button type="button" class="icon-btn" data-audio-action="collection" title="Music collection" aria-label="Music collection">'+uiIcon('music')+'</button>'+
+  '<button type="button" class="icon-btn" data-audio-action="music" title="Mute or unmute music" aria-label="Mute or unmute music">'+uiIcon('music')+'</button>'+
+  '<button type="button" class="icon-btn" data-audio-action="effects" title="Mute or unmute sound effects" aria-label="Mute or unmute sound effects">'+uiIcon('mute')+'</button>';
+ q(hud,'.hud-commands').prepend(soundControls);
+ q(soundControls,'[data-audio-action="collection"]').onclick=showMusicShop;
+ q(soundControls,'[data-audio-action="music"]').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();save();refreshV15();};
+ q(soundControls,'[data-audio-action="effects"]').onclick=()=>{g.sound=!g.sound;save();refreshV15();};
  const activate=(id,fn)=>{const b=q(hud,id);b.onclick=()=>{fn();b.style.borderColor='#906BFF';setTimeout(()=>b.style.borderColor='',550);};};activate('#pulse',activatePulse);activate('#dash',activateBoost);q(hud,'#view-mode').remove();
  const cameraToggle=document.createElement('button');cameraToggle.className='v15-camera-toggle';cameraToggle.textContent='− / +';cameraToggle.setAttribute('aria-label',L('Camera controls','Масштаб камеры','Controles de cámara'));cameraToggle.setAttribute('aria-expanded','false');cameraToggle.onclick=()=>{const on=document.body.classList.toggle('v15-camera-open');cameraToggle.setAttribute('aria-expanded',String(on));};hud.append(cameraToggle);
  const info=q(hud,'.evo-status');info.setAttribute('role','button');info.tabIndex=0;info.setAttribute('aria-label',L('Evolution recipe','Рецепт эволюции','Receta de evolución'));info.onclick=e=>{if(!e.target.closest('button'))showV15Evolution();};info.onkeydown=e=>{if(e.key==='Enter')showV15Evolution();};
@@ -2975,13 +2996,17 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  const originalRender=renderUI;renderUI=function(...args){originalRender(...args);refreshV15();};
  function refreshV15(){
   refreshPhoneSettings();
-  qa(hud,'[data-quick-upgrade]').forEach(b=>{const u=upgrades.find(u=>u.id===b.dataset.quickUpgrade),quote=upgradeQuote(u);b.innerHTML='<span>'+esc(u.name)+'</span><b>✦ '+fmt(quote.cost)+'</b>';b.disabled=!quote.count||quote.cost>g.credits;});
+  qa(hud,'[data-quick-upgrade]').forEach(b=>{const u=upgrades.find(u=>u.id===b.dataset.quickUpgrade),quote=upgradeQuote(u);b.innerHTML='<span>'+esc(u.name)+'<small>LVL '+fmt(g.upgrade[u.id])+'</small></span><b>'+((quote.count&&Number.isFinite(quote.cost))?'✦ '+fmt(quote.cost):'—')+'</b>';b.disabled=!quote.count||!Number.isFinite(quote.cost)||quote.cost>g.credits;});
+   qa(hud,'[data-quick-qty]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.quickQty===String(g.buyAmount))));
+   const m=q(hud,'[data-audio-action="music"]'),fx=q(hud,'[data-audio-action="effects"]');
+   if(m){m.setAttribute('aria-pressed',String(g.music));m.setAttribute('aria-label',g.music?L('Mute music','Выключить музыку','Silenciar música'):L('Unmute music','Включить музыку','Activar música'));m.title=m.getAttribute('aria-label');m.innerHTML=uiIcon(g.music?'music':'mute');}
+   if(fx){fx.setAttribute('aria-pressed',String(g.sound));fx.setAttribute('aria-label',g.sound?L('Mute sound effects','Выключить эффекты','Silenciar efectos'):L('Unmute sound effects','Включить эффекты','Activar efectos'));fx.title=fx.getAttribute('aria-label');fx.innerHTML=g.sound?'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"/></svg>':uiIcon('mute');}
   q(hud,'#pulse').dataset.cooling=String(pulseCd>0);q(hud,'#dash').dataset.cooling=String(boostCd>0);
   const visible=$('modal').classList.contains('off');hud.style.display=visible?'block':'none';
   const resources=qa(hud,'.hud-resources strong');resources[0].textContent=$('matter-value').textContent;resources[1].textContent=fmt(g.credits);resources[2].textContent=timeFmt(g.time);
   text(hud,'.hud-resources small',g.endless?L('BLACK HOLE MASS','МАССА ЧЁРНОЙ ДЫРЫ','MASA DEL AGUJERO NEGRO'):L('MATTER','МАТЕРИЯ','MATERIA'));text(hud,'.hud-sub',TA[g.tier].epoch);text(hud,'.world-coords',$('world-subtitle').textContent);
   q(hud,'#mass-number').innerHTML=esc(g.endless?fmt(solarMass()):fmt(g.total))+(g.endless?' <small>M☉</small>':'');text(hud,'#radius-number',$('radius-value').textContent);text(hud,'.mass-details .mass-detail:last-child strong',Math.round(g.viewZoom*100)+'%');
-  text(hud,'.evo-title>span:first-child',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(hud,'.evo-title>span:nth-child(2)',g.endless?'∞':TA[Math.min(27,g.tier+1)].name);text(hud,'.evo-aux b',Math.round(stageFraction()*100)+'%');q(hud,'.progress-bar span').style.width=stageFraction()*100+'%';text(hud,'#player-label-text',TA[g.tier].name);text(hud,'.player-label small',`${g.tier+1} / 28`);text(hud,'#pulse small',$('pulse-cooldown').textContent);text(hud,'#dash small',$('boost-cooldown').textContent);text(hud,'#upgrades-open b',Object.values(g.upgrade).reduce((a,b)=>a+b,0));
+  text(hud,'.evo-title>span:first-child',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(hud,'.evo-title>span:nth-child(2)',g.endless?'∞':TA[Math.min(27,g.tier+1)].name);text(hud,'.evo-aux b',Math.round(stageFraction()*100)+'%');q(hud,'.progress-bar span').style.width=stageFraction()*100+'%';text(hud,'#player-label-text',TA[g.tier].name);text(hud,'.player-label small',`${g.tier+1} / 28`);text(hud,'#pulse small',$('pulse-cooldown').textContent);text(hud,'#dash small',$('boost-cooldown').textContent);
  }
  const originalResume=resumeGame;resumeGame=function(){stopMusicPreview();visual?.closeSelect();originalResume();refreshV15();};
  if(TEST_MODE){const b=document.createElement('button');b.className='v15-tester';b.textContent='</>';b.setAttribute('aria-label','Tester panel');b.onclick=()=>testerToggle();document.body.append(b);}
@@ -3034,11 +3059,20 @@ canvas.addEventListener('pointerup',releaseMouse);
 canvas.addEventListener('pointercancel',releaseMouse);
 canvas.addEventListener('lostpointercapture',releaseMouse);
 canvas.addEventListener('pointerleave',()=>{if(!pointer.down){pointer.active=false;updateFlightMarker();}});
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();
+// Map physical key positions, not the characters produced by EN/RU/ES layouts.
+function physicalKey(e){
+ const codes={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',KeyE:'e',KeyM:'m',KeyP:'p',Space:' ',ShiftLeft:'shift',ShiftRight:'shift',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright',Escape:'escape',F2:'f2'};
+ return codes[e.code]||e.key.toLowerCase();
+}
+addEventListener('keydown',e=>{const k=physicalKey(e);
  if(k==='f2'&&TEST_MODE){e.preventDefault();testerToggle();return;}
- if(e.target instanceof HTMLElement&&e.target.closest('input, select, textarea'))return;
- if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();keys.add(k);if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p')toggleOverlay('menu',showPause);if(k==='escape'){if(running)showPause();else resumeGame();}if(k==='m')toggleOverlay('map',showMap);}});
-addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
+ if(e.target instanceof HTMLElement&&e.target.closest('input, select, textarea, [contenteditable="true"]'))return;
+ if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();
+ keys.add(k);
+ if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p')toggleOverlay('menu',showPause);if(k==='escape'){if(running)showPause();else resumeGame();}if(k==='m')toggleOverlay('map',showMap);}
+});
+addEventListener('keyup',e=>keys.delete(physicalKey(e)));
+addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
