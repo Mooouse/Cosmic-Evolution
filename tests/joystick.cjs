@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const source=fs.readFileSync('game.js','utf8');
 const from=source.indexOf('function updateStickPosition('),to=source.indexOf('\n}',source.indexOf('function setupFlightStick()',from))+2;
 const listeners={},classes=new Set(),thumb={style:{}},pad={getBoundingClientRect:()=>({left:18,top:470,width:144,height:144}),classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)},addEventListener:(n,f)=>listeners[n]=f,setPointerCapture:()=>{}};
-const context={stick:{active:false,id:null,x:0,y:0},running:true,$:id=>id==='flight-stick'?pad:thumb};vm.createContext(context);vm.runInContext(source.slice(from,to)+'\nsetupFlightStick();',context);
+const context={mobileControls:null,stick:{active:false,id:null,x:0,y:0},running:true,$:id=>id==='flight-stick'?pad:thumb};vm.createContext(context);vm.runInContext(source.slice(from,to)+'\nsetupFlightStick();',context);
 const event=(id,x,y)=>({pointerId:id,clientX:x,clientY:y,button:0,preventDefault(){},stopPropagation(){}});
 listeners.pointerdown(event(1,40,510));assert.equal(context.stick.x,0);assert.equal(context.stick.y,0,'Touch-down anywhere on the pad must not jump');
 listeners.pointermove(event(1,43,512));assert.equal(context.stick.x,0,'Small finger tremor stays in the dead zone');

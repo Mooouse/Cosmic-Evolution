@@ -25,7 +25,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.39.0';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.40.0';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){legacy.menu(paused);const {root}=mount('menu');
@@ -33,7 +33,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.39.0`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.40.0`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -42,6 +42,27 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   qa(lang,'[data-lang]').forEach(b=>{b.setAttribute('aria-selected',String(b===selected));b.onclick=()=>{window.SpaceI18n.setLanguage(b.dataset.lang);hud.remove();hud=buildHud();showMainMenu(paused);};});
   const sound=q(root,'[data-toggle="sound"]');if(sound)sound.setAttribute('aria-pressed',String(g.sound));if(sound)sound.onclick=()=>{g.sound=!g.sound;save();sound.setAttribute('aria-pressed',String(g.sound));};
  };
+ function phoneModeLabel(mode){return ({fixed:L('Fixed joystick','Обычный стик','Joystick fijo'),floating:L('Floating joystick','Плавающий стик','Joystick flotante'),gyro:L('Gyroscope','Гироскоп','Giroscopio')})[mode];}
+ function phoneStatus(){return ({off:L('Tap Enable, then hold your phone comfortably.','Нажми «Включить» и держи телефон в удобном положении.','Pulsa Activar y sujeta el teléfono cómodamente.'),permission:L('Waiting for sensor permission…','Ожидается разрешение на датчики…','Esperando permiso de sensores…'),calibrating:L('Hold still for calibration…','Держи телефон неподвижно для калибровки…','Mantén el teléfono quieto para calibrar…'),ready:L('Ready. Tilt gently to fly; return to neutral to stop steering.','Готово. Наклоняй телефон для полёта; верни в исходное положение, чтобы перестать разгоняться.','Listo. Inclina suavemente para volar y vuelve al centro para dejar de acelerar.'),denied:L('Sensor permission denied. Joystick restored.','Доступ к датчикам не разрешён. Включён обычный стик.','Permiso denegado. Joystick restaurado.'),unavailable:L('No sensor data. Joystick restored.','Данные датчиков недоступны. Включён обычный стик.','No hay datos de sensores. Joystick restaurado.')})[mobileControls?.status||'off'];}
+ function refreshPhoneSettings(){
+  const root=$('modal');qa(root,'[data-phone-mode]').forEach(b=>{const on=b.dataset.phoneMode===g.mobileMode;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on));});
+  const panel=q(root,'.phone-gyro-settings');if(panel)panel.hidden=g.mobileMode!=='gyro';text(root,'.phone-sensor-status',phoneStatus());
+  const enable=q(root,'#phone-gyro-enable');if(enable){enable.disabled=mobileControls?.status==='permission';enable.textContent=mobileControls?.enabled?L('Calibrate','Калибровать','Calibrar'):L('Enable gyroscope','Включить гироскоп','Activar giroscopio');}
+  const quick=document.querySelector('.phone-gyro-quick');if(quick){quick.hidden=!mobileControls?.isPhone()||g.mobileMode!=='gyro';quick.textContent=mobileControls?.enabled?L('⊕ Recenter','⊕ Калибровка','⊕ Centrar'):L('⊕ Enable tilt','⊕ Включить наклон','⊕ Activar inclinación');}
+ }
+ function decoratePhoneSettings(root){
+  if(!mobileControls?.isPhone())return;
+  const pane=q(root,'[data-settings-pane=control]');q(pane,'#set-control-mode').closest('.br-option').hidden=true;q(pane,'.br-controls').hidden=true;
+  text(root,'[data-settings-tab=control] small',L('TOUCH · TILT','КАСАНИЯ · НАКЛОН','TÁCTIL · INCLINACIÓN'));
+  text(pane,'.br-pane-title p',L('Phone controls are saved separately from desktop controls.','Управление телефоном настраивается отдельно от компьютера.','Los controles del móvil se guardan por separado.'));
+  const section=document.createElement('section');section.className='phone-mode-settings';section.innerHTML=`<h4>${L('PHONE FLIGHT','ПОЛЁТ НА ТЕЛЕФОНЕ','VUELO EN MÓVIL')}</h4><div class="phone-mode-grid">${['fixed','floating','gyro'].map((mode,i)=>`<button type="button" data-phone-mode="${mode}"><span>${icon(['compass','orbit','star'][i])}</span><strong>${phoneModeLabel(mode)}</strong><small>${[L('Steer with the lower-left stick.','Стик внизу слева.','Joystick abajo a la izquierda.'),L('Touch empty space and drag to steer.','Коснись свободного места и веди пальцем.','Toca el espacio libre y arrastra.'),L('Tilt your phone to steer.','Управляй наклоном телефона.','Inclina el teléfono para dirigir.')][i]}</small></button>`).join('')}</div><div class="phone-gyro-settings"><label for="phone-gyro-sensitivity">${L('Tilt sensitivity','Чувствительность наклона','Sensibilidad')} <span id="phone-sensitivity-value"></span></label><input id="phone-gyro-sensitivity" type="range" min="50" max="200" step="5" value="${Math.round(g.mobileSensitivity*100)}"><button id="phone-gyro-enable" type="button"></button><p class="phone-sensor-status" role="status" aria-live="polite"></p></div>`;
+  pane.querySelector('.br-pane-title').after(section);
+  qa(section,'[data-phone-mode]').forEach(b=>b.onclick=()=>{g.mobileMode=b.dataset.phoneMode;clearFlightInput();mobileControls.configure();save();refreshPhoneSettings();});
+  const sensitivity=q(section,'#phone-gyro-sensitivity'),sync=()=>{g.mobileSensitivity=+sensitivity.value/100;text(section,'#phone-sensitivity-value',g.mobileSensitivity.toFixed(2)+'×');sensitivity.style.setProperty('--val',((+sensitivity.value-50)/150*100)+'%');save();};sensitivity.oninput=sync;sync();
+  q(section,'#phone-gyro-enable').onclick=()=>{if(mobileControls.enabled)mobileControls.calibrate();else mobileControls.enable();refreshPhoneSettings();};refreshPhoneSettings();
+ }
+ document.addEventListener('space-mobile-status',refreshPhoneSettings);
+
  showSettings=function(){legacy.settings();const {root,old}=mount('settings');
   const move=(target,id)=>{const n=q(old,'#'+id);q(root,target).replaceWith(n);return n;};
   move('[data-settings-pane="control"] select:nth-of-type(1)','set-control-mode');
@@ -54,8 +75,8 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.39.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
-  q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.40.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){show('');const {root}=mount('upgrades');const render=()=>{
   text(root,'#up-balance',fmt(g.credits));text(root,'.currency small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));
@@ -128,10 +149,12 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  const activate=(id,fn)=>{const b=q(hud,id);b.onclick=()=>{fn();b.style.borderColor='#906BFF';setTimeout(()=>b.style.borderColor='',550);};};activate('#pulse',activatePulse);activate('#dash',activateBoost);q(hud,'#view-mode').remove();
  const cameraToggle=document.createElement('button');cameraToggle.className='v15-camera-toggle';cameraToggle.textContent='− / +';cameraToggle.setAttribute('aria-label',L('Camera controls','Масштаб камеры','Controles de cámara'));cameraToggle.setAttribute('aria-expanded','false');cameraToggle.onclick=()=>{const on=document.body.classList.toggle('v15-camera-open');cameraToggle.setAttribute('aria-expanded',String(on));};hud.append(cameraToggle);
  const info=q(hud,'.evo-status');info.setAttribute('role','button');info.tabIndex=0;info.setAttribute('aria-label',L('Evolution recipe','Рецепт эволюции','Receta de evolución'));info.onclick=e=>{if(!e.target.closest('button'))showV15Evolution();};info.onkeydown=e=>{if(e.key==='Enter')showV15Evolution();};
+ const tiltButton=document.createElement('button');tiltButton.className='phone-gyro-quick';tiltButton.hidden=true;tiltButton.onclick=()=>{if(mobileControls?.enabled)mobileControls.calibrate();else mobileControls?.enable();refreshPhoneSettings();};hud.append(tiltButton);
  return hud;}
  let hud=buildHud();
  const originalRender=renderUI;renderUI=function(...args){originalRender(...args);refreshV15();};
  function refreshV15(){
+  refreshPhoneSettings();
   qa(hud,'[data-quick-upgrade]').forEach(b=>{const u=upgrades.find(u=>u.id===b.dataset.quickUpgrade),quote=upgradeQuote(u);b.innerHTML='<span>'+esc(u.name)+'</span><b>✦ '+fmt(quote.cost)+'</b>';b.disabled=!quote.count||quote.cost>g.credits;});
   q(hud,'#pulse').dataset.cooling=String(pulseCd>0);q(hud,'#dash').dataset.cooling=String(boostCd>0);
   const visible=$('modal').classList.contains('off');hud.style.display=visible?'block':'none';

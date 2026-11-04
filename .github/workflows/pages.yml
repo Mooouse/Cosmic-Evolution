@@ -26,6 +26,7 @@ jobs:
           node tests/regressions.cjs
           node tests/music.cjs
           node tests/joystick.cjs
+          node tests/mobile-controls.cjs
           test -s index.html
           test -s styles.css
           test -s favicon.svg

@@ -148,3 +148,16 @@ body.ui-v15 [hidden]{display:none!important}
 .ui-v15 #screen-map .atlas-measures>div{background:#201431;border-color:#684789}
 .ui-v15 #screen-map .atlas-measures small{color:#b49aca}.ui-v15 #screen-map .atlas-measures strong{color:#ecdbff}
 .ui-v15 #screen-map .atlas-pins select,.ui-v15 #screen-map .atlas-pins input{background:#201431;border-color:#7956a9;color:#edddff}
+/* Phone modes are enabled by touch-device detection, never by desktop width alone. */
+.ui-v15.mobile-floating #flight-stick{left:var(--stick-x,80px)!important;top:var(--stick-y,70vh)!important;bottom:auto!important;transform:translate(-50%,-50%);opacity:0;pointer-events:none!important}
+.ui-v15.mobile-floating #flight-stick.engaged{opacity:.95}
+.ui-v15.mobile-gyro #flight-stick{display:none!important}
+.ui-v15 .phone-gyro-quick{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(28px,env(safe-area-inset-bottom));min-height:52px;max-width:160px;padding:12px;border:1px solid #9c72d3;border-bottom:3px solid #583286;border-radius:10px;background:#26163eea;color:#ead9ff;font-size:12px;font-weight:800;pointer-events:auto}
+.ui-v15 .phone-gyro-quick[hidden],.ui-v15 .phone-gyro-settings[hidden],.ui-v15 .br-option[hidden],.ui-v15 .br-controls[hidden]{display:none!important}
+.ui-v15 .phone-mode-settings{margin:18px 0}.ui-v15 .phone-mode-settings h4{font-size:12px;letter-spacing:.09em;color:#c8a5ff}
+.ui-v15 .phone-mode-grid{display:grid;gap:8px;grid-template-columns:1fr}
+.ui-v15 .phone-mode-grid button{display:grid;grid-template-columns:32px 1fr;gap:4px 10px;text-align:left;min-height:66px;padding:10px;border:1px solid #735294;border-bottom:3px solid #4e3269;border-radius:6px;background:#211530;color:#f1e5ff}
+.ui-v15 .phone-mode-grid button>span{grid-row:span 2;align-self:center}.ui-v15 .phone-mode-grid svg{width:28px;height:28px}.ui-v15 .phone-mode-grid strong{font-size:13px}.ui-v15 .phone-mode-grid small{font-size:11px;color:#bba7d1;line-height:1.4}
+.ui-v15 .phone-mode-grid .selected{border-color:#bd8cff;background:#43246d;box-shadow:inset 3px 0 #b786ff}
+.ui-v15 .phone-gyro-settings{display:grid;gap:12px;padding:16px 0}.ui-v15 .phone-gyro-settings label{display:flex;justify-content:space-between;gap:12px;font-size:12px}.ui-v15 .phone-gyro-settings input{width:100%;min-height:30px;touch-action:pan-x}
+.ui-v15 #phone-gyro-enable{min-height:44px;border:1px solid #9970d1;border-bottom:3px solid #4c277f;border-radius:6px;background:#46237b;color:#f1e4ff;font-weight:800}.ui-v15 .phone-sensor-status{font-size:11px;line-height:1.6;color:#c3aed9;margin:0}
