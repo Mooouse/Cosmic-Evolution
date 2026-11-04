@@ -378,3 +378,17 @@
  .ui-v15 .control-mini-ship,.ui-v15 .control-mini-touch{animation:none!important}
  .ui-v15 #hud #direction-control .direction-arrow{transition:none}
 }
+
+/* Keep cooldown numbers visible on compact touch action buttons. */
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ .ui-v15 #hud .v15-hud .abilities .ability-btn[data-cooling="true"] small{
+  display:block!important;position:absolute!important;right:-6px;top:-14px;
+  background:#25123f;border:1px solid #9b74d6;border-radius:5px;
+  padding:2px 4px;color:#f6e7ff;font-size:9px!important;line-height:12px;
+  box-shadow:0 3px 8px #0008;white-space:nowrap;
+ }
+ .ui-v15.phone-controls #hud .phone-gyro-quick{
+  left:auto!important;right:max(18px,env(safe-area-inset-right))!important;
+  bottom:max(26px,env(safe-area-inset-bottom))!important;
+ }
+}
