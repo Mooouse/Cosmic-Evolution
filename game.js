@@ -2275,9 +2275,13 @@ requestAnimationFrame(frame);
 function setNavigationState(screen){
  for(const [id,name] of [['btn-menu','menu'],['btn-pause','menu'],['btn-map','map'],['btn-settings','settings']])$(id).setAttribute('aria-pressed',String(screen===name));
 }
+let navigateOverlayBack=null;
 function toggleOverlay(screen,open){
  const modal=$('modal');
- if(!modal.classList.contains('off')&&modal.dataset.screen===screen)resumeGame();else open();
+ if(!modal.classList.contains('off')&&modal.dataset.screen===screen){
+  if(screen!=='menu'&&navigateOverlayBack)navigateOverlayBack();
+  else resumeGame();
+ }else open();
 }
 function resumeGame(){closePinEditor();clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=true;window.SpacePlatform?.playing(true);startMusic();$('modal').classList.add('off');last=performance.now();}
 function show(html){
@@ -2894,6 +2898,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   restoringScreen=true;
   try{navigate(destination);}finally{restoringScreen=false;}
  }
+ navigateOverlayBack=navigateBack;
  function translate(root){
   const lang=window.SpaceI18n?.language||'en';if(lang==='ru')return;
   const dictionary=window.SpaceUIv15Dictionary||{};const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
@@ -2912,7 +2917,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.40.1';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.41.1';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
@@ -2920,7 +2925,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.40.1`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.41.1`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -2967,7 +2972,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.40.1');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.41.1');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{
@@ -3139,7 +3144,7 @@ addEventListener('keydown',e=>{const k=physicalKey(e);
  if(e.target instanceof HTMLElement&&e.target.closest('input, select, textarea, [contenteditable="true"]'))return;
  if(['arrowup','arrowleft','arrowright','arrowdown',' '].includes(k))e.preventDefault();
  keys.add(k);
- if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p')toggleOverlay('menu',showPause);if(k==='escape'){if(running)showPause();else resumeGame();}if(k==='m')toggleOverlay('map',showMap);}
+ if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p')toggleOverlay('menu',showPause);if(k==='escape'){if(running)showPause();else if($('modal').dataset.screen!=='menu'&&navigateOverlayBack)navigateOverlayBack();else resumeGame();}if(k==='m')toggleOverlay('map',showMap);}
 });
 addEventListener('keyup',e=>keys.delete(physicalKey(e)));
 addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
