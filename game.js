@@ -1238,7 +1238,7 @@ function updateAbysses(dt,speed,oldX,oldY){
  }
  const ahead=strongest||abyssPhysical.filter(h=>!g.abyssConsumed[h.id]&&!canEatAbyss(h)).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
  const warning=$('abyss-warning');
- const notice=strongest?`⚠ ${strongest.name} · ГРАВИТАЦИОННЫЙ ЗАХВАТ · До горизонта ${lightYears(Math.max(0,Math.hypot(strongest.x-player.x,strongest.y-player.y)-strongest.r))} · Вход = потеря всего прогресса`:ahead?`⚠ ВПЕРЕДИ ${ahead.name} · До горизонта ${lightYears(Math.max(0,Math.hypot(ahead.x-player.x,ahead.y-player.y)-ahead.r))} · Смертельная чёрная дыра`:'';
+ const notice=strongest?`⚠ ${strongest.name} · ГРАВИТАЦИОННЫЙ ЗАХВАТ · До горизонта ${lightYears(Math.max(0,Math.hypot(strongest.x-player.x,strongest.y-player.y)-strongest.r))} · Риск потери текущего полёта`:ahead?`⚠ ВПЕРЕДИ ${ahead.name} · До горизонта ${lightYears(Math.max(0,Math.hypot(ahead.x-player.x,ahead.y-player.y)-ahead.r))} · Смертельная чёрная дыра`:'';
  if(notice!==abyssNotice){abyssNotice=notice;warning.textContent=notice;warning.hidden=!notice;}
  return true;
 }
@@ -1300,12 +1300,25 @@ function renderAbysses(){
  const h=abyssPhysical.filter(b=>!g.abyssConsumed[b.id]&&!canEatAbyss(b)).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)/a.r-Math.hypot(b.x-player.x,b.y-player.y)/b.r)[0];
  if(h){
   const p=project(h.x,h.y);
-  if(p.x<30||p.y<100||p.x>W-30||p.y>H-130){
-   const angle=Math.atan2(p.y-H/2,p.x-W/2),x=W/2+Math.cos(angle)*W*.36,y=H/2+Math.sin(angle)*H*.30;
-   ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.fillStyle='#d6a8b4';
-   ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-7,-5);ctx.lineTo(-4,0);ctx.lineTo(-7,5);ctx.closePath();ctx.fill();ctx.restore();
-   ctx.save();ctx.fillStyle='#c1a8b5';ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(h.name,x,y+20);ctx.restore();
-  }
+  if(p.x<45||p.y<115||p.x>W-45||p.y>H-175){
+    const angle=Math.atan2(p.y-H/2,p.x-W/2);
+    const safeLeft=W<=800?Math.min(177,W*.45):300,safeRight=W-48;
+    const minY=W<=800?165:130,maxY=Math.max(minY+20,H-(W<=800?185:155));
+    const x=clamp(W/2+Math.cos(angle)*W*.38,safeLeft,safeRight);
+    const y=clamp(H/2+Math.sin(angle)*H*.34,minY,maxY);
+    ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+    ctx.shadowColor='#ffb4c5';ctx.shadowBlur=22;
+    ctx.fillStyle='rgba(228,96,132,.22)';ctx.beginPath();ctx.arc(0,0,25,0,TAU);ctx.fill();
+    ctx.strokeStyle='#ffb4c5';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(0,0,23,0,TAU);ctx.stroke();
+    ctx.fillStyle='#ffe3e9';ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(-10,-12);ctx.lineTo(-5,0);ctx.lineTo(-10,12);ctx.closePath();ctx.fill();ctx.restore();
+    ctx.save();ctx.font='800 12px Inter,sans-serif';ctx.textAlign='center';
+    const label=h.name,ww=Math.min(192,Math.max(92,ctx.measureText(label).width+20)),tx=clamp(x-ww/2,7,W-ww-7);
+    const labelY=clamp(y+34,10,H-35);
+    ctx.fillStyle='rgba(28,10,30,.92)';ctx.strokeStyle='#df91ac';ctx.lineWidth=1;
+    ctx.fillRect(tx,labelY,ww,25);ctx.strokeRect(tx+.5,labelY+.5,ww-1,24);
+    ctx.fillStyle='#ffe0ea';ctx.fillText(label,tx+ww/2,labelY+17,ww-10);ctx.restore();
+   }
+
  }
 }
 function atlasShowAbyss(){
@@ -2605,12 +2618,21 @@ function drawAtlas(){
   for(const [key,e] of Object.entries(g.freeFlights))if((e.macro||e.cosmic)&&!live.has(key))plotBody(freeFlightAt(e),e.captureOpacity??1);
  }
  c.globalAlpha=1;
- const mapPlayer=projectMap(player.x,player.y),labelRects=[{x:mapPlayer.x-8,y:mapPlayer.y-21,w:65,h:26}];
+ const mapPlayer=projectMap(player.x,player.y),labelRects=[{x:mapPlayer.x-30,y:mapPlayer.y-38,w:135,h:68}];
+ // Keep text away from controls and from other map labels.
+ const canvasBox=surface.getBoundingClientRect();
+ for(const selector of ['.map-corner.left','.map-corner.right','.map-threat']){
+  const el=$('screen-map')?.querySelector(selector);if(!el||!el.offsetWidth)continue;
+  const rect=el.getBoundingClientRect();labelRects.push({x:rect.left-canvasBox.left-9,y:rect.top-canvasBox.top-9,w:rect.width+18,h:rect.height+18});
+ }
+ labelRects.push({x:0,y:h-65,w:250,h:65});
+ const maxHoleLabels=Math.max(2,Math.min(7,Math.floor(w/220)));let holeLabels=0;
  for(const marker of atlasAbyssMarkers(atlas.x,atlas.y,w,h,scale)){
   const {x,y,r,bodies}=marker,h0=bodies[0];
   if(r>=4)paintAbyss(c,x,y,r,w,h);
   else {c.fillStyle='#010205';c.strokeStyle='#a2b3c4';c.lineWidth=1;c.beginPath();c.arc(x,y,3,0,TAU);c.fill();c.stroke();}
-  const label=bodies.length>1?`ДЫРЫ: ${bodies.length} · ПРИБЛИЗИТЬ`:h0.name+(canEatAbyss(h0)?' · МОЖНО ПОГЛОТИТЬ':'');
+  if(holeLabels>=maxHoleLabels||r<6)continue;
+  const label=bodies.length>1?`ЧЁРНЫЕ ДЫРЫ ×${bodies.length}`:h0.name+(canEatAbyss(h0)?' · ДОБЫЧА':'');
   c.font='600 10px Inter,sans-serif';
   const detail=bodies.length===1&&r>=8,ww=Math.max(c.measureText(label).width,detail?165:0)+8,hh=detail?29:16;
   let placement=null;
@@ -2621,28 +2643,41 @@ function drawAtlas(){
    }
    if(placement)break;
   }
-  if(placement){const {x:tx,y:ty}=placement;labelRects.push(placement);c.fillStyle='#dce6ee';c.fillText(label,tx,ty);
+  if(placement){holeLabels++;const {x:tx,y:ty}=placement;labelRects.push(placement);c.fillStyle='#dce6ee';c.fillText(label,tx,ty);
    if(detail){c.font='9px Inter,sans-serif';c.fillStyle='#ab8588';c.fillText(`ГОРИЗОНТ ${lightYears(h0.r*2)}`,tx,ty+13);}
   }
  }
  const playerPoint=projectMap(player.x,player.y);
  // Both the event horizon and gravity field are drawn at their TRUE map size.
- const bodyRadius=(g.endless?blackHoleCoreWorldRadius():player.r)*scale;
- const gravityRadius=(g.endless?blackHoleGravityRadius():ordinaryGravityRadius())*scale;
- if(gravityRadius<Math.max(w,h)*20){
-  c.strokeStyle='rgba(173,145,255,.65)';c.lineWidth=1;c.setLineDash([5,6]);
+ const isBlackHole=TA[g.tier].type==='blackhole';
+ const bodyRadius=(isBlackHole?blackHoleCoreWorldRadius():player.r)*scale;
+ const gravityRadius=(isBlackHole?blackHoleGravityRadius():ordinaryGravityRadius())*scale;
+ if(Number.isFinite(gravityRadius)&&gravityRadius<Math.max(w,h)*20){
+  c.strokeStyle='rgba(173,145,255,.48)';c.lineWidth=1;c.setLineDash([5,6]);
   c.beginPath();c.arc(playerPoint.x,playerPoint.y,gravityRadius,0,TAU);c.stroke();c.setLineDash([]);
  }
- if(bodyRadius<Math.max(w,h)*20){
-  c.fillStyle=g.endless?'#010205':'#bc9bff';c.strokeStyle='#bc9bff';c.lineWidth=1.5;
-  c.beginPath();c.arc(playerPoint.x,playerPoint.y,bodyRadius,0,TAU);c.fill();c.stroke();
+ if(Number.isFinite(bodyRadius)&&bodyRadius<Math.max(w,h)*20&&bodyRadius>1){
+  c.strokeStyle=isBlackHole?'rgba(255,215,170,.75)':'rgba(198,174,255,.72)';
+  c.lineWidth=1.3;c.beginPath();c.arc(playerPoint.x,playerPoint.y,bodyRadius,0,TAU);c.stroke();
+ }
+ // Draw the ACTUAL evolution shape (asteroid, planet, star, galaxy or black hole).
+ // Keep a legible icon even when the map zoom makes its physical radius subpixel.
+ const avatarRadius=clamp(bodyRadius,10,26);
+ if(isBlackHole){
+  paintAbyss(c,playerPoint.x,playerPoint.y,avatarRadius,w,h);
+ }else{
+  const previousCtx=ctx;ctx=c;
+  try{paintPlayerForm(playerPoint.x,playerPoint.y,avatarRadius,0,g.tier);}
+  finally{ctx=previousCtx;}
  }
  // The rectangular frame is the actual camera footprint, not a fixed inset.
  const viewCenter=projectMap(camera.x,camera.y),viewW=W/camera.zoom*scale,viewH=H/camera.zoom*scale;
  c.strokeStyle='rgba(179,143,241,.8)';c.lineWidth=1;c.strokeRect(viewCenter.x-viewW/2,viewCenter.y-viewH/2,viewW,viewH);
  if(playerPoint.x>=0&&playerPoint.y>=0&&playerPoint.x<=w&&playerPoint.y<=h){
-  c.fillStyle='#f3eaff';c.beginPath();c.arc(playerPoint.x,playerPoint.y,2.5,0,TAU);c.fill();
-  c.font='600 10px Inter,sans-serif';c.fillText('ТЫ',playerPoint.x+Math.max(9,bodyRadius+7),playerPoint.y-5);
+  c.font='800 11px Inter,sans-serif';c.fillStyle='#fff3d6';
+  const markerLabel=L('YOU','ТЫ','TÚ')+' · '+TA[g.tier].name;
+  const tx=clamp(playerPoint.x+Math.min(34,avatarRadius+10),8,Math.max(8,w-130));
+  c.fillText(markerLabel,tx,clamp(playerPoint.y-avatarRadius-5,14,h-15),130);
  }
  const origin=projectMap(0,0);
  if(Math.hypot(origin.x-playerPoint.x,origin.y-playerPoint.y)>35&&origin.x>15&&origin.y>15&&origin.x<w-70&&origin.y<h-20){
@@ -2691,7 +2726,7 @@ function showMap(){
  $('atlas-pin-go').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){atlas.x=p.x;atlas.y=p.y;atlas.zoom=p.zoom;atlas.dirty=true;}};
  refreshPinPanel();
  const giant=nearestAbyss();
- $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${lightYears(giant.r*2)} · ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. За горизонтом весь прогресс теряется.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
+ $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${lightYears(giant.r*2)} · ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. При гибели звёздная пыль и покупки сохраняются.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
  requestAnimationFrame(drawAtlas);
 }
 
