@@ -347,7 +347,7 @@ console.log('PASS: permanent giant landmarks, safe origin, attraction and swept 
 const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction testerRefresh()',resetStart);
 const freshStart=game.indexOf('const fresh ='),freshStop=game.indexOf('\nlet g =',freshStart);
 const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='';
-const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,g:{tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,autoQuality:false,particles:false,controlMode:'keys',flightFeel:'direct'},
+const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,g:{ownedTracks:[2,5],activeTrack:5,achievements:{first:123},bestiary:{planet:true},tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,autoQuality:false,particles:false,controlMode:'keys',flightFeel:'direct'},
  cosmicAbsorptions:[{}],absorbingMacroKeys:new Set(['taken']),visitedChunks:new Set(['1,1']),loadedChunks:new Set(['1,1']),distantChunkCache:new Map(),macroLoaded:new Set(),macroCache:new Map(),macroLODCache:new Map(),macroBackdrop:null,macroBackdropOld:null,macroEntities:[{}],entities:[{}],
  TEST_MODE:false,tester:{ring:1.5},player:{x:123,y:456,r:1e20,vx:200,vy:300},camera:{x:123,y:456,zoom:1e-10},particles:[{}],shockwaves:[{}],energyArcs:[{}],texts:[{}],radiusAt:()=>13,
  $:()=>resetNode,visitPosition(){},streamField(){},renderUI(){},testerRefresh(){},testerToggle(){},clearFlightInput(){},
@@ -363,7 +363,9 @@ assert.equal(resetBox.player.x,0);assert.equal(resetBox.player.vx,0);assert.equa
 assert.equal(resetBox.running,false);assert.equal(resetBox.boostCd,0);
 assert.equal(savedDeath.autoQuality,false);assert.equal(savedDeath.music,false);assert.equal(savedDeath.controlMode,'keys');
 assert.equal(resetBox.tester.ring,1.5);assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
-console.log('PASS: death resets and saves all progression, retains preferences and pauses simulation');
+assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);assert.deepEqual(savedDeath.achievements,{first:123});assert.deepEqual(savedDeath.bestiary,{planet:true});
+resetBox.resetCampaignState(true);assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
+console.log('PASS: death and restart reset run progression but preserve purchased music, achievements, bestiary and preferences');
 
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);

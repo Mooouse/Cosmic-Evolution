@@ -1,12 +1,5 @@
 window.SpaceMusicTracks = [
   {
-    "id": 0,
-    "title": "First Light",
-    "price": 0,
-    "src": null,
-    "subtitle": "Ambient · first spark"
-  },
-  {
     "id": 1,
     "title": "Five Billion Years Ago",
     "price": 1000000,
