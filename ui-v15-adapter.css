@@ -143,3 +143,8 @@ body.ui-v15 [hidden]{display:none!important}
 @media(max-width:800px){.ui-v15 #screen-map .map-corner.right{right:12px!important;bottom:16px!important}.ui-v15 #screen-map .map-threat{display:none}}
 
 .ui-v15 .music-track-grid{padding-top:5px;padding-bottom:5px}
+.ui-v15 #screen-map .atlas-mark.you{background:#c2a0ff;box-shadow:0 0 8px #b391ef}
+.ui-v15 #screen-map .atlas-mark.known{background:#65467d;border-color:#a07dc4}
+.ui-v15 #screen-map .atlas-measures>div{background:#201431;border-color:#684789}
+.ui-v15 #screen-map .atlas-measures small{color:#b49aca}.ui-v15 #screen-map .atlas-measures strong{color:#ecdbff}
+.ui-v15 #screen-map .atlas-pins select,.ui-v15 #screen-map .atlas-pins input{background:#201431;border-color:#7956a9;color:#edddff}
