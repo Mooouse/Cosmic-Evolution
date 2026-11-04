@@ -353,7 +353,7 @@ function flightSpeed(){
  return tester.speed*cosmicSpeed*(g.endless?10*(1+power*.01):1+Math.max(0,power-60)*.01);
 }
 function uiIcon(name){
- const shapes={"map": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"m16 8-2.5 5.5L8 16l2.5-5.5Z\"/>", "gravity": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><ellipse cx=\"12\" cy=\"12\" rx=\"10\" ry=\"6\" transform=\"rotate(-35 12 12)\"/>", "speed": "<path d=\"m13 3-9 11h7l-1 7 10-12h-8Z\"/>", "harvest": "<path d=\"m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z\"/>", "shield": "<path d=\"m12 3 8 3v6c0 4-5 7-8 9-3-2-8-5-8-9V6Z\"/><path d=\"m8 12 3 3 5-6\"/>", "music": "<path d=\"M9 18V5l11-2v13M9 9l11-2\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/><ellipse cx=\"17\" cy=\"16\" rx=\"3\" ry=\"2\"/>", "mute": "<path d=\"M9 18v-5m0-6V5l11-2v13M13 8l7-1M3 3l18 18\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/>", "pause": "<path d=\"M8 5v14M16 5v14\" stroke-width=\"3\"/>", "settings": "<path d=\"M4 7h16M4 17h16\"/><circle cx=\"9\" cy=\"7\" r=\"3\" fill=\"#0b2031\"/><circle cx=\"16\" cy=\"17\" r=\"3\" fill=\"#0b2031\"/>", "tester": "<path d=\"m8 4-5 8 5 8M16 4l5 8-5 8M14 4l-4 16\"/>", "arrow": "<path d=\"M4 12h16m-6-6 6 6-6 6\"/>", "close": "<path d=\"m6 6 12 12M6 18 18 6\"/>", "chevron": "<path d=\"m14 6-6 6 6 6\"/>", "expand": "<path d=\"M7 17 18 6M7 6h11v11\"/>", "plus": "<path d=\"M12 5v14M5 12h14\"/>", "minus": "<path d=\"M5 12h14\"/>", "center": "<circle cx=\"12\" cy=\"12\" r=\"6\"/><path d=\"M12 2v5m0 10v5M2 12h5m10 0h5\"/>", "achievements": "<path d=\"M8 3h8v5a4 4 0 0 1-8 0ZM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 12v6m-4 3h8m-6-3h4\"/>", "statistics": "<path d=\"M4 20V4m0 16h17M9 16v-5m5 5V7m5 9V3\"/>", "upgrades": "<path d=\"M5 19v-6m7 6V5m7 14v-9M2 13h6m1-8h6m1 5h6\"/>"};
+ const shapes={"map": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"m16 8-2.5 5.5L8 16l2.5-5.5Z\"/>", "gravity": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><ellipse cx=\"12\" cy=\"12\" rx=\"10\" ry=\"6\" transform=\"rotate(-35 12 12)\"/>", "speed": "<path d=\"m13 3-9 11h7l-1 7 10-12h-8Z\"/>", "harvest": "<path d=\"m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z\"/>", "shield": "<path d=\"m12 3 8 3v6c0 4-5 7-8 9-3-2-8-5-8-9V6Z\"/><path d=\"m8 12 3 3 5-6\"/>", "music": "<path d=\"M9 18V5l11-2v13M9 9l11-2\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/><ellipse cx=\"17\" cy=\"16\" rx=\"3\" ry=\"2\"/>", "playlist": "<rect x=\"3\" y=\"4\" width=\"14\" height=\"15\" rx=\"2\"/><path d=\"M7 8h6M7 12h6M7 16h4M20 8v10\"/><circle cx=\"18\" cy=\"18\" r=\"2\"/>", "mute": "<path d=\"M9 18v-5m0-6V5l11-2v13M13 8l7-1M3 3l18 18\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/>", "pause": "<path d=\"M8 5v14M16 5v14\" stroke-width=\"3\"/>", "settings": "<path d=\"M4 7h16M4 17h16\"/><circle cx=\"9\" cy=\"7\" r=\"3\" fill=\"#0b2031\"/><circle cx=\"16\" cy=\"17\" r=\"3\" fill=\"#0b2031\"/>", "tester": "<path d=\"m8 4-5 8 5 8M16 4l5 8-5 8M14 4l-4 16\"/>", "arrow": "<path d=\"M4 12h16m-6-6 6 6-6 6\"/>", "close": "<path d=\"m6 6 12 12M6 18 18 6\"/>", "chevron": "<path d=\"m14 6-6 6 6 6\"/>", "expand": "<path d=\"M7 17 18 6M7 6h11v11\"/>", "plus": "<path d=\"M12 5v14M5 12h14\"/>", "minus": "<path d=\"M5 12h14\"/>", "center": "<circle cx=\"12\" cy=\"12\" r=\"6\"/><path d=\"M12 2v5m0 10v5M2 12h5m10 0h5\"/>", "achievements": "<path d=\"M8 3h8v5a4 4 0 0 1-8 0ZM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 12v6m-4 3h8m-6-3h4\"/>", "statistics": "<path d=\"M4 20V4m0 16h17M9 16v-5m5 5V7m5 9V3\"/>", "upgrades": "<path d=\"M5 19v-6m7 6V5m7 14v-9M2 13h6m1-8h6m1 5h6\"/>"};
  return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[name]||shapes.arrow}</svg>`;
 }
 function populateUpgrades(){const root=$('upgrades');root.textContent='';for(const u of upgrades){let b=document.createElement('button');b.className='upgrade';b.dataset.upgrade=u.id;b.addEventListener('click',()=>buy(u.id));b.innerHTML=`<span class="upgrade-icon">${uiIcon(u.id)}</span><span class="upgrade-description"><strong>${u.name}</strong><small>${u.label} · <span class="upgrade-level"></span></small></span><span class="upgrade-cost"><span class="upgrade-price"></span><small>✦ цена</small></span>`;root.append(b);}}
@@ -2874,7 +2874,26 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  const text=(root,s,value)=>{const e=q(root,s);if(e)e.textContent=value;};
  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const legacy={menu:showMainMenu,settings:showSettings,achievements:showAchievements,bestiary:showBestiary,statistics:showStatistics,music:showMusicShop,map:showMap,tutorial:showTutorial};
- function navigate(name){({menu:showMainMenu,play:resumeGame,map:showMap,settings:showSettings,upgrades:showV15Upgrades,evolution:showV15Evolution,achievements:showAchievements,bestiary:showBestiary,statistics:showStatistics,music:showMusicShop,tutorial:showTutorial}[name]||resumeGame)();}
+ // Keep a screen history rather than hard-coding "Back" to the main menu.
+ // The history records where a page was opened, including in-game shortcuts.
+ const navigationStack=[];
+ let restoringScreen=false;
+ function currentScreen(){return $('modal').classList.contains('off')?'play':$('modal').dataset.screen||'menu';}
+ function enterScreen(name){
+  if(restoringScreen)return;
+  if(name==='menu'){navigationStack.length=0;return;}
+  const previous=currentScreen();
+  if(previous!==name)navigationStack.push(previous==='panel'?'menu':previous);
+ }
+ function navigate(name){
+  if(name==='upgrades'){resumeGame();const toggle=q(hud,'#upgrades-open');if(toggle&&!toggle.getAttribute('aria-expanded')?.includes('true'))toggle.click();return;}
+  ({menu:showMainMenu,play:resumeGame,map:showMap,settings:showSettings,evolution:showV15Evolution,achievements:showAchievements,bestiary:showBestiary,statistics:showStatistics,music:showMusicShop,tutorial:showTutorial}[name]||resumeGame)();
+ }
+ function navigateBack(){
+  const destination=navigationStack.pop()||'menu';
+  restoringScreen=true;
+  try{navigate(destination);}finally{restoringScreen=false;}
+ }
  function translate(root){
   const lang=window.SpaceI18n?.language||'en';if(lang==='ru')return;
   const dictionary=window.SpaceUIv15Dictionary||{};const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
@@ -2884,7 +2903,9 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  }
  function decorate(root){
   qa(root,'[data-icon]').forEach(e=>e.innerHTML=icon(e.dataset.icon));
-  qa(root,'[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));
+  qa(root,'[data-page]').forEach(b=>b.onclick=()=>(
+   b.matches('.back,.br-head-back,.br-foot-secondary')?navigateBack():navigate(b.dataset.page)
+  ));
   qa(root,'input[type=range]').forEach(input=>{const sync=()=>{const value=+input.value,min=+input.min||0,max=+input.max||100;input.style.setProperty('--val',`${(value-min)/(max-min)*100}%`);const out=input.parentElement.querySelector('output');if(out)out.textContent=Math.round(value)+'%';};input.addEventListener('input',sync);sync();});
   translate(root);
  }
@@ -2894,7 +2915,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.40.1';});
   decorate(root);return {root,old};
  }
- showMainMenu=function(paused=false){legacy.menu(paused);const {root}=mount('menu');
+ showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
   q(root,'.primary.big-play').onclick=()=>g.tutorialDone?resumeGame():showTutorial();q(root,'.quiet-btn').onclick=restartCampaign;
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
@@ -2934,7 +2955,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  }
  document.addEventListener('space-mobile-status',refreshPhoneSettings);
 
- showSettings=function(){legacy.settings();const {root,old}=mount('settings');
+ showSettings=function(){enterScreen('settings');legacy.settings();const {root,old}=mount('settings');
   const move=(target,id)=>{const n=q(old,'#'+id);q(root,target).replaceWith(n);return n;};
   move('[data-settings-pane="control"] select:nth-of-type(1)','set-control-mode');
   const controls=qa(root,'[data-settings-pane="control"] .br-option select');const feel=q(old,'#set-flight-feel');controls[1].replaceWith(feel);
@@ -2949,21 +2970,21 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   text(root,'.br-readout-foot','INFINITI SPACE · v3.40.1');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
- function showV15Upgrades(){show('');const {root}=mount('upgrades');const render=()=>{
+ function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{
   text(root,'#up-balance',fmt(g.credits));text(root,'.currency small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));
   qa(root,'.up-row').forEach((row,i)=>{const u=upgrades[i],quote=upgradeQuote(u);text(row,'.up-desc strong',u.name);text(row,'.up-desc small',u.label);text(row,'.up-level',`${g.upgrade[u.id]} / ∞`);text(row,'.up-bonus',L('EFFECTIVE POWER','ЭФФЕКТИВНАЯ СИЛА','POTENCIA EFECTIVA')+' · '+upgradePower(u.id).toFixed(2));const b=q(row,'.purchase');b.textContent=L('BUY','КУПИТЬ','COMPRAR')+` ×${quote.count} · ✦ ${Number.isFinite(quote.cost)?fmt(quote.cost):'∞'}`;b.classList.toggle('insufficient',!quote.count||quote.cost>g.credits);b.disabled=!quote.count||!Number.isFinite(quote.cost)||quote.cost>g.credits;b.onclick=()=>{buy(u.id);render();};});
   qa(root,'[data-quantity]').forEach(b=>{b.classList.toggle('active',String(g.buyAmount)===b.dataset.quantity);b.onclick=()=>{setBuyAmount(b.dataset.quantity);render();};});const input=q(root,'#up-custom-qty');if(document.activeElement!==input)input.value=g.buyAmount==='max'?'':g.buyAmount;input.oninput=()=>{if(input.value&&setBuyAmount(input.value)!==false)render();};translate(root);
  };render();}
- showAchievements=function(){legacy.achievements();const {root}=mount('achievements');const list=q(root,'.br-ach-list');
+ showAchievements=function(){enterScreen('achievements');legacy.achievements();const {root}=mount('achievements');const list=q(root,'.br-ach-list');
   list.innerHTML=ACHIEVEMENTS.map(a=>{const [rarity,color]=RARITIES[a[1]],done=!!g.achievements?.[a[0]],progress=done?100:achievementProgress(a);return `<div class="br-ach-row" data-rarity="${rarity}" style="--rarity:${color}"><div class="br-ach-symbol ${rarity}">${icon(({common:'check',uncommon:'star',rare:'compass',epic:'orbit',legendary:'trophy',mythic:'star'})[rarity])}</div><div class="br-ach-copy"><span class="br-ach-rarity ${rarity}">${L(...RARITIES[a[1]][2])}</span><strong>${esc(L(...a[2]))}</strong><small>${fmt(achievementValue(a[3]))} / ${fmt(a[4])} ${goalLabel(a[3])}</small><div class="br-ach-prog" role="progressbar" aria-label="${esc(L(...a[2]))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div></div><b>${progress===100?'100':progress>0&&progress<.01?'&lt;0.01':progress.toFixed(1)}%</b></div>`;}).join('');
   const earned=Object.keys(g.achievements||{}).length;q(root,'.br-ach-big').innerHTML=`${earned}<span>/${ACHIEVEMENTS.length}</span>`;text(root,'.br-ach-summary p',L('Your discoveries and milestones','Твои открытия и достижения','Tus descubrimientos y logros'));
   qa(root,'.br-filter').forEach(b=>b.onclick=()=>{qa(root,'.br-filter').forEach(n=>n.classList.toggle('active',n===b));qa(list,'.br-ach-row').forEach(n=>n.hidden=b.dataset.achFilter!=='all'&&n.dataset.rarity!==b.dataset.achFilter);});
  };
- showBestiary=function(){legacy.bestiary();const {root}=mount('bestiary');const buttons=qa(root,'[data-bestiary]');function select(i){const [id,t,title,desc]=FIELD_GUIDE[i];buttons.forEach((b,j)=>b.classList.toggle('selected',i===j));text(root,'#br-best-number',String(i+1).padStart(2,'0'));text(root,'#br-best-name',L(...title));text(root,'#br-best-desc',L(...desc));text(root,'#br-best-status',g.tier>=t?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR'));q(root,'#br-best-visual').className='br-best-planet '+({blackhole:'hole',planet:'rock',galaxy:'galaxy'}[id]||id);}
+ showBestiary=function(){enterScreen('bestiary');legacy.bestiary();const {root}=mount('bestiary');const buttons=qa(root,'[data-bestiary]');function select(i){const [id,t,title,desc]=FIELD_GUIDE[i];buttons.forEach((b,j)=>b.classList.toggle('selected',i===j));text(root,'#br-best-number',String(i+1).padStart(2,'0'));text(root,'#br-best-name',L(...title));text(root,'#br-best-desc',L(...desc));text(root,'#br-best-status',g.tier>=t?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR'));q(root,'#br-best-visual').className='br-best-planet '+({blackhole:'hole',planet:'rock',galaxy:'galaxy'}[id]||id);}
  buttons.forEach((b,i)=>{b.onclick=()=>select(i);b.children[1].textContent=`${String(i+1).padStart(2,'0')} / ${L(...FIELD_GUIDE[i][2])}`;b.querySelector('b').textContent=g.tier>=FIELD_GUIDE[i][1]?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR');});q(root,'.br-best-details>small')?.remove();select(0);
  };
- showStatistics=function(){legacy.statistics();const {root,old}=mount('statistics');const grid=q(root,'.br-stat-grid');grid.replaceChildren(...qa(old,'.stat-list>div'));text(root,'.br-simple-intro>span',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(root,'.br-simple-intro p',L('Your current journey','Твоё текущее прохождение','Tu viaje actual'));};
- function showV15Evolution(){renderUI(true);show('');const {root}=mount('evolution'),tier=g.tier; text(root,'.overline',`${tier+1} / 28`);text(root,'.page-nav .muted-caps',TA[tier].epoch);const words=TA[tier].name.split(' ');q(root,'.display-heading').innerHTML=esc(words.shift())+'<br><em>'+esc(words.join(' ')||'·')+'</em>';text(root,'.lead',TA[tier].desc);text(root,'.large-progress-label strong',g.endless?L('INFINITE GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):`${TA[Math.min(27,tier+1)].name} · ${Math.round(stageFraction()*100)}%`);q(root,'.progress-bar span').style.width=stageFraction()*100+'%';
+ showStatistics=function(){enterScreen('statistics');legacy.statistics();const {root,old}=mount('statistics');const grid=q(root,'.br-stat-grid');grid.replaceChildren(...qa(old,'.stat-list>div'));text(root,'.br-simple-intro>span',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(root,'.br-simple-intro p',L('Your current journey','Твоё текущее прохождение','Tu viaje actual'));};
+ function showV15Evolution(){enterScreen('evolution');renderUI(true);show('');const {root}=mount('evolution'),tier=g.tier; text(root,'.overline',`${tier+1} / 28`);text(root,'.page-nav .muted-caps',TA[tier].epoch);const words=TA[tier].name.split(' ');q(root,'.display-heading').innerHTML=esc(words.shift())+'<br><em>'+esc(words.join(' ')||'·')+'</em>';text(root,'.lead',TA[tier].desc);text(root,'.large-progress-label strong',g.endless?L('INFINITE GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):`${TA[Math.min(27,tier+1)].name} · ${Math.round(stageFraction()*100)}%`);q(root,'.progress-bar span').style.width=stageFraction()*100+'%';
   const stages=q(root,'.stage-controls');stages.replaceChildren();for(let i=Math.max(0,tier-1);i<=Math.min(27,tier+1);i++){const b=document.createElement('span');b.className='pill-button '+(i===tier?'active':i>tier?'disabled':'');b.textContent=`${i+1} ${TA[i].name}`;stages.append(b);}
   const recipe=q(root,'.recipe'),req=g.endless?[]:stageRecipe();text(root,'.recipe-head b',`${req.filter(r=>(g.materials[r.type]||0)>=r.amount).length} / ${req.length}`);qa(recipe,'.recipe-row').forEach(n=>n.remove());const foot=q(recipe,'.recipe-foot');
   req.forEach(({type,amount})=>{const m=MATERIALS[type],v=g.materials[type]||0,row=document.createElement('div');row.className='recipe-row';row.innerHTML=`<span class="material-icon ${type==='ore'?'rock':type}" style="--material-color:${m.color}"></span><div>${esc(window.SpaceI18n?.t(m.label)||m.label)}<small>${v>=amount?L('READY','ГОТОВО','LISTO'):L('Still needed: ','Не хватает: ','Faltan: ')+fmt(amount-v)}</small></div><b>${fmt(v)} / ${fmt(amount)}</b><span class="req-dot ${v>=amount?'ready':''}"></span>`;recipe.insertBefore(row,foot);});
@@ -2971,7 +2992,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   if(g.endless)text(root,'.recipe-head>span',L('BEYOND THE HORIZON','ЗА ГОРИЗОНТОМ','MÁS ALLÁ DEL HORIZONTE'));translate(root);
  }
  const trackCover=(t,i)=>t.cover?`<img src="${esc(t.cover)}" alt="${esc(t.title)}" loading="lazy" decoding="async" width="360" height="360">`:visual.musicCover(i);
- showMusicShop=function(){legacy.music();const {root,old}=mount('music');text(root,'#music-balance',fmt(g.credits));text(root,'.music-wallet small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));text(root,'.music-heading p',q(old,'.overlay-copy').textContent);text(root,'.music-eyebrow',L('SOUNDTRACK','САУНДТРЕК','BANDA SONORA')+' / '+MUSIC_TRACKS.length+' '+L('TRACKS','КОМПОЗИЦИЙ','PISTAS'));text(root,'#music-owned-count',`${g.ownedTracks.length} / ${MUSIC_TRACKS.length} `+L('unlocked','открыто','desbloqueadas'));const legend=q(root,'.music-legend');[...legend.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.textContent='');q(root,'.legend-sep')?.remove();
+ showMusicShop=function(){enterScreen('music');legacy.music();const {root,old}=mount('music');text(root,'#music-balance',fmt(g.credits));text(root,'.music-wallet small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));text(root,'.music-heading p',q(old,'.overlay-copy').textContent);text(root,'.music-eyebrow',L('SOUNDTRACK','САУНДТРЕК','BANDA SONORA')+' / '+MUSIC_TRACKS.length+' '+L('TRACKS','КОМПОЗИЦИЙ','PISTAS'));text(root,'#music-owned-count',`${g.ownedTracks.length} / ${MUSIC_TRACKS.length} `+L('unlocked','открыто','desbloqueadas'));const legend=q(root,'.music-legend');[...legend.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.textContent='');q(root,'.legend-sep')?.remove();
   const list=q(root,'#music-track-list');const subtitles=[L('Ambient · first spark','Эмбиент · первая искра','Ambiente · primera chispa'),L('Pulsar · distant signal','Пульсар · далёкий сигнал','Púlsar · señal lejana'),L('Stellar wind','Звёздный ветер','Viento estelar'),L('Night horizon','Ночной горизонт','Horizonte nocturno'),L('Galactic depth','Галактическая глубина','Profundidad galáctica'),L('Echo of the abyss','Эхо бездны','Eco del abismo'),L('Beyond the horizon','За горизонтом','Más allá del horizonte'),L('The last singularity','Последняя сингулярность','La última singularidad')];
   list.innerHTML=MUSIC_TRACKS.map((t,i)=>{const owned=g.ownedTracks.includes(t.id),chosen=g.activeTrack===t.id,available=!!t.src;return `<article class="music-track-card ${chosen?'selected':''}" data-track-index="${i}"><div class="music-cover">${trackCover(t,i)}<span class="music-cover-index">${String(i+1).padStart(2,'0')} / ${String(MUSIC_TRACKS.length).padStart(2,'0')}</span></div><div class="music-track-meta"><strong>${esc(t.title)}</strong><small>${esc(t.subtitle||subtitles[i]||'')}</small></div><div class="music-track-actions"><span class="music-track-price">${i===0?L('FREE · BASE TRACK','БЕСПЛАТНО · БАЗОВЫЙ','GRATIS · PISTA BÁSICA'):owned?'✓ '+L('UNLOCKED','ОТКРЫТ','ABIERTO'):'✦ '+fmt(t.price)}</span><button class="music-track-preview" data-preview="${i}" aria-label="${esc(L('Listen: ','Слушать: ','Escuchar: ')+t.title)}" ${owned&&available?'':'disabled'}>${visual.mediaSVG('play')}</button><button data-music-action="${i}" class="${owned?(chosen?'chosen':'owned'):''}" ${available?'':'disabled'}>${!available?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):owned?(chosen?L('SELECTED','ВЫБРАНО','ELEGIDA'):L('SELECT','ВЫБРАТЬ','ELEGIR')):L('BUY','КУПИТЬ','COMPRAR')}</button></div></article>`;}).join('');
   const activeIndex=MUSIC_TRACKS.findIndex(t=>t.id===g.activeTrack&&g.ownedTracks.includes(t.id)),active=MUSIC_TRACKS[activeIndex];q(root,'#music-player-art').innerHTML=active?trackCover(active,activeIndex):'';text(root,'#music-now-title',active?active.title:L('No track selected','Трек не выбран','Sin pista seleccionada'));text(root,'#music-now-detail',active?(g.music?L('Playing','Играет','Sonando'):L('Paused','Пауза','Pausa')):L('Purchase a track to listen','Купи трек для прослушивания','Compra una pista para escuchar'));q(root,'#music-play-glyph').innerHTML=visual.mediaSVG(active&&g.music?'pause':'play');['#music-play','#music-prev','#music-next'].forEach(sel=>q(root,sel).disabled=!active);
@@ -2983,7 +3004,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const seek=q(root,'#music-seek'),audio=externalMusic;const syncPlayback=()=>{if(!root.isConnected)return;const duration=audio?.duration;if(Number.isFinite(duration)&&duration>0){seek.disabled=false;seek.max=duration;if(document.activeElement!==seek)seek.value=audio.currentTime;seek.style.setProperty('--val',(audio.currentTime/duration*100)+'%');text(root,'#music-duration',timeFmt(duration));text(root,'#music-position',timeFmt(audio.currentTime));}else{seek.disabled=true;seek.value=0;text(root,'#music-duration','—');text(root,'#music-position','00:00');}};seek.oninput=()=>{if(audio&&Number.isFinite(audio.duration))audio.currentTime=+seek.value;};if(audio){audio.ontimeupdate=syncPlayback;audio.onloadedmetadata=syncPlayback;audio.ondurationchange=syncPlayback;}syncPlayback();decorate(root);
  };
  // Keep the atlas renderer and all marker editing controls in their live DOM.
- showMap=function(){legacy.map();const {root,old}=mount('map');
+ showMap=function(){enterScreen('map');legacy.map();const {root,old}=mount('map');
   q(root,'.header-right button').setAttribute('aria-label',L('Settings','Настройки','Ajustes'));
   q(root,'#atlas').replaceWith(q(old,'#atlas-canvas'));
   q(root,'#atlas-pin-menu').remove();q(root,'.map-scale').remove();
@@ -3008,7 +3029,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   editor.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();finish();}if(e.key==='Enter'){e.preventDefault();q(editor,'#pin-save').click();}};
   const rect=editor.getBoundingClientRect();editor.style.left=clamp(px+10,8,Math.max(8,bounds.width-rect.width-8))+'px';editor.style.top=clamp(py+8,8,Math.max(8,bounds.height-rect.height-8))+'px';input.focus();input.select();
  };
- showTutorial=function(){show('');const {root}=mount('tutorial');
+ showTutorial=function(){enterScreen('tutorial');show('');const {root}=mount('tutorial');
   const articles=qa(root,'.br-tutorial article');
   text(articles[2],'p',L('Gather mass and the materials in your evolution recipe. M opens the atlas. Right-click to name and colour a marker; on a phone use + Marker. A larger black hole ends your run.','Собирай массу и материалы из рецепта эволюции. M открывает карту. ПКМ создаёт метку с именем и цветом; на телефоне — + Метка. Большая чёрная дыра завершит прохождение.','Reúne masa y los materiales de tu receta. M abre el atlas. Clic derecho crea una marca con nombre y color; en móvil usa + Marca. Un agujero negro mayor termina tu partida.'));
   q(root,'.br-tutorial-done').onclick=()=>{g.tutorialDone=true;save();resumeGame();};
@@ -3016,9 +3037,13 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  const oldOpenEvolution=openEvolution;openEvolution=()=>{if($('modal').dataset.screen==='evolution'&&!$('modal').classList.contains('off'))resumeGame();else showV15Evolution();};
  $('btn-evolution').onclick=openEvolution;$('btn-stage-details').onclick=openEvolution;
  function buildHud(){const holder=document.createElement('template');holder.innerHTML=tpl.play;const hud=holder.content.firstElementChild;hud.classList.add('active','v15-hud');$('hud').append(hud);decorate(hud);
- const drawer=q(hud,'#upgrade-drawer');
- q(hud,'#upgrades-open').remove();q(drawer,'#upgrades-close').remove();q(drawer,'.drawer-more').remove();
- drawer.classList.add('open','always-open-upgrades');
+ const drawer=q(hud,'#upgrade-drawer'),upgradeToggle=q(hud,'#upgrades-open'),upgradeClose=q(drawer,'#upgrades-close');
+ q(drawer,'.drawer-more').remove();
+ drawer.classList.add('quick-upgrades');drawer.classList.remove('open');
+ upgradeToggle.setAttribute('aria-expanded','false');
+ const setUpgradesOpen=on=>{drawer.classList.toggle('open',on);upgradeToggle.setAttribute('aria-expanded',String(on));};
+ upgradeToggle.onclick=()=>setUpgradesOpen(!drawer.classList.contains('open'));
+ upgradeClose.onclick=()=>setUpgradesOpen(false);
  q(drawer,'.drawer-head strong').textContent=L('UPGRADES','УЛУЧШЕНИЯ','MEJORAS');
  const bulk=document.createElement('div');bulk.className='quick-upgrade-qty';bulk.setAttribute('role','group');bulk.setAttribute('aria-label',L('Purchase quantity','Количество уровней','Cantidad de compra'));
  bulk.innerHTML=['1','10','100','max'].map(v=>'<button type="button" data-quick-qty="'+v+'">'+(v==='max'?'MAX':'×'+v)+'</button>').join('');
@@ -3028,13 +3053,11 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  upgrades.forEach(u=>{const b=document.createElement('button');b.type='button';b.className='drawer-up';b.dataset.quickUpgrade=u.id;b.onclick=()=>{buy(u.id);refreshV15();};drawer.append(b);});
  const soundControls=document.createElement('div');soundControls.className='quick-audio';
  soundControls.innerHTML=
-  '<button type="button" class="icon-btn" data-audio-action="collection" title="Music collection" aria-label="Music collection">'+uiIcon('music')+'</button>'+
-  '<button type="button" class="icon-btn" data-audio-action="music" title="Mute or unmute music" aria-label="Mute or unmute music">'+uiIcon('music')+'</button>'+
-  '<button type="button" class="icon-btn" data-audio-action="effects" title="Mute or unmute sound effects" aria-label="Mute or unmute sound effects">'+uiIcon('mute')+'</button>';
+  '<button type="button" class="icon-btn" data-audio-action="collection" aria-label="'+L('Music collection','Коллекция музыки','Colección de música')+'" title="'+L('Music collection','Коллекция музыки','Colección de música')+'">'+uiIcon('playlist')+'</button>'+
+  '<button type="button" class="icon-btn" data-audio-action="mute" aria-label="'+L('Mute all sounds','Выключить весь звук','Silenciar todo')+'" title="'+L('Mute all sounds','Выключить весь звук','Silenciar todo')+'">'+uiIcon('music')+'</button>';
  q(hud,'.hud-commands').prepend(soundControls);
- q(soundControls,'[data-audio-action="collection"]').onclick=showMusicShop;
- q(soundControls,'[data-audio-action="music"]').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();save();refreshV15();};
- q(soundControls,'[data-audio-action="effects"]').onclick=()=>{g.sound=!g.sound;save();refreshV15();};
+ q(soundControls,'[data-audio-action="collection"]').onclick=()=>navigate('music');
+ q(soundControls,'[data-audio-action="mute"]').onclick=()=>{const enabled=!(g.music||g.sound);g.music=enabled;g.sound=enabled;initAudio();setMusicVolume();save();refreshV15();};
  const activate=(id,fn)=>{const b=q(hud,id);b.onclick=()=>{fn();b.style.borderColor='#906BFF';setTimeout(()=>b.style.borderColor='',550);};};activate('#pulse',activatePulse);activate('#dash',activateBoost);q(hud,'#view-mode').remove();
  const cameraToggle=document.createElement('button');cameraToggle.className='v15-camera-toggle';cameraToggle.textContent='− / +';cameraToggle.setAttribute('aria-label',L('Camera controls','Масштаб камеры','Controles de cámara'));cameraToggle.setAttribute('aria-expanded','false');cameraToggle.onclick=()=>{const on=document.body.classList.toggle('v15-camera-open');cameraToggle.setAttribute('aria-expanded',String(on));};hud.append(cameraToggle);
  const info=q(hud,'.evo-status');info.setAttribute('role','button');info.tabIndex=0;info.setAttribute('aria-label',L('Evolution recipe','Рецепт эволюции','Receta de evolución'));info.onclick=e=>{if(!e.target.closest('button'))showV15Evolution();};info.onkeydown=e=>{if(e.key==='Enter')showV15Evolution();};
@@ -3046,9 +3069,8 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   refreshPhoneSettings();
   qa(hud,'[data-quick-upgrade]').forEach(b=>{const u=upgrades.find(u=>u.id===b.dataset.quickUpgrade),quote=upgradeQuote(u);b.innerHTML='<span>'+esc(u.name)+'<small>LVL '+fmt(g.upgrade[u.id])+'</small></span><b>'+((quote.count&&Number.isFinite(quote.cost))?'✦ '+fmt(quote.cost):'—')+'</b>';b.disabled=!quote.count||!Number.isFinite(quote.cost)||quote.cost>g.credits;});
    qa(hud,'[data-quick-qty]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.quickQty===String(g.buyAmount))));
-   const m=q(hud,'[data-audio-action="music"]'),fx=q(hud,'[data-audio-action="effects"]');
-   if(m){m.setAttribute('aria-pressed',String(g.music));m.setAttribute('aria-label',g.music?L('Mute music','Выключить музыку','Silenciar música'):L('Unmute music','Включить музыку','Activar música'));m.title=m.getAttribute('aria-label');m.innerHTML=uiIcon(g.music?'music':'mute');}
-   if(fx){fx.setAttribute('aria-pressed',String(g.sound));fx.setAttribute('aria-label',g.sound?L('Mute sound effects','Выключить эффекты','Silenciar efectos'):L('Unmute sound effects','Включить эффекты','Activar efectos'));fx.title=fx.getAttribute('aria-label');fx.innerHTML=g.sound?'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"/></svg>':uiIcon('mute');}
+   const mute=q(hud,'[data-audio-action="mute"]');
+   if(mute){const audible=g.music||g.sound;mute.setAttribute('aria-pressed',String(audible));mute.setAttribute('aria-label',audible?L('Mute all sounds','Выключить весь звук','Silenciar todo'):L('Enable all sounds','Включить весь звук','Activar sonido'));mute.title=mute.getAttribute('aria-label');mute.innerHTML=uiIcon(audible?'music':'mute');}
   q(hud,'#pulse').dataset.cooling=String(pulseCd>0);q(hud,'#dash').dataset.cooling=String(boostCd>0);
   const visible=$('modal').classList.contains('off');hud.style.display=visible?'block':'none';
   const resources=qa(hud,'.hud-resources strong');resources[0].textContent=$('matter-value').textContent;resources[1].textContent=fmt(g.credits);resources[2].textContent=timeFmt(g.time);
@@ -3056,7 +3078,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(hud,'#mass-number').innerHTML=esc(g.endless?fmt(solarMass()):fmt(g.total))+(g.endless?' <small>M☉</small>':'');text(hud,'#radius-number',$('radius-value').textContent);text(hud,'.mass-details .mass-detail:last-child strong',Math.round(g.viewZoom*100)+'%');
   text(hud,'.evo-title>span:first-child',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(hud,'.evo-title>span:nth-child(2)',g.endless?'∞':TA[Math.min(27,g.tier+1)].name);text(hud,'.evo-aux b',Math.round(stageFraction()*100)+'%');q(hud,'.progress-bar span').style.width=stageFraction()*100+'%';text(hud,'#player-label-text',TA[g.tier].name);text(hud,'.player-label small',`${g.tier+1} / 28`);text(hud,'#pulse small',$('pulse-cooldown').textContent);text(hud,'#dash small',$('boost-cooldown').textContent);
  }
- const originalResume=resumeGame;resumeGame=function(){stopMusicPreview();visual?.closeSelect();originalResume();refreshV15();};
+ const originalResume=resumeGame;resumeGame=function(){navigationStack.length=0;stopMusicPreview();visual?.closeSelect();originalResume();refreshV15();};
  if(TEST_MODE){const b=document.createElement('button');b.className='v15-tester';b.textContent='</>';b.setAttribute('aria-label','Tester panel');b.onclick=()=>testerToggle();document.body.append(b);}
  document.body.classList.add('ui-v15');
  refreshV15();
