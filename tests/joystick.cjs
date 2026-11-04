@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('game.js','utf8');
+const from=source.indexOf('function updateStickPosition('),to=source.indexOf('\n}',source.indexOf('function setupFlightStick()',from))+2;
+const listeners={},classes=new Set(),thumb={style:{}},pad={getBoundingClientRect:()=>({left:18,top:470,width:144,height:144}),classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)},addEventListener:(n,f)=>listeners[n]=f,setPointerCapture:()=>{}};
+const context={stick:{active:false,id:null,x:0,y:0},running:true,$:id=>id==='flight-stick'?pad:thumb};vm.createContext(context);vm.runInContext(source.slice(from,to)+'\nsetupFlightStick();',context);
+const event=(id,x,y)=>({pointerId:id,clientX:x,clientY:y,button:0,preventDefault(){},stopPropagation(){}});
+listeners.pointerdown(event(1,40,510));assert.equal(context.stick.x,0);assert.equal(context.stick.y,0,'Touch-down anywhere on the pad must not jump');
+listeners.pointermove(event(1,43,512));assert.equal(context.stick.x,0,'Small finger tremor stays in the dead zone');
+listeners.pointermove(event(1,100,510));assert.ok(Math.abs(context.stick.x-1)<1e-12);assert.equal(context.stick.y,0);
+listeners.pointerdown(event(2,90,560));assert.equal(context.stick.id,1,'Second finger cannot steal steering');
+listeners.pointermove(event(2,30,500));assert.ok(context.stick.x>.99,'Another finger cannot alter direction');
+listeners.pointermove(event(1,90,560));assert.ok(Math.abs(Math.hypot(context.stick.x,context.stick.y)-1)<1e-12,'Diagonal direction must not increase speed');
+listeners.pointercancel(event(1,90,560));assert.equal(context.stick.x,0);assert.equal(context.stick.active,false);assert.equal(classes.size,0);
+listeners.pointerdown(event(3,55,530));listeners.lostpointercapture(event(3,55,530));assert.equal(context.stick.id,null);assert.equal(context.stick.y,0);
+context.running=false;listeners.pointerdown(event(4,55,530));assert.equal(context.stick.active,false,'Menus cannot start motion');
+console.log('PASS: relative touch origin, dead zone, clamped speed, diagonal motion, multitouch ownership and cancellation');

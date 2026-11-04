@@ -1,6 +1,6 @@
 // Visual functions from the approved v15.3 reference; no demo state or audio.
 (()=>{'use strict';
-function musicCover(i){const t={title:'Transmission '+String(i+1).padStart(2,'0'),hue:[252,278,226,308,199,267,17,330][i%8],kind:i%8},h=t.hue,s=100+i*23;
+function musicCover(i){const t={title:i===0?'First Light':'Transmission '+String(i+1).padStart(2,'0'),hue:[252,278,226,308,199,267,17,330][i%8],kind:i%8},h=t.hue,s=100+i*23;
  const points=Array.from({length:19},(_,j)=>{const x=(j*47+s*3)%300,y=(j*89+s)%300,r=(j%3===0?1.4:.7);return `<circle cx="${x}" cy="${y}" r="${r}" fill="white" opacity="${j%3===0?.55:.28}"/>`}).join('');
  const art=[
  `<ellipse cx="154" cy="66" rx="104" ry="33" fill="none" stroke="#d9b6ff" stroke-width="4" transform="rotate(-23 154 66)" opacity=".75"/><circle cx="154" cy="66" r="39" fill="#090720" stroke="#ae80f5" stroke-width="3"/><path d="M74 90 Q150 50 240 34" stroke="#e9d6ff" stroke-width="3" fill="none" opacity=".8"/>`,
