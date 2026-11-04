@@ -392,3 +392,11 @@
   bottom:max(26px,env(safe-area-inset-bottom))!important;
  }
 }
+
+/* Visible gesture explanation in phone steering settings. */
+.ui-v15 #screen-settings .phone-gesture-tip{
+ display:block;margin:12px 0 4px;padding:11px 12px;
+ border:1px solid #70519b;border-left:3px solid #a884f4;
+ border-radius:6px;background:#251638;
+ color:#d4c2e8;font-size:11px;line-height:1.5;
+}
