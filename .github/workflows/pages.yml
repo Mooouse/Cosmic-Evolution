@@ -24,6 +24,8 @@ jobs:
         run: |
           node --check game.js
           node tests/regressions.cjs
+          node tests/music.cjs
+          node tests/joystick.cjs
           test -s index.html
           test -s styles.css
           test -s favicon.svg

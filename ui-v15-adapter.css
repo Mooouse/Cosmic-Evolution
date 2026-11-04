@@ -132,3 +132,12 @@ body.ui-v15 [hidden]{display:none!important}
 .ui-v15 .br-stat-grid>div strong,.ui-v15 .br-stat-grid>div b{font-size:clamp(22px,2.2vw,32px);line-height:1.2}
 
 @media(max-width:800px){.ui-v15 #screen-map .atlas-pin-hint,.ui-v15 #screen-map .atlas-stats{display:none}.ui-v15 #screen-map .map-corner.left{padding:12px;width:170px}.ui-v15 #screen-map .map-corner.left .map-accent-action{min-height:44px}.ui-v15 #screen-map .v15-map-details summary{font-size:10px}}
+
+/* Reserve independent zones for map warning/actions, zoom controls and scale. */
+.ui-v15 #screen-map .map-corner.right{top:auto!important;bottom:20px!important;right:20px!important;transform:none!important}
+.ui-v15 #screen-map .map-threat{top:20px!important;right:20px!important;max-width:min(420px,calc(100% - 330px));text-align:right}
+.ui-v15 #screen-map #atlas-threat{color:#d4b5f6}.ui-v15 #screen-map #atlas-abyss{margin:0;max-width:100%;white-space:normal;min-height:44px}
+.ui-v15 .atlas-legend{color:#c8b1e5}.ui-v15 .atlas-legend .explored-key{background:#65467d}
+.ui-v15 .music-cover img,.ui-v15 .music-player-art img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.ui-v15 .music-track-preview[aria-pressed=true]{border-color:#cba7ff;box-shadow:0 0 12px #a36bea66}
+@media(max-width:800px){.ui-v15 #screen-map .map-corner.right{right:12px!important;bottom:16px!important}.ui-v15 #screen-map .map-threat{display:none}}

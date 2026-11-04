@@ -176,7 +176,7 @@ function setupFlightStick(){const pad=$('flight-stick');
 }
 setupFlightStick();
 let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
-let externalMusic=null;let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
+let externalMusic=null,musicPreview=null,musicPreviewTimer=null;let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
 let pickupSoundAt=-1e9,pickupCount=0,pickupValue=0,pickupDisplayAt=-1e9;
 let absorptionTokens=0;
 let harvestChain=0,harvestChainTime=0;
@@ -230,7 +230,14 @@ function initAudio(){
   if(!musicLoop){musicBeat=0;musicNext=soundCtx.currentTime+.12;musicLoop=setInterval(scheduleMusic,120);}
  }catch(_){/* Audio may be unsupported */}
 }
-function setMusicVolume(){const audible=g.music&&!window.SpacePlatform?.muted;if(musicMaster&&soundCtx)musicMaster.gain.setTargetAtTime(audible&&!g.activeTrack?g.musicVolume*.42:0,soundCtx.currentTime,.12);if(externalMusic){externalMusic.volume=audible?g.musicVolume:0;}}
+function setMusicVolume(){const audible=g.music&&!window.SpacePlatform?.muted;
+ if(musicMaster&&soundCtx)musicMaster.gain.setTargetAtTime(audible&&!g.activeTrack&&!musicPreview?g.musicVolume*.42:0,soundCtx.currentTime,.12);
+ if(externalMusic){externalMusic.volume=audible?g.musicVolume:0;if(audible&&!musicPreview){if(externalMusic.paused)externalMusic.play().catch(()=>{});}else externalMusic.pause();}
+ if(musicPreview)musicPreview.volume=window.SpacePlatform?.muted?0:g.musicVolume;
+}
+function stopMusicPreview(){clearTimeout(musicPreviewTimer);musicPreviewTimer=null;if(musicPreview){musicPreview.pause();musicPreview=null;}setMusicVolume();}
+function previewMusicTrack(track,onEnd){stopMusicPreview();const sample=new Audio(track.src);musicPreview=sample;sample.preload='metadata';const finish=()=>{if(musicPreview!==sample)return;stopMusicPreview();onEnd?.();};sample.onended=finish;sample.onerror=finish;setMusicVolume();sample.play().catch(finish);musicPreviewTimer=setTimeout(finish,15000);}
+
 function playVoice(note,when,duration,level=.08,type='triangle'){
  if(!soundCtx||!musicFX)return;
  const o=soundCtx.createOscillator(),o2=soundCtx.createOscillator(),gain=soundCtx.createGain();
@@ -2383,7 +2390,7 @@ function languageSelect(){return `<select id="set-language" aria-label="Language
 const MUSIC_TRACKS=window.SpaceMusicTracks||[{id:0,title:'First Light',price:0,src:null},...Array.from({length:7},(_,i)=>({id:i+1,title:`Transmission 0${i+2}`,price:10**(6+i*4),src:null}))];
 
 function chooseTrack(track){
- if(!track||track.id!==0&&!track.src)return false;
+ if(!track||track.id!==0&&!track.src)return false;stopMusicPreview();
  g.ownedTracks??=[0];
  if(!g.ownedTracks.includes(track.id)){
   if(g.credits<track.price){toast('Недостаточно звёздной пыли');return false;}
@@ -2394,7 +2401,7 @@ function chooseTrack(track){
  startMusic();save();return true;
 }
 function showMusicShop(){
- show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('First Light is included. Seven future tracks will be added later. Preview prices are in stardust; unavailable tracks cannot be purchased.','First Light уже доступен. Ещё семь треков будут добавлены позже. Цены указаны в звёздной пыли; недоступные треки пока нельзя купить.','First Light está incluido. Se añadirán siete pistas más. Los precios son en polvo estelar; las pistas no disponibles no se pueden comprar.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===0?L('Included · original ambient','Включено · оригинальный эмбиент','Incluida · ambiente original'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${t.id!==0&&!t.src?'disabled':''}>${t.id!==0&&!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
+ show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('First Light is included. Unlock 12 additional tracks with stardust. Preview each track before buying; unlocked tracks stay in your collection.','First Light уже доступен. Ещё 12 треков можно открыть за звёздную пыль. Перед покупкой доступно прослушивание; открытые треки остаются в коллекции.','First Light está incluido. Desbloquea otras 12 pistas con polvo estelar. Escucha una muestra antes de comprar; las pistas desbloqueadas quedan en tu colección.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===0?L('Included · original ambient','Включено · оригинальный эмбиент','Incluida · ambiente original'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${t.id!==0&&!t.src?'disabled':''}>${t.id!==0&&!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
 }
 function showMainMenu(paused=false){
  show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-upgrades"><span>${uiIcon('upgrades')}</span>Улучшения <small>${uiIcon('expand')}</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.37.0 / INFINITI SPACE</span></div>`);
@@ -2630,28 +2637,28 @@ function drawAtlas(){
   c.beginPath();c.arc(playerPoint.x,playerPoint.y,gravityRadius,0,TAU);c.stroke();c.setLineDash([]);
  }
  if(bodyRadius<Math.max(w,h)*20){
-  c.fillStyle=g.endless?'#010205':'#9ce9ff';c.strokeStyle='#9ce9ff';c.lineWidth=1.5;
+  c.fillStyle=g.endless?'#010205':'#bc9bff';c.strokeStyle='#bc9bff';c.lineWidth=1.5;
   c.beginPath();c.arc(playerPoint.x,playerPoint.y,bodyRadius,0,TAU);c.fill();c.stroke();
  }
  // The rectangular frame is the actual camera footprint, not a fixed inset.
  const viewCenter=projectMap(camera.x,camera.y),viewW=W/camera.zoom*scale,viewH=H/camera.zoom*scale;
- c.strokeStyle='rgba(132,224,242,.8)';c.lineWidth=1;c.strokeRect(viewCenter.x-viewW/2,viewCenter.y-viewH/2,viewW,viewH);
+ c.strokeStyle='rgba(179,143,241,.8)';c.lineWidth=1;c.strokeRect(viewCenter.x-viewW/2,viewCenter.y-viewH/2,viewW,viewH);
  if(playerPoint.x>=0&&playerPoint.y>=0&&playerPoint.x<=w&&playerPoint.y<=h){
-  c.fillStyle='#f1f8ff';c.beginPath();c.arc(playerPoint.x,playerPoint.y,2.5,0,TAU);c.fill();
+  c.fillStyle='#f3eaff';c.beginPath();c.arc(playerPoint.x,playerPoint.y,2.5,0,TAU);c.fill();
   c.font='600 10px Inter,sans-serif';c.fillText('ТЫ',playerPoint.x+Math.max(9,bodyRadius+7),playerPoint.y-5);
  }
  const origin=projectMap(0,0);
  if(Math.hypot(origin.x-playerPoint.x,origin.y-playerPoint.y)>35&&origin.x>15&&origin.y>15&&origin.x<w-70&&origin.y<h-20){
-  c.strokeStyle='#9caebf';c.beginPath();c.arc(origin.x,origin.y,4,0,TAU);c.stroke();
-  c.fillStyle='#91a5b9';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
+  c.strokeStyle='#a18dbb';c.beginPath();c.arc(origin.x,origin.y,4,0,TAU);c.stroke();
+  c.fillStyle='#ac98c7';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
  }
  drawMapPins(c,w,h,scale);
  // Scale bar uses the same light-year conversion as coordinates, sizes and waypoints.
  const barSectors=atlasNiceDistance(Math.min(150,w*.28)/sectorPx),barPx=barSectors*sectorPx;
- c.fillStyle='rgba(4,11,23,.94)';c.fillRect(12,h-59,Math.max(172,barPx+32),47);
- c.strokeStyle='#d0eaf5';c.lineWidth=2;c.beginPath();c.moveTo(24,h-24);c.lineTo(24+barPx,h-24);
+ c.fillStyle='rgba(25,16,43,.96)';c.fillRect(12,h-59,Math.max(172,barPx+32),47);
+ c.strokeStyle='#765496';c.lineWidth=1;c.strokeRect(12.5,h-58.5,Math.max(172,barPx+32)-1,46);c.strokeStyle='#c6a5f5';c.lineWidth=2;c.beginPath();c.moveTo(24,h-24);c.lineTo(24+barPx,h-24);
  c.moveTo(24,h-29);c.lineTo(24,h-19);c.moveTo(24+barPx,h-29);c.lineTo(24+barPx,h-19);c.stroke();
- c.fillStyle='#c6e3f0';c.font='600 11px Inter,sans-serif';c.fillText(`${lightYears(barSectors*CHUNK)}`,24,h-38);
+ c.fillStyle='#e7d6ff';c.font='600 11px Inter,sans-serif';c.fillText(`${lightYears(barSectors*CHUNK)}`,24,h-38);
  $('atlas-diameter').textContent=lightYears((g.endless?blackHoleCoreWorldRadius():player.r)*2);
  $('atlas-viewport').textContent=lightYears(W/camera.zoom);
  $('atlas-span').textContent=lightYears(w/scale);
@@ -2835,9 +2842,9 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   translate(root);
  }
  function mount(name){
-  visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
+  stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.38.2';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.39.0';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){legacy.menu(paused);const {root}=mount('menu');
@@ -2845,7 +2852,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.38.2`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.39.0`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -2866,7 +2873,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.38.2');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.39.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);
  };
  function showV15Upgrades(){show('');const {root}=mount('upgrades');const render=()=>{
@@ -2890,14 +2897,16 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   text(foot,'.overline',L('EVOLUTION OBJECTIVES','ЗАДАЧИ ЭВОЛЮЦИИ','OBJETIVOS DE EVOLUCIÓN'));qa(foot,':scope>div:not(.overline)').forEach((row,i)=>{row.innerHTML=esc($('mission-'+(i+1)+'-label').textContent)+'<b>'+esc($('mission-'+(i+1)+'-val').textContent)+'</b>';});
   if(g.endless)text(root,'.recipe-head>span',L('BEYOND THE HORIZON','ЗА ГОРИЗОНТОМ','MÁS ALLÁ DEL HORIZONTE'));translate(root);
  }
- showMusicShop=function(){legacy.music();const {root,old}=mount('music');text(root,'#music-balance',fmt(g.credits));text(root,'.music-wallet small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));text(root,'.music-heading p',q(old,'.overlay-copy').textContent);text(root,'#music-owned-count',`${g.ownedTracks.length} / ${MUSIC_TRACKS.length} `+L('unlocked','открыто','desbloqueadas'));const legend=q(root,'.music-legend');[...legend.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.textContent='');q(root,'.legend-sep')?.remove();
+ const trackCover=(t,i)=>t.cover?`<img src="${esc(t.cover)}" alt="${esc(t.title)}" loading="lazy" decoding="async" width="360" height="360">`:visual.musicCover(i);
+ showMusicShop=function(){legacy.music();const {root,old}=mount('music');text(root,'#music-balance',fmt(g.credits));text(root,'.music-wallet small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));text(root,'.music-heading p',q(old,'.overlay-copy').textContent);text(root,'.music-eyebrow',L('SOUNDTRACK','САУНДТРЕК','BANDA SONORA')+' / '+MUSIC_TRACKS.length+' '+L('TRACKS','КОМПОЗИЦИЙ','PISTAS'));text(root,'#music-owned-count',`${g.ownedTracks.length} / ${MUSIC_TRACKS.length} `+L('unlocked','открыто','desbloqueadas'));const legend=q(root,'.music-legend');[...legend.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.textContent='');q(root,'.legend-sep')?.remove();
   const list=q(root,'#music-track-list');const subtitles=[L('Ambient · first spark','Эмбиент · первая искра','Ambiente · primera chispa'),L('Pulsar · distant signal','Пульсар · далёкий сигнал','Púlsar · señal lejana'),L('Stellar wind','Звёздный ветер','Viento estelar'),L('Night horizon','Ночной горизонт','Horizonte nocturno'),L('Galactic depth','Галактическая глубина','Profundidad galáctica'),L('Echo of the abyss','Эхо бездны','Eco del abismo'),L('Beyond the horizon','За горизонтом','Más allá del horizonte'),L('The last singularity','Последняя сингулярность','La última singularidad')];
-  list.innerHTML=MUSIC_TRACKS.map((t,i)=>{const owned=g.ownedTracks.includes(t.id),chosen=g.activeTrack===t.id,available=t.id===0||!!t.src;return `<article class="music-track-card ${chosen?'selected':''}" data-track-index="${i}"><div class="music-cover">${visual.musicCover(i)}<span class="music-cover-index">${String(i+1).padStart(2,'0')} / 08</span></div><div class="music-track-meta"><strong>${esc(t.title)}</strong><small>${esc(subtitles[i]||'')}</small></div><div class="music-track-actions"><span class="music-track-price">${owned?'✓ '+L('UNLOCKED','ОТКРЫТ','ABIERTO'):'✦ '+fmt(t.price)}</span><button class="music-track-preview" data-preview="${i}" aria-label="${esc(L('Listen: ','Слушать: ','Escuchar: ')+t.title)}" ${available?'':'disabled'}>${visual.mediaSVG('play')}</button><button data-music-action="${i}" class="${owned?(chosen?'chosen':'owned'):''}" ${available?'':'disabled'}>${!available?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):owned?(chosen?L('SELECTED','ВЫБРАНО','ELEGIDA'):L('SELECT','ВЫБРАТЬ','ELEGIR')):L('BUY','КУПИТЬ','COMPRAR')}</button></div></article>`;}).join('');
-  const activeIndex=Math.max(0,MUSIC_TRACKS.findIndex(t=>t.id===g.activeTrack));q(root,'#music-player-art').innerHTML=visual.musicCover(activeIndex);text(root,'#music-now-title',MUSIC_TRACKS[activeIndex].title);text(root,'#music-now-detail',g.music?L('Playing','Играет','Sonando'):L('Paused','Пауза','Pausa'));q(root,'#music-play-glyph').innerHTML=visual.mediaSVG(g.music?'pause':'play');
-  qa(root,'[data-music-action]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS[+b.dataset.musicAction]))showMusicShop();});qa(root,'[data-preview]').forEach(b=>b.onclick=()=>{const t=MUSIC_TRACKS[+b.dataset.preview];if(g.ownedTracks.includes(t.id)){chooseTrack(t);showMusicShop();}else if(t.src){const preview=new Audio(t.src);preview.volume=g.musicVolume;preview.play().catch(()=>{});setTimeout(()=>preview.pause(),15000);}});
+  list.innerHTML=MUSIC_TRACKS.map((t,i)=>{const owned=g.ownedTracks.includes(t.id),chosen=g.activeTrack===t.id,available=t.id===0||!!t.src;return `<article class="music-track-card ${chosen?'selected':''}" data-track-index="${i}"><div class="music-cover">${trackCover(t,i)}<span class="music-cover-index">${String(i+1).padStart(2,'0')} / ${String(MUSIC_TRACKS.length).padStart(2,'0')}</span></div><div class="music-track-meta"><strong>${esc(t.title)}</strong><small>${esc(t.subtitle||subtitles[i]||'')}</small></div><div class="music-track-actions"><span class="music-track-price">${owned?'✓ '+L('UNLOCKED','ОТКРЫТ','ABIERTO'):'✦ '+fmt(t.price)}</span><button class="music-track-preview" data-preview="${i}" aria-label="${esc(L('Listen: ','Слушать: ','Escuchar: ')+t.title)}" ${available?'':'disabled'}>${visual.mediaSVG('play')}</button><button data-music-action="${i}" class="${owned?(chosen?'chosen':'owned'):''}" ${available?'':'disabled'}>${!available?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):owned?(chosen?L('SELECTED','ВЫБРАНО','ELEGIDA'):L('SELECT','ВЫБРАТЬ','ELEGIR')):L('BUY','КУПИТЬ','COMPRAR')}</button></div></article>`;}).join('');
+  const activeIndex=Math.max(0,MUSIC_TRACKS.findIndex(t=>t.id===g.activeTrack));q(root,'#music-player-art').innerHTML=trackCover(MUSIC_TRACKS[activeIndex],activeIndex);text(root,'#music-now-title',MUSIC_TRACKS[activeIndex].title);text(root,'#music-now-detail',g.music?L('Playing','Играет','Sonando'):L('Paused','Пауза','Pausa'));q(root,'#music-play-glyph').innerHTML=visual.mediaSVG(g.music?'pause':'play');
+  qa(root,'[data-music-action]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS[+b.dataset.musicAction]))showMusicShop();});qa(root,'[data-preview]').forEach(b=>b.onclick=()=>{const t=MUSIC_TRACKS[+b.dataset.preview];if(b.getAttribute('aria-pressed')==='true'){stopMusicPreview();b.innerHTML=visual.mediaSVG('play');b.setAttribute('aria-pressed','false');return;}if(!t.src){chooseTrack(t);showMusicShop();return;}qa(root,'[data-preview]').forEach(n=>{n.innerHTML=visual.mediaSVG('play');n.setAttribute('aria-pressed','false');});b.innerHTML=visual.mediaSVG('pause');b.setAttribute('aria-pressed','true');previewMusicTrack(t,()=>{if(b.isConnected){b.innerHTML=visual.mediaSVG('play');b.setAttribute('aria-pressed','false');}});});
+
   q(root,'#music-play').onclick=()=>{g.music=!g.music;initAudio();setMusicVolume();save();showMusicShop();};['#music-prev','#music-next'].forEach((sel,i)=>q(root,sel).onclick=()=>{const owned=MUSIC_TRACKS.filter(t=>g.ownedTracks.includes(t.id)&&(t.id===0||t.src)),index=owned.findIndex(t=>t.id===g.activeTrack);if(chooseTrack(owned[(index+(i?1:-1)+owned.length)%owned.length]))showMusicShop();});
   const volume=q(root,'#music-volume');volume.value=Math.round(g.musicVolume*100);volume.oninput=()=>{g.musicVolume=+volume.value/100;setMusicVolume();save();};
-  const seek=q(root,'#music-seek');const duration=externalMusic?.duration;if(Number.isFinite(duration)&&duration>0){seek.max=duration;seek.value=externalMusic.currentTime;seek.oninput=()=>externalMusic.currentTime=+seek.value;text(root,'#music-duration',timeFmt(duration));text(root,'#music-position',timeFmt(externalMusic.currentTime));}else{seek.disabled=true;seek.value=0;text(root,'#music-duration','∞');text(root,'#music-position',L('LIVE','ЭФИР','DIRECTO'));}decorate(root);
+  const seek=q(root,'#music-seek'),audio=externalMusic;const syncPlayback=()=>{if(!root.isConnected)return;const duration=audio?.duration;if(Number.isFinite(duration)&&duration>0){seek.disabled=false;seek.max=duration;if(document.activeElement!==seek)seek.value=audio.currentTime;seek.style.setProperty('--val',(audio.currentTime/duration*100)+'%');text(root,'#music-duration',timeFmt(duration));text(root,'#music-position',timeFmt(audio.currentTime));}else{seek.disabled=true;seek.value=0;text(root,'#music-duration','∞');text(root,'#music-position',L('LIVE','ЭФИР','DIRECTO'));}};seek.oninput=()=>{if(audio&&Number.isFinite(audio.duration))audio.currentTime=+seek.value;};if(audio){audio.ontimeupdate=syncPlayback;audio.onloadedmetadata=syncPlayback;audio.ondurationchange=syncPlayback;}syncPlayback();decorate(root);
  };
  // Keep the atlas renderer and all marker editing controls in their live DOM.
  showMap=function(){legacy.map();const {root,old}=mount('map');
@@ -2950,7 +2959,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(hud,'#mass-number').innerHTML=esc(g.endless?fmt(solarMass()):fmt(g.total))+(g.endless?' <small>M☉</small>':'');text(hud,'#radius-number',$('radius-value').textContent);text(hud,'.mass-details .mass-detail:last-child strong',Math.round(g.viewZoom*100)+'%');
   text(hud,'.evo-title>span:first-child',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(hud,'.evo-title>span:nth-child(2)',g.endless?'∞':TA[Math.min(27,g.tier+1)].name);text(hud,'.evo-aux b',Math.round(stageFraction()*100)+'%');q(hud,'.progress-bar span').style.width=stageFraction()*100+'%';text(hud,'#player-label-text',TA[g.tier].name);text(hud,'.player-label small',`${g.tier+1} / 28`);text(hud,'#pulse small',$('pulse-cooldown').textContent);text(hud,'#dash small',$('boost-cooldown').textContent);text(hud,'#upgrades-open b',Object.values(g.upgrade).reduce((a,b)=>a+b,0));
  }
- const originalResume=resumeGame;resumeGame=function(){visual?.closeSelect();originalResume();refreshV15();};
+ const originalResume=resumeGame;resumeGame=function(){stopMusicPreview();visual?.closeSelect();originalResume();refreshV15();};
  if(TEST_MODE){const b=document.createElement('button');b.className='v15-tester';b.textContent='</>';b.setAttribute('aria-label','Tester panel');b.onclick=()=>testerToggle();document.body.append(b);}
  document.body.classList.add('ui-v15');
  refreshV15();
