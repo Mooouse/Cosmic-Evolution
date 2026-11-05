@@ -116,7 +116,7 @@ function traceFrame(lensFails=false){
   sky(){calls.push("sky")},renderBackgroundComets(){calls.push("comet")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
   renderRivalLensing(){calls.push("rivalLens")},rivalLensMaps:new Map(),rivalLensRetryAt:0,renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
-  clipPlayerHorizon(){calls.push("occlusion")},renderWaypoint(){},renderGatherFlow(){},renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderParticles(){calls.push("particles")},
+  clipPlayerHorizon(){calls.push("occlusion")},renderWaypoint(){},renderGatherFlow(){},renderAbysses(){calls.push("abysses")},renderPlayer(){calls.push("player")},renderAccretionStreams(){calls.push("accretion")},renderParticles(){calls.push("particles")},
   paintBlackHole(){calls.push("blackhole")},project(){return{x:960,y:540}},
   player:{x:0,y:0,r:200},camera:{zoom:1},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
   screenFlash:0,shake:0,entities:[{}],blackHoleLensRetryAt:0,renderTicks:0,
@@ -506,6 +506,16 @@ for(const r of [6,300,1e100]){
  const caught={...p1,gravityBound:true};assert.equal(driftBox.driftBody(caught),caught);
  driftBox.g.time=0;
 }
+// Keep all 27 pre-black-hole transitions gated, for a strict 600s minimum.
+assert.ok(game.includes('const MIN_STAGE_SECONDS=600/(TA.length-1)'), 'Pre-black-hole stages must total at least 600 seconds');
+assert.ok(game.includes('g.stageElapsed<MIN_STAGE_SECONDS')||game.includes('(g.stageElapsed||0)<MIN_STAGE_SECONDS'), 'Evolution must respect stage time gates');
+assert.ok(game.includes('if(!g.endless)g.stageElapsed=(g.stageElapsed||0)+dt;'), 'Stage clock must accumulate only active gameplay');
+assert.ok(game.includes('g.stageElapsed>=MIN_STAGE_SECONDS)evolve()'), 'A ready stage must complete when its timer expires');
+assert.ok(game.includes('const BH_FEAST=2.5,BH_REWARD_SCALE=1/BH_FEAST'), 'Black-hole appetite must scale reward per object');
+const stagesCode=game.slice(game.indexOf('function showV15Evolution(){'),game.indexOf('const trackCover=',game.indexOf('function showV15Evolution(){')));
+assert.ok(stagesCode.includes('for(let i=0;i<TA.length;i++)'), 'All 28 evolution forms must be visible, not just three');
+assert.ok(game.includes("FIELD_GUIDE.push(...TA.map"), 'All current and future forms must be in the bestiary');
+assert.ok(game.includes("flashAbilityButton('pulse')")&&game.includes("flashAbilityButton('dash')"), 'Keyboard abilities must animate their buttons');
 const mapCode=game.slice(game.indexOf('function drawAtlas(){'),game.indexOf('function showMap(){'));
 assert.ok(!mapCode.includes('clamp(bodyRadius,10,26)'), 'Atlas must not clamp the physical player radius to a fixed-size avatar');
 assert.ok(mapCode.includes('paintAbyss(c,playerPoint.x,playerPoint.y,bodyRadius,w,h)'), 'Black-hole map core must use original physical radius');
@@ -722,7 +732,7 @@ assert.ok(Math.abs(rivalProbe.x+1417.5)<1e-8,'Rival holes must receive the same 
 // Campaign yield tracks relative area; black-hole economy keeps fractional rewards.
 const lootBox={g:{endless:false,complete:false,tier:0,matter:0,total:0,stageCollects:0,collects:0,credits:0,materials:{ore:0},upgrade:{harvest:0},particles:false},
  player:{x:0,y:0,r:13},tester:{loot:1},CHUNK:480,TA:[{required:280}],
- advanceHarvestChain(){},resourceOf:()=> 'ore',radiusAt:()=>1000,ordinaryBodyValue:()=>100,blackHoleBodyValue:()=>100,
+ advanceHarvestChain(){},resourceOf:()=> 'ore',radiusAt:()=>1000,ordinaryBodyValue:()=>100,blackHoleBodyValue:()=>100,BH_REWARD_SCALE:.4,
  clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
 vm.createContext(lootBox);vm.runInContext(upgradePrelude+game.slice(game.indexOf('const CAMPAIGN_YIELD='),game.indexOf('function absorb(e)'))+absorbCode,lootBox);
 for(let i=0;i<100;i++)lootBox.absorb({value:1,r:6.5,kind:'matter'});
@@ -730,7 +740,7 @@ assert.ok(Math.abs(lootBox.g.matter-100*280*.05*.25)<1e-8);
 assert.ok(Math.abs(lootBox.g.credits-100*280*.05*.25*.75)<1e-8);
 assert.ok(Math.abs(lootBox.g.materials.ore-100)<1e-8);
 lootBox.g.endless=true;const beforeLoot=lootBox.g.matter;lootBox.absorb({kind:'matter'});
-assert.ok(Math.abs(lootBox.g.matter-beforeLoot-10)<1e-8,'Black-hole catches also yield one tenth');
+assert.ok(Math.abs(lootBox.g.matter-beforeLoot-4)<1e-8,'2.5x capture rate must pay 2.5x less for each black-hole catch');
 
 // Comets are sparse decorative effects driven by game time, with one cached sprite.
 let cometAllocations=0;
@@ -1014,7 +1024,7 @@ console.log('PASS: every rendered LOD is eligible for gravity across zooms and s
   b.g.upgrade[u.id]=u.max;b.g.credits=1e290;const q=b.upgradeQuote(u);assert.ok(q.count>100&&Number.isFinite(q.cost)&&q.cost<=b.g.credits);
   assert.ok(b.upgradeTotalCost(u,u.max,q.count+1)>b.g.credits);
  }
- b.g.upgrade.speed=0;b.g.endless=false;const oldBase=b.flightSpeed();b.g.endless=true;assert.equal(b.flightSpeed(),oldBase*10);
+ b.g.upgrade.speed=0;b.g.endless=false;const oldBase=b.flightSpeed();b.g.endless=true;assert.equal(b.flightSpeed(),oldBase*8.5);
  b.g.upgrade.speed=60;const atCap=b.flightSpeed();b.g.upgrade.speed=61;assert.ok(b.flightSpeed()>atCap);
  assert.ok(saves>=8);
 }
