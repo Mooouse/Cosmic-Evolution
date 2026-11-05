@@ -4028,7 +4028,8 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const current=document.createElement('article');current.className='evo-v2-current';
   current.innerHTML='<div class="evo-v2-kicker">'+L('CURRENT FORM','ТЕКУЩАЯ ФОРМА','FORMA ACTUAL')+' · '+String(tier+1).padStart(2,'0')+' / 28</div>'+
    '<div class="evo-v2-current-row"><canvas class="evo-v2-current-portrait" data-size="134" aria-label="'+esc(stage.name)+'"></canvas><div class="evo-v2-current-copy"><small>'+esc(stage.epoch)+'</small><h2>'+esc(stage.name)+'</h2><p>'+esc(stage.desc)+'</p></div></div>'+
-   '<div class="evo-v2-mass-head"><span>'+L('MASS GATHERED','СОБРАНО МАТЕРИИ','MATERIA RECOGIDA')+'</span><b></b></div><div class="evo-v2-meter" role="progressbar"><i></i></div>'+
+   '<div class="evo-v2-mass-head"><span>'+(next?L('MASS GATHERED','СОБРАНО МАТЕРИИ','MATERIA RECOGIDA'):L('BLACK HOLE MASS','МАССА ЧЁРНОЙ ДЫРЫ','MASA DEL AGUJERO NEGRO'))+'</span><b></b></div>'+
+   '<div class="evo-v2-meter'+(next?'':' evo-v2-meter-eternal')+'"'+(next?' role="progressbar"':' aria-label="'+L('Endless growth','Бесконечный рост','Crecimiento infinito')+'"')+'><i></i></div>'+
    (next?'<div class="evo-v2-next"><span>'+L('NEXT FORM','СЛЕДУЮЩАЯ ФОРМА','SIGUIENTE FORMA')+'</span><canvas class="evo-v2-next-portrait" data-size="64"></canvas><strong></strong></div>':
    '<div class="evo-v2-eternal"><span class="evo-v2-eternal-icon" aria-hidden="true">∞</span><div><small>'+
     L('FINAL FORM REACHED','ПОСЛЕДНЯЯ ФОРМА ДОСТИГНУТА','FORMA FINAL ALCANZADA')+'</small><strong>'+
@@ -4038,10 +4039,12 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   paintStagePortrait(q(current,'.evo-v2-current-portrait'),tier);
   const massGoal=q(current,'.evo-v2-mass-head b');
   const massPercent=g.endless?100:Math.round(stageFraction()*100);
-  massGoal.textContent=g.endless?L('ENDLESS','БЕСКОНЕЧНО','INFINITO'):fmt(Math.min(g.matter,stage.required))+' / '+fmt(stage.required)+' · '+massPercent+'%';
-  q(current,'.evo-v2-meter').setAttribute('aria-valuenow',String(massPercent));
-  q(current,'.evo-v2-meter').setAttribute('aria-valuemin','0');
-  q(current,'.evo-v2-meter').setAttribute('aria-valuemax','100');
+  massGoal.textContent=next?fmt(Math.min(g.matter,stage.required))+' / '+fmt(stage.required)+' · '+massPercent+'%':fmt(solarMass())+' M☉';
+  if(next){
+   q(current,'.evo-v2-meter').setAttribute('aria-valuenow',String(massPercent));
+   q(current,'.evo-v2-meter').setAttribute('aria-valuemin','0');
+   q(current,'.evo-v2-meter').setAttribute('aria-valuemax','100');
+  }
   q(current,'.evo-v2-meter i').style.width=massPercent+'%';
   if(next){
    text(current,'.evo-v2-next strong',next.name);
