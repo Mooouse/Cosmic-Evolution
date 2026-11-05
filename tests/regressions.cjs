@@ -410,6 +410,21 @@ resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new un
 assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
 console.log('PASS: death avoids rendering and defers its dialog until physics stops; stardust revival removed');
 
+// A death-screen restart must not wait for ad callbacks (SDK timeout: 120 s).
+{
+ const start=game.indexOf(" $('revive-restart').onclick=");
+ const end=game.indexOf("\n const revive=reviveFromDeath;",start);
+ assert.ok(start>0&&end>start,'Death restart handler must exist');
+ const handler=game.slice(start,end);
+ assert.ok(handler.includes("onclick=()=>"),'Restart should be synchronous');
+ assert.ok(!/await\b|requestAd\(|setTimeout\(/.test(handler),
+  'Restart must not depend on any advertisement or timer');
+ assert.ok(handler.indexOf('resetCampaignState(false)')<handler.indexOf('resumeGame()'),
+  'Restart must reset the run before resuming the flight');
+}
+console.log('PASS: immediate death restart without a blocking ad');
+
+
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
 let rivalMarks=0;
