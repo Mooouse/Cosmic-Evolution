@@ -2446,6 +2446,10 @@ function render(time){
 let idleLast=0;
 function frame(now){
  requestAnimationFrame(frame);
+ // The interactive reward and death overlays draw their own DOM content.
+ // Never run full-screen lensing/menu 3D rendering underneath: a rival hole
+ // or the menu lens can monopolize the main thread and freeze ALL buttons.
+ if(!running&&['daily','roulette','death'].includes($('modal').dataset.screen))return;
  if(!running&&now-idleLast<(menuVisible||atlas.focusTween?33:70))return;idleLast=now;
  const elapsed=clamp((now-last)/1000,.001,.08);last=now;
  if(running){
@@ -2874,6 +2878,7 @@ const ROULETTE_GALAXY_COLORS=['#ee4e6d','#ffa439','#f7d44a','#41d184','#31bddb',
 // thousands of pinpoints across the game, with colorful clustered galaxies
 // and deep black gaps. Each weighted prize slice is its own clipped starfield.
 let rouletteArtworkCacheKey='',rouletteArtworkCacheHtml='';
+let rouletteObjectUrlKey='',rouletteObjectUrl='';
 function rouletteWheelArtwork(prizes){
  const key=prizes.map(p=>p.id+':'+p.weight.toFixed(6)).join('|');
  if(key===rouletteArtworkCacheKey)return rouletteArtworkCacheHtml;
@@ -2981,8 +2986,7 @@ function showCosmicRoulette(origin){
   '<small>'+L('Spins played','Всего прокруток','Giros realizados')+': '+state.spins+'</small></div>'+
   '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true"><span></span></div>'+
   '<div class="daily-wheel" id="daily-wheel" role="img" aria-label="'+L('Weighted prize roulette','Колесо с вероятностями призов','Ruleta de premios ponderados')+'">'+
-  '<img class="roulette-disc-svg" alt="" loading="eager" decoding="async" src="data:image/svg+xml;charset=utf-8,'+
-  encodeURIComponent(rouletteWheelArtwork(meta.PRIZES)).replace(/'/g,'%27')+'"></div>'+
+  '<img class="roulette-disc-svg" alt="" loading="eager" decoding="async"></div>'+
   '<div class="roulette-wheel-base" aria-hidden="true"></div></div>'+
   '<div class="roulette-prizes"><div class="roulette-prizes-title">'+L('PRIZES AND ODDS','ПРИЗЫ И ШАНСЫ','PREMIOS Y PROBABILIDADES')+
   '</div><div class="daily-wheel-legend">'+prizeRows+'</div></div></div>'+
@@ -3001,6 +3005,31 @@ function showCosmicRoulette(origin){
   L('Cosmic roulette','Космическая рулетка','Ruleta cósmica'),
   L('Spin for stardust or a rare music track.','Крути колесо ради звёздной пыли или редкого музыкального трека.','Gira para ganar polvo estelar o una pista musical rara.'),
   body);
+ // Open the panel FIRST. The high-detail procedural wheel previously blocked
+ // the click handler while serializing >100 KB of inline SVG into HTML.
+ // Rasterization/decoding happens later without delaying tabs or Back.
+ const wheelImage=$('daily-wheel')?.querySelector('img');
+ requestAnimationFrame(()=>{
+  if(!wheelImage?.isConnected)return;
+  try{
+   const svg=rouletteWheelArtwork(meta.PRIZES);
+   const key=rouletteArtworkCacheKey;
+   if(rouletteObjectUrlKey!==key&&rouletteObjectUrl){
+    URL.revokeObjectURL(rouletteObjectUrl);
+    rouletteObjectUrl='';
+   }
+   if(!rouletteObjectUrl&&typeof Blob!=='undefined'&&typeof URL.createObjectURL==='function'){
+    rouletteObjectUrl=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+    rouletteObjectUrlKey=key;
+   }
+   wheelImage.src=rouletteObjectUrl||'data:image/svg+xml;charset=utf-8,'+
+    encodeURIComponent(svg).replace(/'/g,'%27');
+  }catch(error){
+   console.error('Roulette wheel artwork error:',error);
+   wheelImage.alt=L('Roulette wheel','Колесо рулетки','Rueda de ruleta');
+   wheelImage.style.display='none';
+  }
+ });
  const bonus=$('daily-ad-spin');
  bonus.title=window.SpacePlatform?.adsAvailable?
   L('Complete a rewarded video for one extra spin today.','Досмотри рекламу и получи одну дополнительную попытку сегодня.','Mira el anuncio completo para conseguir un giro extra hoy.'):
