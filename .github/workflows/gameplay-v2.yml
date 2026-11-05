@@ -1,0 +1,72 @@
+name: Record smooth Infiniti Space previews with game UI
+on:
+  push:
+    branches: [crazygames-video-v2]
+    paths:
+      - scripts/record_crazygames_previews_v2.cjs
+      - .github/workflows/gameplay-v2.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install video encoder
+        shell: bash
+        run: |
+          python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
+          ENCODER="$(python3 -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')"
+          sudo cp "$ENCODER" /usr/local/bin/ffmpeg
+          sudo chmod +x /usr/local/bin/ffmpeg
+      - name: Install browser recorder
+        shell: bash
+        run: |
+          npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/video-test" playwright@1.56.1
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/video-chromium"
+          "$RUNNER_TEMP/video-test/node_modules/.bin/playwright" install chromium --only-shell
+      - name: Record game UI and verify actual motion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/video-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          export NODE_PATH="$RUNNER_TEMP/video-test/node_modules"
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/video-chromium"
+          node scripts/record_crazygames_previews_v2.cjs
+      - name: Confirm videos are silent, correct dimensions, and have full HUD
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suffix in 1920x1080 1080x1620; do
+            file="video-export/Infiniti_Space_Gameplay_$suffix.mp4"
+            test -s "$file"
+            test -s "video-export/Infiniti_Space_Gameplay_$suffix-frame.jpg"
+            ffmpeg -hide_banner -i "$file" 2>&1 | tee "$RUNNER_TEMP/verify-$suffix.txt" || true
+            grep -q 'Video: h264' "$RUNNER_TEMP/verify-$suffix.txt"
+            grep -q 'Duration: 00:00:1' "$RUNNER_TEMP/verify-$suffix.txt"
+            ! grep -q 'Audio:' "$RUNNER_TEMP/verify-$suffix.txt"
+          done
+      - name: Publish previews only to independent video branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f video-export/*mp4 video-export/*frame.jpg
+          if ! git diff --cached --quiet; then
+            git commit -m "Render smooth full-UI CrazyGames gameplay previews [skip ci]"
+            git push origin HEAD:crazygames-video-v2
+          fi
+      - name: Preserve debugging frames if recording fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gameplay-ui-debug
+          path: |
+            video-export/*frame.jpg
+            video-export/*.mp4
+          retention-days: 1
+          if-no-files-found: ignore
