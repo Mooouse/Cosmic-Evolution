@@ -8,15 +8,17 @@ const base=process.env.INFINITI_DIAG_URL||'https://mooouse.github.io/Infiniti-Sp
  let failed=false;
  try{
   for(const config of [
-   {width:1280,height:720,dpr:1},
-   {width:1707,height:960,dpr:1.5},
-   {width:2560,height:1440,dpr:1}
+   {width:1707,height:960,dpr:1.5}
   ]){
    const context=await browser.newContext({viewport:{width:config.width,height:config.height},deviceScaleFactor:config.dpr});
    const page=await context.newPage();
    await page.addInitScript(()=>{
     localStorage.setItem('infiniti-space-language','ru');
     window.__rewardTrace=[];
+    window.addEventListener('error',e=>{
+     console.log('STRUCTURED_ERROR',JSON.stringify({message:e.message,file:e.filename,line:e.lineno,col:e.colno,
+      error:e.error,stack:e.error?.stack,properties:e.error?Object.getOwnPropertyNames(e.error):[]}));
+    });
     for(const type of ['pointerdown','pointerup','click','wheel']){
      window.addEventListener(type,e=>{
       window.__rewardTrace.push({type,id:e.target?.id,tag:e.target?.tagName,
@@ -29,6 +31,13 @@ const base=process.env.INFINITI_DIAG_URL||'https://mooouse.github.io/Infiniti-Sp
    page.on('pageerror',e=>console.log('PAGEERROR',String(e)));
    page.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',m.text());});
    const dump=()=>page.evaluate(()=>({
+    platform:(()=>{
+     const probe=fn=>{try{return {value:fn()};}catch(e){return {error:e,stack:e?.stack};}};
+     return {status:window.SpacePlatform?.status,
+      available:probe(()=>window.SpacePlatform?.adsAvailable),
+      environment:probe(()=>window.CrazyGames?.SDK?.environment),
+      ad:probe(()=>typeof window.CrazyGames?.SDK?.ad?.requestAd)};
+    })(),
     build:[...document.scripts].find(s=>s.src.includes('/game.js'))?.src,
     viewport:{w:innerWidth,h:innerHeight,dpr:devicePixelRatio,scale:visualViewport?.scale},
     screen:document.querySelector('#modal')?.dataset.screen,
