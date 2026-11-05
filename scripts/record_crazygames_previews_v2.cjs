@@ -31,7 +31,7 @@ async function capture(spec){
   await page.addInitScript(()=>{
    localStorage.setItem('infiniti-space-language','en');
    localStorage.setItem('cosmic-evolution-tester-save-v1',JSON.stringify({
-    version:1,tier:0,tutorialDone:true,controlMode:'follow',
+    version:1,tier:10,tutorialDone:true,controlMode:'follow',
     music:false,sound:false,particles:false,autoQuality:true,
     quality:.6,viewZoom:1
    }));
@@ -61,7 +61,7 @@ async function capture(spec){
   assert.equal(actual.screen,'play','Gameplay must be active');
   assert.equal(actual.hud,true,'Real HUD must be visible');
   console.log('RECORDING',spec.name,JSON.stringify(actual));
-  const scenes=[{tier:10,duration:4300},{tier:16,duration:8200},{tier:27,duration:4800}];
+  const scenes=[{tier:10,duration:2200},{tier:16,duration:4200},{tier:27,duration:11100}];
   let cycles=0;
   for(const scene of scenes){
    await tier(scene.tier);
@@ -69,7 +69,7 @@ async function capture(spec){
    while(Date.now()<until){
     const clock=Date.now()/1000;
     await page.mouse.move(spec.width*(.54+.3*Math.cos(clock*.8)),spec.height*(.5+.26*Math.sin(clock*.64)));
-    if(cycles++%9===0)await page.keyboard.press('e');
+    if(cycles++===22)await page.keyboard.press('e');
     if(cycles%5===0){
      const state=await page.evaluate(()=>window.InfinitiTestActions?.currentScreen());
      if(state?.screen!=='play'||state?.death||!state?.running){
