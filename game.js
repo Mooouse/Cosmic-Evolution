@@ -3361,6 +3361,9 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   dailyBtn.innerHTML='<span class="daily-link-icon">✦</span><span>'+L('Daily rewards & roulette','Ежедневные награды и рулетка','Recompensas y ruleta')+'</span><span>↗</span>';
   dailyBtn.onclick=()=>showDailyRewards('menu');
   const menuGrid=q(root,'.menu-grid');menuGrid.append(dailyBtn);
+  // Use the exact same playlist glyph as the in-game music collection button.
+  const collectionIcon=q(menuGrid,'[data-page="music"] > span:first-child');
+  if(collectionIcon){collectionIcon.removeAttribute('data-icon');collectionIcon.innerHTML=uiIcon('playlist');}
   if(window.SpaceMeta?.canClaim(g))dailyBtn.classList.add('daily-new');
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
