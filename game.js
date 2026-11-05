@@ -93,6 +93,7 @@ function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...teste
 
 const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,awaySince:0,awayFromFlight:false,drift:{route:[],seconds:0,totalDistance:0,visits:0,last:null},daily:{lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0},awaitingReturnEvolution:false,reviveUsed:false,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
+let testerAbsoluteResetPending=false;
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
   g={...fresh(),...s,upgrade:{...fresh().upgrade,...s.upgrade},visited:Array.isArray(s.visited)?s.visited:[],discoveryDiscs:Array.isArray(s.discoveryDiscs)?s.discoveryDiscs.filter(d=>Array.isArray(d)&&d.length===3&&d.every(Number.isFinite)):[],exploredBonus:Number.isFinite(s.exploredBonus)?s.exploredBonus:0,depleted:s.depleted&&typeof s.depleted==='object'?s.depleted:{},depletedMacro:s.depletedMacro&&typeof s.depletedMacro==='object'?s.depletedMacro:{},depletedCosmic:s.depletedCosmic&&typeof s.depletedCosmic==='object'?s.depletedCosmic:{},materials:{...fresh().materials,...s.materials}};
@@ -317,7 +318,7 @@ function scheduleMusic(){}
 
 function startMusic(){const t=MUSIC_TRACKS.find(t=>t.id===g.activeTrack&&g.ownedTracks.includes(t.id));if(!t){if(externalMusic)externalMusic.pause();externalMusic=null;g.activeTrack=null;}else if(!externalMusic){externalMusic=new Audio(t.src);externalMusic.loop=true;}initAudio();setMusicVolume();}
 addEventListener('space-platform-audio',()=>setMusicVolume());
-function save(){g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAVE_KEY,JSON.stringify(g));}catch(_){toastStorageWarning();}}
+function save(){if(testerAbsoluteResetPending)return;g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAVE_KEY,JSON.stringify(g));}catch(_){toastStorageWarning();}}
 let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Infiniti Space: сохранение мира не помещается в localStorage');}}
 
 function makeSky(){
@@ -3652,6 +3653,24 @@ function testerSetTier(tier){
 function testerRemakeNearby(){
  loadedChunks.clear();entities=[];distantChunkCache.clear();macroLoaded.clear();macroEntities=[];streamField();
 }
+// Remove ALL tester-specific state, including the automatic backup. The ordinary
+// player profile lives under a different key and is deliberately never touched.
+function testerAbsoluteReset(){
+ if(!TEST_MODE)return false;
+ if(!confirm('ПОЛНЫЙ СБРОС ТЕСТЕРА: навсегда удалить тестовый прогресс, звёздную пыль, купленную музыку, достижения, карту, маршруты, ежедневные награды, статистику и все настройки тестера?\n\nОбычное прохождение останется нетронутым.'))return false;
+ testerAbsoluteResetPending=true;
+ try{
+  localStorage.removeItem(SAVE_KEY);
+  localStorage.removeItem(SAVE_KEY+'-backup');
+  localStorage.removeItem(TEST_KEY);
+ }catch(error){
+  testerAbsoluteResetPending=false;
+  toast('Не удалось очистить тестовые данные браузера.');
+  return false;
+ }
+ location.reload();
+ return true;
+}
 function testerInit(){
  if(!TEST_MODE){$('btn-tester').hidden=true;return;}
  window.SpaceMeta?.setTesterTuning({rewardMultiplier:tester.rewardMultiplier,trackChance:tester.trackChance});
@@ -3758,6 +3777,7 @@ function testerInit(){
   Object.assign(tester,TEST_DEFAULTS);window.SpaceMeta?.setTesterTuning({rewardMultiplier:1,trackChance:.8});saveTester();testerRemakeNearby();testerRefresh();
   toast('Тестовые множители сброшены');};
  $('tester-new-game').onclick=restartCampaign;
+ $('tester-full-reset').onclick=testerAbsoluteReset;
  $('tester-copy-save').onclick=()=>{
   if(!confirm(window.SpaceI18n?.t('Скопировать основное прохождение в тестерское? Текущий тестовый прогресс будет заменён.')||'Скопировать основное прохождение в тестерское? Текущий тестовый прогресс будет заменён.'))return;
   try{const data=localStorage.getItem('cosmic-evolution-save-v1');if(!data){toast('Основное сохранение не найдено');return;}localStorage.setItem(SAVE_KEY,data);location.reload();}
@@ -4002,7 +4022,12 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   current.innerHTML='<div class="evo-v2-kicker">'+L('CURRENT FORM','ТЕКУЩАЯ ФОРМА','FORMA ACTUAL')+' · '+String(tier+1).padStart(2,'0')+' / 28</div>'+
    '<div class="evo-v2-current-row"><canvas class="evo-v2-current-portrait" data-size="134" aria-label="'+esc(stage.name)+'"></canvas><div class="evo-v2-current-copy"><small>'+esc(stage.epoch)+'</small><h2>'+esc(stage.name)+'</h2><p>'+esc(stage.desc)+'</p></div></div>'+
    '<div class="evo-v2-mass-head"><span>'+L('MASS GATHERED','СОБРАНО МАТЕРИИ','MATERIA RECOGIDA')+'</span><b></b></div><div class="evo-v2-meter" role="progressbar"><i></i></div>'+
-   '<div class="evo-v2-next"><span>'+L('NEXT FORM','СЛЕДУЮЩАЯ ФОРМА','SIGUIENTE FORMA')+'</span><canvas class="evo-v2-next-portrait" data-size="64"></canvas><strong></strong></div>';
+   (next?'<div class="evo-v2-next"><span>'+L('NEXT FORM','СЛЕДУЮЩАЯ ФОРМА','SIGUIENTE FORMA')+'</span><canvas class="evo-v2-next-portrait" data-size="64"></canvas><strong></strong></div>':
+   '<div class="evo-v2-eternal"><span class="evo-v2-eternal-icon" aria-hidden="true">∞</span><div><small>'+
+    L('FINAL FORM REACHED','ПОСЛЕДНЯЯ ФОРМА ДОСТИГНУТА','FORMA FINAL ALCANZADA')+'</small><strong>'+
+    L('ENDLESS GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO')+'</strong><p>'+
+    L('Event horizon diameter: ','Диаметр горизонта событий: ','Diámetro del horizonte: ')+
+    lightYears(blackHoleCoreWorldRadius()*2)+'</p></div></div>');
   paintStagePortrait(q(current,'.evo-v2-current-portrait'),tier);
   const massGoal=q(current,'.evo-v2-mass-head b');
   const massPercent=g.endless?100:Math.round(stageFraction()*100);
@@ -4011,8 +4036,10 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(current,'.evo-v2-meter').setAttribute('aria-valuemin','0');
   q(current,'.evo-v2-meter').setAttribute('aria-valuemax','100');
   q(current,'.evo-v2-meter i').style.width=massPercent+'%';
-  text(current,'.evo-v2-next strong',next?next.name:L('INFINITE BLACK HOLE','БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА','AGUJERO NEGRO INFINITO'));
-  paintStagePortrait(q(current,'.evo-v2-next-portrait'),Math.min(tier+1,TA.length-1));
+  if(next){
+   text(current,'.evo-v2-next strong',next.name);
+   paintStagePortrait(q(current,'.evo-v2-next-portrait'),tier+1);
+  }
   const goals=document.createElement('article');goals.className='evo-v2-goals';
   const goalHeading=document.createElement('div');goalHeading.className='evo-v2-goals-header';
   goalHeading.innerHTML='<h3>'+L('WHAT IS LEFT TO DO?','ЧТО НУЖНО ДЛЯ ЭВОЛЮЦИИ?','¿QUÉ FALTA PARA EVOLUCIONAR?')+'</h3>'+
