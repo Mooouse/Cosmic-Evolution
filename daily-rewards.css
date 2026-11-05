@@ -56,7 +56,10 @@ body.ui-v15 #screen-menu .menu-grid .daily-menu-link::after,
 body.ui-v15 #screen-menu .menu-grid .roulette-menu-link::after{display:none}
 
 /* Identical fixed window position and geometry on both tabs. */
-body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]){
+/* The shared .modal-backdrop.off rule is less specific than this selector.
+   Without an explicit :not(.off), the reward dialog stays ON TOP of the game
+   even after resumeGame() marks it closed. This also steals mouse clicks. */
+body.ui-v15 #modal:not(.off):is([data-screen="daily"],[data-screen="roulette"]){
   display:flex;justify-content:center;align-items:center;
   padding:20px!important;overflow:hidden;
   background:rgba(5,3,17,.76);backdrop-filter:blur(10px);
