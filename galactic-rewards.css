@@ -658,3 +658,14 @@ body.ui-v15 #modal[data-screen="roulette"] .daily-screen{
   min-height:32px!important;padding:6px!important;
  }
 }
+
+
+/* v3.57 — closing a modal MUST win over any reward-page display rule.
+   Prior CSS selected #modal[data-screen=daily] with greater specificity
+   than .modal-backdrop.off and left an invisible input-blocking overlay. */
+body.ui-v15 #modal.off,
+body.ui-v15 #modal.off:is([data-screen="daily"],[data-screen="roulette"]){
+ display:none!important;
+ visibility:hidden!important;
+ pointer-events:none!important;
+}
