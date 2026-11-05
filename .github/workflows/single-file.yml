@@ -37,11 +37,15 @@ jobs:
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           export NODE_PATH="$RUNNER_TEMP/infiniti-browser-test/node_modules"
           node scripts/test_single_file.cjs
+      - name: Package one-file ZIP ready for CrazyGames upload
+        run: |
+          python3 -c "import zipfile; z=zipfile.ZipFile('single-file/Infiniti-Space-CrazyGames.zip','w',compression=zipfile.ZIP_DEFLATED,compresslevel=9); z.write('single-file/index.html','index.html'); z.close()"
+          python3 -c "import zipfile; z=zipfile.ZipFile('single-file/Infiniti-Space-CrazyGames.zip'); assert z.namelist()==['index.html']; assert z.testzip() is None; print('PASS: upload-ready ZIP contains exactly one root index.html')"
       - name: Store completed index.html in export branch (not main)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add single-file/index.html
+          git add single-file/index.html single-file/Infiniti-Space-CrazyGames.zip
           if ! git diff --cached --quiet; then
             git commit -m "Export verified one-file CrazyGames index.html [skip ci]"
             git push origin HEAD:crazygames-single-file
