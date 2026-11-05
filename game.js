@@ -1262,13 +1262,13 @@ function abyssCandidates(x,y,extent=0,minRadius=0){
 }
 // Offline drift runs once when the player returns. No physics objects are spawned
 // while the tab is closed and, crucially, NO evolution or death can occur.
-let awayReport=null,awaitingAd=false,pendingDeath=null;
+let awayReport=null,awaitingAd=false,pendingDeath=g.pendingDeath||null;
 function beginAway(){
  if(awaitingAd||window.SpacePlatform?.adBusy||pendingDeath||!g.time||g.awaySince)return;
  g.awaySince=Date.now();save();
 }
 function completeAway(){
- if(!g.awaySince||awaitingAd||window.SpacePlatform?.adBusy)return null;
+ if(!g.awaySince||awaitingAd||window.SpacePlatform?.adBusy||pendingDeath)return null;
  const elapsed=Date.now()-g.awaySince;g.awaySince=0;
  if(elapsed<45000){save();return null;}
  const meta=window.SpaceMeta;if(!meta){save();return null;}
@@ -3118,21 +3118,89 @@ function showPause(){showMainMenu(true);}
 function showSettings(){show(`<label class="settings-line"><span>Language / Язык / Idioma</span>${languageSelect()}</label><div class="eyebrow">ПАРАМЕТРЫ ПОЛЁТА</div><div class="overlay-title">НАСТРОЙКИ</div><div class="settings-line"><span>Управление мышью</span><select id="set-control-mode"><option value="hold" ${g.controlMode==='hold'?'selected':''}>Зажать кнопку и направлять</option><option value="follow" ${g.controlMode==='follow'?'selected':''}>Следовать за курсором</option><option value="keys" ${g.controlMode==='keys'?'selected':''}>Только клавиатура</option></select></div><div class="settings-line"><span>Отклик движения</span><select id="set-flight-feel"><option value="direct" ${g.flightFeel==='direct'?'selected':''}>Точный, без инерции</option><option value="smooth" ${g.flightFeel==='smooth'?'selected':''}>Плавный, с инерцией</option></select></div><p class="overlay-copy" style="text-align:left">WASD / стрелки — точное движение. По умолчанию объект плавно следует за курсором без нажатия. WASD — точное движение, на телефоне — джойстик. E — необязательный импульс, Shift — рывок.</p><div class="settings-line"><span>Кинематографичная космическая музыка</span><input id="set-music" type="checkbox" ${g.music?'checked':''}></div><div class="settings-line"><span>Громкость музыки</span><input id="set-music-volume" type="range" min="0" max="100" value="${Math.round(g.musicVolume*100)}" aria-label="Громкость музыки"></div><p class="overlay-copy" style="text-align:left">Оригинальный саундтрек: медленное органное звучание и пространственный эмбиент. Музыка запускается после нажатия «Играть».</p><div class="settings-line"><span>Звуковые эффекты</span><input id="set-sound" type="checkbox" ${g.sound?'checked':''}></div><label class="settings-line"><span>${L('Effects volume','Громкость эффектов','Volumen de efectos')}</span><input id="set-sound-volume" type="range" min="0" max="100" value="${Math.round((g.soundVolume??.7)*100)}"></label><div class="settings-line"><span>Частицы и вспышки</span><input id="set-particles" type="checkbox" ${g.particles?'checked':''}></div><label class="settings-line"><span>${L('Automatic graphics reduction','Автоматическое снижение графики','Reducción gráfica automática')}</span><input id="set-auto-quality" type="checkbox" ${g.autoQuality!==false?'checked':''}></label><p class="overlay-copy" style="text-align:left">${L('Off: full screen resolution and full-resolution black hole distortion, even at low FPS.','Выключено: полное разрешение экрана и искажения чёрных дыр, даже при низком FPS.','Desactivado: resolución completa de pantalla y distorsión de agujeros negros, incluso con pocos FPS.')}</p><div class="settings-line"><span>Качество эффектов</span><select id="set-quality" ${g.autoQuality===false?'disabled':''}><option value="1" ${g.autoQuality===false||g.quality===1?'selected':''}>Высокое</option><option value="0.5" ${g.autoQuality!==false&&g.quality===.5?'selected':''}>Экономное</option></select></div><p class="overlay-copy" style="text-align:left">M — карта, P — пауза. Схема управления сохраняется между запусками.</p><div class="modal-actions"><button id="settings-music" class="secondary-button">${L('Music collection','Коллекция музыки','Colección de música')}</button><button id="settings-tutorial" class="secondary-button">${L('Flight tutorial','Обучение','Tutorial de vuelo')}</button>${continueButton('СОХРАНИТЬ И ИГРАТЬ')}<button class="secondary-button" id="btn-new-universe">НОВАЯ ИГРА</button></div>`);$('modal').dataset.screen='settings';setNavigationState('settings');attachContinue();$('set-language').onchange=e=>{window.SpaceI18n.setLanguage(e.target.value);renderUI();showSettings();};$('settings-music').onclick=showMusicShop;$('settings-tutorial').onclick=()=>showTutorial();$('set-sound-volume').oninput=e=>{g.soundVolume=+e.target.value/100;save();};$('btn-new-universe').onclick=restartCampaign;$('set-control-mode').onchange=e=>{g.controlMode=e.target.value;clearFlightInput();syncHeadingControl();save();};$('set-flight-feel').onchange=e=>{g.flightFeel=e.target.value;save();};$('set-music').onchange=e=>{g.music=e.target.checked;initAudio();setMusicVolume();save();};$('set-music-volume').oninput=e=>{g.musicVolume=+e.target.value/100;setMusicVolume();save();};$('set-sound').onchange=e=>{g.sound=e.target.checked;save();};$('set-particles').onchange=e=>{g.particles=e.target.checked;save();};$('set-auto-quality').onchange=e=>{setAutoQuality(e.target.checked);$('set-quality').disabled=!e.target.checked;$('set-quality').value=String(e.target.checked?g.quality:1);};$('set-quality').onchange=e=>{g.quality=Number(e.target.value);performanceScale=1;applyResolution();save();};}
 function resetCampaignState(resetModifiers=false){
  achievementQueue=[];achievementToastAt=-10;requirementNotice='';requirementNoticeAt=-100;if(externalMusic){externalMusic.pause();externalMusic=null;}
- const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,soundVolume:g.soundVolume,tutorialDone:g.tutorialDone,quality:g.quality,autoQuality:g.autoQuality,buyAmount:g.buyAmount,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel,mobileMode:g.mobileMode,mobileSensitivity:g.mobileSensitivity,headingAngle:g.headingAngle,credits:Math.max(0,Number(g.credits)||0),ownedTracks:[...(g.ownedTracks||[])],activeTrack:g.activeTrack,achievements:{...g.achievements},bestiary:{...g.bestiary}};
+ const preferences={sound:g.sound,music:g.music,musicVolume:g.musicVolume,soundVolume:g.soundVolume,tutorialDone:g.tutorialDone,quality:g.quality,autoQuality:g.autoQuality,buyAmount:g.buyAmount,particles:g.particles,controlMode:g.controlMode,flightFeel:g.flightFeel,mobileMode:g.mobileMode,mobileSensitivity:g.mobileSensitivity,headingAngle:g.headingAngle,credits:Math.max(0,Number(g.credits)||0),ownedTracks:[...(g.ownedTracks||[])],activeTrack:g.activeTrack,achievements:{...g.achievements},bestiary:{...g.bestiary},daily:{...g.daily},drift:{...g.drift,route:[...(g.drift?.route||[])]}};
  cosmicAbsorptions.length=0;absorbingMacroKeys.clear();
- const next=fresh();Object.assign(g,next,preferences);visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
+ const next=fresh();Object.assign(g,next,preferences);pendingDeath=null;g.pendingDeath=null;visitedChunks.clear();loadedChunks.clear();distantChunkCache.clear();macroLoaded.clear();macroCache.clear();macroLODCache.clear();if(macroBackdrop){macroBackdrop.canvas.width=0;macroBackdrop.canvas.height=0;macroBackdrop=null;}if(macroBackdropOld){macroBackdropOld.canvas.width=0;macroBackdropOld=null;}macroEntities=[];entities=[];
  if(resetModifiers&&TEST_MODE){Object.assign(tester,TEST_DEFAULTS);saveTester();}
  player.x=0;player.y=0;player.vx=player.vy=0;player.r=player.targetR=radiusAt(0,0);lastReveal={x:Infinity,y:Infinity,r:-Infinity};
  player.trail=[];camera.x=camera.y=0;camera.zoom=1;particles=[];shockwaves=[];energyArcs=[];texts=[];
  harvestChain=0;harvestChainTime=0;screenFlash=0;morph=null;running=false;abyssTimer=0;abyssPhysical=[];abyssVisual=[];abyssNotice='';$('abyss-warning').hidden=true;clearFlightInput();pulseCd=boostCd=boostTime=0;visitPosition();streamField();save();renderUI(true);testerRefresh();testerToggle(false);
 }
 function dieInAbyss(h){
- const mass=fmt(g.total),duration=timeFmt(g.time);
- resetCampaignState(false);
- // Save the reset immediately: reload cannot restore the lost run.
- save();
- show(`<div class="eyebrow">ГОРИЗОНТ ПЕРЕСЕЧЁН</div><div class="overlay-title">ПОГЛОЩЁН БЕЗДНОЙ</div><p class="overlay-copy">${h.name} поглотила тебя. Вся материя, улучшения, формы эволюции и исследованная карта этого прохождения потеряны.</p><div class="stat-list"><div><strong>${mass}</strong><small>Потеряно материи</small></div><div><strong>${duration}</strong><small>Длительность прохождения</small></div></div><p class="overlay-copy">Звёздная пыль, купленная музыка, достижения, бестиарий и настройки сохранены. Новая Вселенная начинается с космической пыли.</p>${continueButton('НАЧАТЬ С НУЛЯ')}`);
- attachContinue();
+ if(pendingDeath)return;
+ const safe={id:h.id,name:h.name,x:h.x,y:h.y,r:h.r};
+ pendingDeath={hole:safe,mass:fmt(g.total),duration:timeFmt(g.time),coinsCost:Math.max(100,Math.ceil((g.credits||0)*.15)),triedAd:false};
+ g.pendingDeath=pendingDeath;
+ g.awaySince=0;
+ g.losses++;
+ showDeathOffer();
+}
+function showDeathOffer(){
+ if(!pendingDeath)return;
+ const d=pendingDeath,eligible=!g.reviveUsed,ads=!!window.SpacePlatform?.adsAvailable;
+ const offeredAd=eligible&&ads?
+  '<button id="revive-ad" type="button" class="revive-ad">'+L('▶ WATCH AD · REVIVE','▶ РЕКЛАМА · ВОЗРОДИТЬСЯ','▶ VER ANUNCIO · REVIVIR')+'</button>':
+  eligible?'<p class="ad-note">'+L('Video revival is available on CrazyGames when ads are enabled.','Возрождение за рекламу доступно на CrazyGames при включённой рекламе.','El anuncio para revivir está disponible en CrazyGames cuando hay anuncios.')+'</p>':'';
+ show('<div class="revive-screen"><div class="revive-eyebrow">'+
+  L('EVENT HORIZON CROSSED','ГОРИЗОНТ СОБЫТИЙ ПЕРЕСЕЧЁН','HORIZONTE CRUZADO')+'</div>'+
+  '<h2>'+L('SWALLOWED BY THE VOID','ПОГЛОЩЁН БЕЗДНОЙ','DEVORADO POR EL VACÍO')+'</h2>'+
+  '<p>'+L('The black hole pulled you beyond its horizon. Choose how to continue.','Чёрная дыра затянула тебя за горизонт. Выбери, как продолжить.','El agujero negro te absorbió. Elige cómo continuar.')+'</p>'+
+  '<div class="revive-stats"><span>'+L('MASS','МАССА','MASA')+' <strong>'+d.mass+'</strong></span><span>'+
+  L('FLIGHT TIME','ВРЕМЯ ПОЛЁТА','TIEMPO')+' <strong>'+d.duration+'</strong></span></div>'+
+  '<div class="revive-actions">'+offeredAd+
+  (eligible?'<button id="revive-coins" type="button" class="revive-coins" '+(g.credits>=d.coinsCost?'':'disabled')+'>'+
+   L('REVIVE FOR STARDUST','ВОЗРОДИТЬСЯ ЗА ПЫЛЬ','REVIVIR CON POLVO')+' · ✦ '+fmt(d.coinsCost)+'</button>':'')+
+  '<button id="revive-restart" type="button" class="revive-restart">'+
+  L('START NEW JOURNEY','НАЧАТЬ ЗАНОВО','NUEVO VIAJE')+'</button></div>'+
+  '<small>'+L('One revival per run. Reviving preserves your progress. Starting over preserves stardust and owned music.','Одно возрождение за прохождение. При возрождении прогресс сохраняется. При новой игре остаются звёздная пыль и музыка.','Una reanimación por partida. Revivir conserva el progreso; empezar de nuevo conserva polvo y música.')+'</small>'+
+  '<div class="revive-feedback" id="revive-feedback" aria-live="polite"></div></div>');
+ $('modal').dataset.screen='death';$('panel-close').onclick=()=>{$('revive-restart').click();};
+ $('revive-restart').onclick=async()=>{
+  if(awaitingAd)return;
+  awaitingAd=true;
+  const actions=[...document.querySelectorAll('.revive-actions button')];
+  actions.forEach(b=>b.disabled=true);
+  // A midgame ad fits the run-ending break; never while actively flying.
+  if(!d.triedAd&&window.SpacePlatform?.adsAvailable)await window.SpacePlatform.requestAd('midgame');
+  resetCampaignState(false);
+  awaitingAd=false;resumeGame();
+  toast(L('New journey started · soundtrack and stardust saved','Новое путешествие · музыка и пыль сохранены','Nuevo viaje · música y polvo conservados'));
+ };
+ const revive=()=>{
+  if(!pendingDeath||g.reviveUsed)return;
+  const hole=pendingDeath.hole;
+  const dx=player.x-hole.x,dy=player.y-hole.y,distance=Math.hypot(dx,dy);
+  const angle=distance>.0001?Math.atan2(dy,dx):(g.headingAngle||0);
+  const safe=Math.max(hole.r*6.7,hole.r+player.r*8);
+  player.x=hole.x+Math.cos(angle)*safe;
+  player.y=hole.y+Math.sin(angle)*safe;
+  player.vx=Math.cos(angle)*flightSpeed()*.8;
+  player.vy=Math.sin(angle)*flightSpeed()*.8;
+  player.shield=9;camera.x=player.x;camera.y=player.y;
+  g.reviveUsed=true;g.pendingDeath=null;pendingDeath=null;
+  abyssTimer=0;refreshAbysses();atlas.dirty=true;
+  save();resumeGame();
+  toast(L('Revived! Your journey continues.','Возрождение! Путешествие продолжается.','¡Has revivido! El viaje continúa.'));
+ };
+ const coin=$('revive-coins');if(coin)coin.onclick=()=>{
+  if(awaitingAd||g.credits<d.coinsCost)return;
+  g.credits-=d.coinsCost;revive();
+ };
+ const ad=$('revive-ad');
+ if(ad)ad.onclick=async()=>{
+  if(awaitingAd||!window.SpacePlatform?.adsAvailable)return;
+  awaitingAd=true;d.triedAd=true;
+  const buttons=[...document.querySelectorAll('.revive-actions button')];buttons.forEach(b=>b.disabled=true);
+  $('revive-feedback').textContent=L('Ad request in progress…','Загрузка рекламы…','Cargando anuncio…');
+  const completed=await window.SpacePlatform.requestAd('rewarded');
+  awaitingAd=false;
+  if(completed){revive();return;}
+  if(!pendingDeath)return;
+  buttons.forEach(b=>b.disabled=b.id==='revive-coins'&&g.credits<d.coinsCost);
+  $('revive-feedback').textContent=L('No ad was shown. You can still revive for stardust or start over.','Реклама недоступна. Можно возродиться за пыль или начать заново.','Anuncio no disponible. Puedes revivir con polvo o empezar otra vez.');
+  // No adFinished event means no free revival, even if an adblocker was active.
+  ad.disabled=true;
+ };
 }
 function restartCampaign(){
  if(!confirm(window.SpaceI18n?.t('Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.')||'Начать новую Вселенную? Текущий прогресс будет сохранён в резервной копии.'))return;
@@ -3649,7 +3717,8 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  refreshV15();
 }
 
-completeAway();showMainMenu();
+if(g.pendingDeath){pendingDeath=g.pendingDeath;showDeathOffer();}
+else{completeAway();showMainMenu();}
 // Start the selected (free by default) soundtrack on the main menu.
 // Browsers can reject audible autoplay until a real input event; retry on
 // user activation so the first click/tap/keypress starts the music.
