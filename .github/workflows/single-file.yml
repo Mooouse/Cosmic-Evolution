@@ -16,6 +16,10 @@ jobs:
     steps:
       - name: Check out isolated export branch
         uses: actions/checkout@v4
+      - name: Install MP3 encoder for offline audio packing
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
       - name: Bundle everything into standalone index.html
         run: |
           ffmpeg -version | head -1
