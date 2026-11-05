@@ -3234,44 +3234,110 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   list.scrollTop=Math.max(0,buttons[initial]?.offsetTop-list.offsetTop-110||0);
  };
  showStatistics=function(){enterScreen('statistics');legacy.statistics();const {root,old}=mount('statistics');const grid=q(root,'.br-stat-grid');grid.replaceChildren(...qa(old,'.stat-list>div'));text(root,'.br-simple-intro>span',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(root,'.br-simple-intro p',L('Your current journey','Твоё текущее прохождение','Tu viaje actual'));};
- function showV15Evolution(){enterScreen('evolution');renderUI(true);show('');const {root}=mount('evolution'),tier=g.tier; text(root,'.overline',`${tier+1} / 28`);text(root,'.page-nav .muted-caps',TA[tier].epoch);const words=TA[tier].name.split(' ');q(root,'.display-heading').innerHTML=esc(words.shift())+'<br><em>'+esc(words.join(' ')||'·')+'</em>';text(root,'.lead',TA[tier].desc);text(root,'.large-progress-label strong',g.endless?L('INFINITE GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):`${TA[Math.min(27,tier+1)].name} · ${Math.round(stageFraction()*100)}%`);q(root,'.progress-bar span').style.width=stageFraction()*100+'%';
-  const stages=q(root,'.stage-controls');stages.replaceChildren();stages.classList.add('stage-atlas');
-  stages.setAttribute('role','group');stages.setAttribute('aria-label',L('All 28 evolution forms','Все 28 форм эволюции','Las 28 formas de evolución'));
-  const galleryTitle=document.createElement('div');galleryTitle.className='stage-atlas-title';
-  galleryTitle.textContent=L('ALL 28 FORMS · CLICK TO INSPECT','ВСЕ 28 ФОРМ · НАЖМИ ДЛЯ ПРОСМОТРА','LAS 28 FORMAS · PULSA PARA VER');
-  stages.before(galleryTitle);
-  const caption=document.createElement('div');caption.className='stage-atlas-caption';caption.setAttribute('aria-live','polite');
-  stages.after(caption);
-  const buttons=[];
-  for(let i=0;i<TA.length;i++){
-   const b=document.createElement('button');b.type='button';b.className='stage-form-card';
-   b.classList.add(i<tier?'past':i===tier?'current':'future');
-   b.dataset.tier=String(i);b.setAttribute('aria-current',i===tier?'step':'false');
-   b.style.setProperty('--form-color',TA[i].color);
-   const canvas=document.createElement('canvas');canvas.className='stage-form-portrait';canvas.dataset.size='76';
-   const content=document.createElement('span');content.className='stage-form-copy';
-   const num=document.createElement('small');num.textContent=String(i+1).padStart(2,'0')+' / '+TA.length;
-   const name=document.createElement('strong');name.textContent=TA[i].name;
-   const status=document.createElement('em');status.textContent=i<tier?L('REACHED','ПРОЙДЕНО','ALCANZADO'):i===tier?L('CURRENT','ТЕКУЩАЯ','ACTUAL'):L('AHEAD','ВПЕРЕДИ','POR VENIR');
-   content.append(num,name,status);b.append(canvas,content);stages.append(b);buttons.push(b);
-   paintStagePortrait(canvas,i);
+ function showV15Evolution(){
+  enterScreen('evolution');renderUI(true);show('');
+  const {root}=mount('evolution'),tier=g.tier,stage=TA[tier],next=TA[tier+1];
+  const content=q(root,'.evolution-content');content.replaceChildren();content.classList.add('evo-v2');
+  text(root,'.page-nav .muted-caps',L('EVOLUTION / ','ЭВОЛЮЦИЯ / ','EVOLUCIÓN / ')+stage.epoch);
+  // A simple answer to the three questions: What am I? What is next? What is missing?
+  const summary=document.createElement('section');summary.className='evo-v2-summary';
+  const current=document.createElement('article');current.className='evo-v2-current';
+  current.innerHTML='<div class="evo-v2-kicker">'+L('CURRENT FORM','ТЕКУЩАЯ ФОРМА','FORMA ACTUAL')+' · '+String(tier+1).padStart(2,'0')+' / 28</div>'+
+   '<div class="evo-v2-current-row"><canvas class="evo-v2-current-portrait" data-size="134" aria-label="'+esc(stage.name)+'"></canvas><div class="evo-v2-current-copy"><small>'+esc(stage.epoch)+'</small><h2>'+esc(stage.name)+'</h2><p>'+esc(stage.desc)+'</p></div></div>'+
+   '<div class="evo-v2-mass-head"><span>'+L('MASS GATHERED','СОБРАНО МАТЕРИИ','MATERIA RECOGIDA')+'</span><b></b></div><div class="evo-v2-meter" role="progressbar"><i></i></div>'+
+   '<div class="evo-v2-next"><span>'+L('NEXT FORM','СЛЕДУЮЩАЯ ФОРМА','SIGUIENTE FORMA')+'</span><canvas class="evo-v2-next-portrait" data-size="64"></canvas><strong></strong></div>';
+  paintStagePortrait(q(current,'.evo-v2-current-portrait'),tier);
+  const massGoal=q(current,'.evo-v2-mass-head b');
+  const massPercent=g.endless?100:Math.round(stageFraction()*100);
+  massGoal.textContent=g.endless?L('ENDLESS','БЕСКОНЕЧНО','INFINITO'):fmt(Math.min(g.matter,stage.required))+' / '+fmt(stage.required)+' · '+massPercent+'%';
+  q(current,'.evo-v2-meter').setAttribute('aria-valuenow',String(massPercent));
+  q(current,'.evo-v2-meter').setAttribute('aria-valuemin','0');
+  q(current,'.evo-v2-meter').setAttribute('aria-valuemax','100');
+  q(current,'.evo-v2-meter i').style.width=massPercent+'%';
+  text(current,'.evo-v2-next strong',next?next.name:L('INFINITE BLACK HOLE','БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА','AGUJERO NEGRO INFINITO'));
+  paintStagePortrait(q(current,'.evo-v2-next-portrait'),Math.min(tier+1,TA.length-1));
+  const goals=document.createElement('article');goals.className='evo-v2-goals';
+  const goalHeading=document.createElement('div');goalHeading.className='evo-v2-goals-header';
+  goalHeading.innerHTML='<h3>'+L('WHAT IS LEFT TO DO?','ЧТО НУЖНО ДЛЯ ЭВОЛЮЦИИ?','¿QUÉ FALTA PARA EVOLUCIONAR?')+'</h3>'+
+   '<p>'+L('Finish the goals below. Evolution happens immediately — no countdowns.','Выполни условия ниже, и форма изменится сразу. Никаких таймеров.','Completa estos objetivos. Evolucionas al instante, sin temporizador.')+'</p>';
+  goals.append(goalHeading);
+  const goalList=document.createElement('div');goalList.className='evo-v2-goal-list';goals.append(goalList);
+  function addGoal(label,currentValue,requiredValue){
+   const complete=currentValue>=requiredValue;
+   const row=document.createElement('div');row.className='evo-v2-goal'+(complete?' done':'');
+   const mark=document.createElement('span');mark.className='evo-v2-goal-mark';mark.textContent=complete?'✓':'○';
+   const title=document.createElement('span');title.className='evo-v2-goal-title';title.textContent=label;
+   const count=document.createElement('b');count.textContent=fmt(Math.min(currentValue,requiredValue))+' / '+fmt(requiredValue);
+   row.append(mark,title,count);goalList.append(row);
   }
-  const inspect=i=>{
-   buttons.forEach((b,j)=>b.setAttribute('aria-pressed',String(i===j)));
-   caption.textContent=(i===tier?L('CURRENT FORM','ТЕКУЩАЯ ФОРМА','FORMA ACTUAL'):i<tier?L('PAST FORM','ПРОЙДЕННАЯ ФОРМА','FORMA ANTERIOR'):L('FUTURE FORM','БУДУЩАЯ ФОРМА','FORMA FUTURA'))+' · '+TA[i].name+' — '+TA[i].desc;
+  if(g.endless){
+   const note=document.createElement('p');note.className='evo-v2-endless';note.textContent=L(
+    'You reached the final stage. Continue collecting real celestial bodies; your black hole grows without a limit.',
+    'Ты достиг последней формы. Поглощай реальные объекты — чёрная дыра может расти бесконечно.',
+    'Llegaste a la forma final. Sigue absorbiendo cuerpos reales para crecer sin límites.');
+   goalList.append(note);
+  }else{
+   const objectives=missionReq();
+   addGoal(L('Matter','Материя','Materia'),g.matter,stage.required);
+   addGoal(L('Collected this stage','Собрано за стадию','Recogido en esta etapa'),g.stageCollects,objectives.collect);
+   addGoal(L('Explored areas','Исследованные области','Zonas exploradas'),g.stageExplored,objectives.explore);
+   for(const requirement of stageRecipe()){
+    addGoal(L('Resource: ','Ресурс: ','Recurso: ')+(window.SpaceI18n?.t(MATERIALS[requirement.type].label)||MATERIALS[requirement.type].label),
+     g.materials[requirement.type]||0,requirement.amount);
+   }
+  }
+  summary.append(current,goals);content.append(summary);
+  // Clear pathway browser: one consistent 28-stage grid with an inspect panel.
+  const gallery=document.createElement('section');gallery.className='evo-v2-gallery';
+  const top=document.createElement('div');top.className='evo-v2-gallery-head';
+  top.innerHTML='<div><small>'+L('THE FULL JOURNEY','ПОЛНЫЙ ПУТЬ','EL VIAJE COMPLETO')+'</small><h3>'+L('ALL 28 EVOLUTION FORMS','ВСЕ 28 СТАДИЙ ЭВОЛЮЦИИ','LAS 28 ETAPAS DE EVOLUCIÓN')+'</h3></div>';
+  const filters=document.createElement('div');filters.className='evo-v2-filters';
+  for(const [id,label] of [['all',L('All 28','Все 28','Las 28')],['past',L('Completed','Пройденные','Completadas')],['future',L('Ahead','Будущие','Futuras')]]){
+   const button=document.createElement('button');button.type='button';button.dataset.filter=id;button.textContent=label;filters.append(button);
+  }
+  top.append(filters);gallery.append(top);
+  const workspace=document.createElement('div');workspace.className='evo-v2-workspace';
+  const list=document.createElement('div');list.className='evo-v2-form-grid';
+  list.setAttribute('role','group');list.setAttribute('aria-label',L('Evolution stages','Стадии эволюции','Etapas de evolución'));
+  const inspector=document.createElement('aside');inspector.className='evo-v2-inspector';
+  inspector.innerHTML='<div class="evo-v2-inspector-top"><small></small><canvas data-size="148" aria-label="Form preview"></canvas><h4></h4><span class="evo-v2-inspector-era"></span><p></p></div><button type="button" class="evo-v2-back-current">'+L('SHOW MY FORM','ПОКАЗАТЬ МОЮ ФОРМУ','MOSTRAR MI FORMA')+'</button>';
+  const cards=[];
+  for(let i=0;i<TA.length;i++){
+   const form=TA[i],card=document.createElement('button');card.type='button';
+   card.className='evo-v2-form-card '+(i<tier?'past':i===tier?'current':'future');
+   card.dataset.tier=String(i);card.dataset.status=i<tier?'past':i===tier?'current':'future';
+   card.setAttribute('aria-current',i===tier?'step':'false');
+   card.style.setProperty('--stage-color',form.color);
+   const portrait=document.createElement('canvas');portrait.dataset.size='72';
+   const info=document.createElement('span');info.className='evo-v2-card-info';
+   const number=document.createElement('small');number.textContent=String(i+1).padStart(2,'0')+' / 28';
+   const name=document.createElement('strong');name.textContent=form.name;
+   const status=document.createElement('em');status.textContent=i<tier?L('COMPLETED','ПРОЙДЕНО','COMPLETADA'):i===tier?L('YOU ARE HERE','ТЫ ЗДЕСЬ','ESTÁS AQUÍ'):L('FUTURE','БУДУЩАЯ','FUTURA');
+   info.append(number,name,status);card.append(portrait,info);list.append(card);cards.push(card);
+   paintStagePortrait(portrait,i);
+  }
+  function inspect(i){
+   cards.forEach((card,j)=>card.setAttribute('aria-pressed',String(j===i)));
+   const form=TA[i];
+   text(inspector,'small',String(i+1).padStart(2,'0')+' / 28 · '+(i<tier?L('COMPLETED','ПРОЙДЕНО','COMPLETADA'):i===tier?L('CURRENT','ТЕКУЩАЯ','ACTUAL'):L('COMING UP','ВПЕРЕДИ','POR VENIR')));
+   text(inspector,'h4',form.name);text(inspector,'.evo-v2-inspector-era',form.epoch);
+   text(inspector,'p',form.desc);paintStagePortrait(q(inspector,'canvas'),i);
+   inspector.classList.toggle('inspecting-future',i>tier);
+  }
+  cards.forEach((card,i)=>card.onclick=()=>inspect(i));
+  q(inspector,'.evo-v2-back-current').onclick=()=>{
+   setFilter('all');inspect(tier);
+   const card=cards[tier];card.scrollIntoView({block:'nearest',behavior:'smooth'});
   };
-  buttons.forEach((b,i)=>b.onclick=()=>inspect(i));inspect(tier);
-  stages.scrollTop=Math.max(0,buttons[tier]?.offsetTop-stages.offsetTop-95||0);
-  const recipe=q(root,'.recipe'),req=g.endless?[]:stageRecipe();text(root,'.recipe-head b',`${req.filter(r=>(g.materials[r.type]||0)>=r.amount).length} / ${req.length}`);qa(recipe,'.recipe-row').forEach(n=>n.remove());const foot=q(recipe,'.recipe-foot');
-  req.forEach(({type,amount})=>{const m=MATERIALS[type],v=g.materials[type]||0,row=document.createElement('div');row.className='recipe-row';row.innerHTML=`<span class="material-icon ${type==='ore'?'rock':type}" style="--material-color:${m.color}"></span><div>${esc(window.SpaceI18n?.t(m.label)||m.label)}<small>${v>=amount?L('READY','ГОТОВО','LISTO'):L('Still needed: ','Не хватает: ','Faltan: ')+fmt(amount-v)}</small></div><b>${fmt(v)} / ${fmt(amount)}</b><span class="req-dot ${v>=amount?'ready':''}"></span>`;recipe.insertBefore(row,foot);});
-  text(foot,'.overline',L('EVOLUTION OBJECTIVES','ЗАДАЧИ ЭВОЛЮЦИИ','OBJETIVOS DE EVOLUCIÓN'));qa(foot,':scope>div:not(.overline)').forEach((row,i)=>{row.innerHTML=esc($('mission-'+(i+1)+'-label').textContent)+'<b>'+esc($('mission-'+(i+1)+'-val').textContent)+'</b>';});
-  const remaining=Math.max(0,MIN_STAGE_SECONDS-(g.stageElapsed||0));
-  const pacing=document.createElement('div');pacing.className='evolution-flight-timer';
-  pacing.textContent=g.endless?L('ENDLESS GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):
-   remaining>0?L('Time until next form','До следующей формы','Tiempo hasta la siguiente forma')+': '+Math.ceil(remaining)+L('s',' с',' s'):
-   L('Flight time complete · finish the objectives','Время полёта пройдено · выполни задачи','Tiempo cumplido · termina los objetivos');
-  recipe.append(pacing);
-  if(g.endless)text(root,'.recipe-head>span',L('BEYOND THE HORIZON','ЗА ГОРИЗОНТОМ','MÁS ALLÁ DEL HORIZONTE'));translate(root);
+  function setFilter(id){
+   qa(filters,'button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.filter===id)));
+   cards.forEach(card=>card.hidden=id==='past'?card.dataset.status==='future':id==='future'?card.dataset.status==='past':false);
+   // The current form is shown in every category for orientation.
+  }
+  qa(filters,'button').forEach(button=>button.onclick=()=>setFilter(button.dataset.filter));
+  workspace.append(list,inspector);gallery.append(workspace);content.append(gallery);
+  setFilter('all');inspect(tier);
+  list.scrollTop=Math.max(0,cards[tier].offsetTop-list.offsetTop-24);
  }
  const trackCover=(t,i)=>t.cover?`<img src="${esc(t.cover)}" alt="${esc(t.title)}" loading="lazy" decoding="async" width="360" height="360">`:visual.musicCover(i);
  showMusicShop=function(){enterScreen('music');legacy.music();const {root,old}=mount('music');text(root,'#music-balance',fmt(g.credits));text(root,'.music-wallet small',L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR'));text(root,'.music-heading p',q(old,'.overlay-copy').textContent);text(root,'.music-eyebrow',L('SOUNDTRACK','САУНДТРЕК','BANDA SONORA')+' / '+MUSIC_TRACKS.length+' '+L('TRACKS','КОМПОЗИЦИЙ','PISTAS'));text(root,'#music-owned-count',`${g.ownedTracks.length} / ${MUSIC_TRACKS.length} `+L('unlocked','открыто','desbloqueadas'));const legend=q(root,'.music-legend');[...legend.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.textContent='');q(root,'.legend-sep')?.remove();
