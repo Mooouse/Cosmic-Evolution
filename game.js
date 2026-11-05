@@ -2591,24 +2591,70 @@ function atlasMapClick(px,py){
  const marker=atlasAbyssMarkers(atlas.x,atlas.y,bounds.width,bounds.height,scale).find(m=>Math.hypot(m.x-px,m.y-py)<Math.max(12,m.r));
  if(marker)atlasFocusHoles(marker.bodies);
 }
+// Persistent markers are all drawn. Close marks are clustered with a visible
+// count rather than hidden beneath whichever marker was saved last.
 function drawMapPins(c,w,h,scale){
+ const groups=[];
  for(const pin of g.mapPins){
   const x=w/2+(pin.x-atlas.x)*scale,y=h/2+(pin.y-atlas.y)*scale;
-  if(x<0||y<0||x>w||y>h)continue;
-  c.save();c.strokeStyle=pin.color||'#7ddcff';c.fillStyle='#111c28';c.lineWidth=1.5;
-  c.beginPath();c.moveTo(x,y-6);c.lineTo(x+5,y);c.lineTo(x,y+6);c.lineTo(x-5,y);c.closePath();c.fill();c.stroke();
-  c.fillStyle=pin.color||'#7ddcff';c.font='11px Inter,sans-serif';c.textAlign=x>w-150?'right':'left';
-  c.fillText(pin.name,x+(x>w-150?-10:10),clamp(y-9,13,h-13));c.restore();
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<-20||y<-20||x>w+20||y>h+20)continue;
+  const neighbor=groups.find(g=>Math.hypot(g.x-x,g.y-y)<24);
+  if(neighbor){neighbor.pins.push(pin);continue;}
+  groups.push({x,y,pins:[pin]});
  }
+ c.save();c.textBaseline='middle';c.font='800 12px Inter,sans-serif';
+ for(const {x,y,pins} of groups){
+  const pin=pins.find(p=>p.id===g.activePin)||pins[0],active=pins.some(p=>p.id===g.activePin),color=pin.color||'#a986ff';
+  const r=active?15:13;
+  c.save();c.shadowBlur=18;c.shadowColor=color;c.lineWidth=active?3.2:2.5;
+  c.fillStyle='rgba(17,9,34,.95)';c.strokeStyle=color;
+  c.beginPath();c.moveTo(x,y-r);c.lineTo(x+r,y);c.lineTo(x,y+r);c.lineTo(x-r,y);c.closePath();c.fill();c.stroke();
+  c.fillStyle=color;c.beginPath();c.arc(x,y,4,0,TAU);c.fill();c.restore();
+  if(pins.length>1){c.save();c.font='900 11px Inter,sans-serif';c.fillStyle='#fff';
+    c.textAlign='center';c.fillText(String(pins.length),x,y+.5);c.restore();}
+  const title=pins.length>1?pin.name+' +'+(pins.length-1):pin.name;
+  const labelW=Math.min(178,Math.max(65,c.measureText(title).width+20));
+  const lx=clamp(x+18,4,Math.max(4,w-labelW-4)),ly=clamp(y-13,4,Math.max(4,h-28));
+  c.fillStyle='rgba(21,11,37,.96)';c.strokeStyle=active?'#d5b8ff':color;c.lineWidth=1.3;
+  c.fillRect(lx,ly,labelW,26);c.strokeRect(lx+.5,ly+.5,labelW-1,25);
+  c.textAlign='left';c.fillStyle='#f8eaff';c.fillText(title,lx+9,ly+13,labelW-16);
+ }
+ c.restore();
 }
 function renderWaypoint(){
- const pin=g.mapPins.find(p=>p.id===g.activePin);if(!pin)return;
- const p=project(pin.x,pin.y),angle=Math.atan2(p.y-H/2,p.x-W/2);
- const outside=p.x<40||p.y<110||p.x>W-40||p.y>H-130;
- const x=outside?W/2+Math.cos(angle)*W*.38:p.x,y=outside?H/2+Math.sin(angle)*H*.32:p.y;
- ctx.save();ctx.strokeStyle=pin.color||'#7ddcff';ctx.fillStyle=pin.color||'#7ddcff';ctx.lineWidth=1.5;
- ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+4,y);ctx.lineTo(x,y+5);ctx.lineTo(x-4,y);ctx.closePath();ctx.stroke();
- ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(pin.name+' · '+lightYears(Math.hypot(pin.x-player.x,pin.y-player.y)),x,y+19);ctx.restore();
+ if(!g.mapPins.length)return;
+ const groups=[],margin=38,top=120,bottom=Math.max(top+30,H-135);
+ // Show every saved marker in the flight view, including those off-screen.
+ for(const pin of g.mapPins){
+  const p=project(pin.x,pin.y);if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+  const angle=Math.atan2(p.y-H/2,p.x-W/2);
+  const outside=p.x<margin||p.y<top||p.x>W-margin||p.y>bottom;
+  const x=outside?clamp(W/2+Math.cos(angle)*W*.42,margin,W-margin):p.x;
+  const y=outside?clamp(H/2+Math.sin(angle)*H*.34,top,bottom):p.y;
+  const neighbor=groups.find(g=>Math.hypot(g.x-x,g.y-y)<35);
+  if(neighbor){neighbor.pins.push(pin);continue;}
+  groups.push({x,y,angle,outside,pins:[pin]});
+ }
+ ctx.save();ctx.textBaseline='middle';ctx.font='800 11px Inter,sans-serif';
+ for(const group of groups){
+  const {x,y,pins,angle,outside}=group,active=pins.some(p=>p.id===g.activePin);
+  const pin=pins.find(p=>p.id===g.activePin)||pins[0],color=pin.color||'#a986ff',r=active?15:13;
+  ctx.save();ctx.translate(x,y);ctx.shadowBlur=18;ctx.shadowColor=color;
+  ctx.fillStyle='rgba(17,9,34,.96)';ctx.strokeStyle=color;ctx.lineWidth=active?3.2:2.4;
+  ctx.beginPath();ctx.arc(0,0,r,0,TAU);ctx.fill();ctx.stroke();
+  ctx.fillStyle=color;ctx.beginPath();
+  if(outside){ctx.rotate(angle);ctx.moveTo(9,0);ctx.lineTo(-5,-6);ctx.lineTo(-5,6);}
+  else{ctx.moveTo(0,-9);ctx.lineTo(9,0);ctx.lineTo(0,9);ctx.lineTo(-9,0);}
+  ctx.closePath();ctx.fill();ctx.restore();
+  const title=pins.length>1?pin.name+' +'+(pins.length-1):pin.name;
+  const label=title+' · '+lightYears(Math.hypot(pin.x-player.x,pin.y-player.y));
+  const ww=Math.min(185,Math.max(85,ctx.measureText(label).width+17));
+  const lx=clamp(x-ww/2,5,Math.max(5,W-ww-5)),ly=clamp(y+18,top+8,Math.max(top+8,H-28));
+  ctx.fillStyle='rgba(18,10,33,.94)';ctx.strokeStyle=color;ctx.lineWidth=1.2;
+  ctx.fillRect(lx,ly,ww,24);ctx.strokeRect(lx+.5,ly+.5,ww-1,23);
+  ctx.textAlign='center';ctx.fillStyle='#f9edff';ctx.fillText(label,lx+ww/2,ly+12,ww-12);
+ }
+ ctx.restore();
 }
 let atlasExplorationSurface=null;
 function drawAtlas(){
@@ -2762,7 +2808,7 @@ function drawAtlas(){
   c.font='800 11px Inter,sans-serif';c.fillStyle='#fff3d6';
   const markerLabel=L('YOU','ТЫ','TÚ')+' · '+TA[g.tier].name;
   const tx=clamp(playerPoint.x+Math.min(34,Math.max(0,bodyRadius)+10),8,Math.max(8,w-130));
-  c.fillText(markerLabel,tx,clamp(playerPoint.y-avatarRadius-5,14,h-15),130);
+  c.fillText(markerLabel,tx,clamp(playerPoint.y-Math.min(30,Math.max(0,bodyRadius))-10,14,h-15),130);
  }
  const origin=projectMap(0,0);
  if(Math.hypot(origin.x-playerPoint.x,origin.y-playerPoint.y)>35&&origin.x>15&&origin.y>15&&origin.x<w-70&&origin.y<h-20){
@@ -2986,7 +3032,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.42.4';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.42.6';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
@@ -2994,7 +3040,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.42.4`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.42.6`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -3061,7 +3107,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.42.4');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.42.6');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{
