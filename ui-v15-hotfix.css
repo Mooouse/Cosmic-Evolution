@@ -473,3 +473,7 @@
   font-size:9px!important;
  }
 }
+
+/* v3.42.2: remove duplicate mobile zoom popup button; pinch is direct. */
+.ui-v15 #hud .v15-camera-toggle{display:none!important}
+.ui-v15 #hud .camera-buttons{pointer-events:auto}
