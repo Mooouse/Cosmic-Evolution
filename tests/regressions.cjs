@@ -399,6 +399,7 @@ assert.equal(savedDeath.daily.claims,5);
 assert.equal(savedDeath.drift.route.length,0,'A NEW run must start with an empty drift route');
 assert.equal(savedDeath.drift.visits,0,'New run must reset offline drift counters');
 assert.equal(savedDeath.awaySince,0,'New run must not inherit idle timer');
+assert.equal(savedDeath.awayFromFlight,false,'New run must never inherit offline-flight eligibility');
 resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new universe also retains stardust');
 assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
 console.log('PASS: death freezes black-hole rendering and new journeys clear drift history while retaining stardust, music and daily rewards');
@@ -1224,7 +1225,7 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
 {
  let now=1_000_000,saves=0;
  const d={
-  g:{time:300,awaySince:0},running:false,awaitingAd:false,pendingDeath:null,
+  g:{time:300,awaySince:0,awayFromFlight:false},running:false,awaitingAd:false,pendingDeath:null,
   window:{SpacePlatform:{adBusy:false},SpaceMeta:null},
   Date:{now(){return now}},
   save(){saves++}
@@ -1242,12 +1243,15 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  d.running=true;
  d.beginAway();
  assert.equal(d.g.awaySince,now,'Active flight leaving app starts the timer');
+ assert.equal(d.g.awayFromFlight,true,'Only active flight marks a valid absence');
  now+=4*60*1000;
  assert.equal(d.completeAway(),null,'Four minutes is not enough to earn drift');
  assert.equal(d.g.awaySince,0,'Short absence clears its pending timer');
+ assert.equal(d.g.awayFromFlight,false,'Short absence clears eligibility too');
  d.beginAway();now+=5*60*1000;
  assert.equal(d.completeAway(),null,'No SpaceMeta module means no offline path');
  assert.equal(d.g.awaySince,0,'Qualified absence is consumed only once');
+ assert.equal(d.g.awayFromFlight,false,'Validated absence cannot be claimed twice');
  assert.ok(saves>=3);
  console.log('PASS: offline drift requires an active flight and 5+ real minutes; menu idle cannot generate a route');
 }
