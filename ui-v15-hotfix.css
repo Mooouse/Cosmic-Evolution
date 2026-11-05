@@ -1470,3 +1470,25 @@ body.ui-v15 #screen-evolution .evo-v2-eternal p{
  body.ui-v15 #screen-evolution .evo-v2-eternal-icon{width:42px;height:42px;flex-basis:42px;font-size:35px}
  body.ui-v15 #screen-evolution .evo-v2-eternal strong{font-size:15px}
 }
+
+
+/* No fixed evolution target beyond the 28th form. An indefinite,
+   slowly moving energy band indicates continuing mass and horizon growth. */
+body.ui-v15 #screen-evolution .evo-v2-meter-eternal{
+ position:relative;overflow:hidden;
+ background:#180f2e;border:1px solid #624796;
+}
+body.ui-v15 #screen-evolution .evo-v2-meter-eternal i{
+ width:100%!important;height:100%;
+ background:linear-gradient(110deg,#37216e,#6440b9 38%,#a46eff 53%,#3d2483 72%,#271655);
+ background-size:240% 100%;
+ animation:infinitiEternalFlow 9s ease-in-out infinite;
+ box-shadow:0 0 14px #a263ef55;
+}
+@keyframes infinitiEternalFlow{
+ 0%,100%{background-position:0 0}
+ 50%{background-position:100% 0}
+}
+@media(prefers-reduced-motion:reduce){
+ body.ui-v15 #screen-evolution .evo-v2-meter-eternal i{animation:none}
+}
