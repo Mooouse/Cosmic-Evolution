@@ -72,9 +72,40 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='roulette',null,{timeout:12000});
   assert.equal(await page.locator('#daily-spin').isEnabled(),true,
    'One free roulette attempt is unlocked by claiming the daily reward');
-  log('PASS: roulette tab works after daily claim + 14 alternating wheel gestures');
+  log('PASS: roulette tab works after daily claim + 40 alternating wheel gestures');
+  // The user reports that after ACTUALLY SPINNING and returning to the
+  // main menu, the Roulette entry silently stops working. The previous
+  // test never clicked Spin, so that regression escaped entirely.
+  await page.locator('#daily-spin').click({timeout:12000});
+  await page.waitForFunction(()=>document.getElementById('daily-spin')?.disabled===true,{timeout:12000});
+  log('PASS: first roulette spin accepted');
   await page.locator('#daily-back').click({timeout:12000});
   await page.locator('#screen-menu').waitFor({state:'visible',timeout:12000});
+  for(let n=0;n<3;n++){
+    // First two reopenings occur while the old 7.35-second animation timers
+    // are still pending. A later reentry tests settled state.
+    if(n===2)await page.waitForTimeout(7600);
+    const entry=page.locator('#screen-menu [data-reward-page="roulette"]');
+    const stateBefore=await page.evaluate(()=>{
+      const el=document.querySelector('#screen-menu [data-reward-page="roulette"]');
+      const rect=el?.getBoundingClientRect();
+      const hit=rect&&document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+      return {exists:!!el,disabled:el?.disabled,hit:hit?.outerHTML?.slice(0,200),
+        hitIsButton:hit===el||el?.contains(hit),modal:document.querySelector('#modal')?.dataset.screen,
+        scroll:document.querySelector('#screen-menu')?.scrollTop};
+    });
+    log('REOPEN MENU ROULETTE '+n+':',JSON.stringify(stateBefore));
+    assert.equal(stateBefore.hitIsButton,true,
+      'Main menu Roulette button is blocked after a spin: '+JSON.stringify(stateBefore));
+    await entry.click({timeout:12000});
+    await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='roulette',null,{timeout:12000});
+    assert.equal(await page.locator('#daily-spin').isDisabled(),true,
+      'Reopening should show exhausted free spin, not fail to open');
+    await page.locator('#daily-back').click({timeout:12000});
+    await page.locator('#screen-menu').waitFor({state:'visible',timeout:12000});
+  }
+  log('PASS: roulette reopens repeatedly from the main menu both DURING and AFTER the spin animation');
+
   log('PASS: Back from rewards opened in menu returns to menu');
 
   // Try the same broken path on the user's likely high-resolution display,
@@ -147,9 +178,11 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   assert.equal(await page.locator('.revive-stats span').count(),6,'All six stats must be visible');
   assert.equal(await page.locator('#revive-ad').isVisible(),true,'Rewarded revival option is always visible');
   assert.equal(await page.locator('#revive-ad').isEnabled(),true,'Unused rewarded revival is interactive');
+  // The CrazyGames SDK can report that ads are available on localhost even
+  // though this is a test runner. Force standalone mode to verify the fallback.
+  await page.evaluate(()=>Object.defineProperty(window.SpacePlatform,'adsAvailable',{value:false,configurable:true}));
   await page.locator('#revive-ad').click({timeout:10000});
-  assert.match(await page.locator('#revive-feedback').textContent(),/CrazyGames/,
-    'Standalone site should explain why ads cannot play; never grant a free life');
+  await page.waitForFunction(()=>document.getElementById('revive-feedback')?.textContent?.includes('CrazyGames'),null,{timeout:3000});
   assert.equal(await page.locator('#revive-coins').count(),0,'No stardust revival');
   await page.locator('#revive-restart').click({timeout:15000});
   await page.waitForFunction(()=>document.getElementById('modal')?.classList.contains('off'),null,{timeout:18000});
