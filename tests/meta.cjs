@@ -54,6 +54,26 @@ assert.equal(meta.driftReward(100,0,5400),100);
 assert.equal(meta.driftReward(100,90,5400),10);
 assert.equal(meta.driftReward(100,100,5400),0);
 assert.equal(meta.driftReward(100,0,0),0);
+// Tester-only tuning must not change the baseline economy or production saves.
+assert.equal(meta.setTesterTuning({rewardMultiplier:20,trackChance:25}),false);
+assert.equal(meta.PRIZES.at(-1).weight,.8);
+const testContext={Date,Math,Number,URLSearchParams,location:{search:'?tester=1'}};
+testContext.globalThis=testContext;
+vm.createContext(testContext);vm.runInContext(source,testContext);
+const testMeta=testContext.SpaceMeta;
+const baseTestReward=testMeta.baseReward({tier:0},1);
+assert.equal(testMeta.setTesterTuning({rewardMultiplier:3,trackChance:12}),true);
+assert.equal(testMeta.PRIZES.at(-1).weight,12);
+assert.ok(Math.abs(testMeta.PRIZES.reduce((sum,p)=>sum+p.weight,0)-100)<1e-8,
+ 'Customized tester odds must always sum to exactly 100%');
+assert.equal(testMeta.baseReward({tier:0},1),baseTestReward*3);
+const tuningGame={tier:0,credits:0,ownedTracks:[]};
+const tuningGift=testMeta.claim(tuningGame,d0);
+assert.equal(tuningGift.amount,baseTestReward*3);
+const tuningTrack=testMeta.roll(tuningGame,[{id:'free',price:0},{id:'paid',price:2500,title:'Test song'}],d0,()=>.99);
+assert.equal(tuningTrack.type,'track','Tester music odds should affect the real reward result');
+assert.ok(tuningGame.ownedTracks.includes('paid'));
+console.log('PASS: tester-only multiplier, weighted roulette chance, prize award and production isolation');
 console.log('PASS: daily rollover, streak, no duplicate spins, 0.8% music prize, paid-track fallback and drift avoidance');
 
 // Exercise the SDK callbacks with a fake CrazyGames host. Playback remains paused
