@@ -1146,7 +1146,7 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  const get=id=>{
   if(id==='modal')return modal;
   if(!els.has(id))els.set(id,{
-   id,disabled:false,hidden:false,isConnected:true,
+   id,disabled:false,hidden:false,isConnected:true,querySelector(){return null;},
    classList:{add(){},remove(){}},
    style:{setProperty(){}},onclick:null,textContent:''
   });
