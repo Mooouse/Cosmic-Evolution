@@ -515,3 +515,69 @@
   max-height:calc(100dvh - 24px)!important;
  }
 }
+
+/* v3.42.4 — coherent luminous hover states on every interactive screen.
+   Only pointers with real hover get the glow; touch layouts remain uncluttered. */
+@media(hover:hover) and (pointer:fine){
+ body.ui-v15 #modal button:not(:disabled):not([hidden]):hover,
+ body.ui-v15 #hud .v15-hud button:not(:disabled):not([hidden]):hover,
+ body.ui-v15 .game-select-trigger:not(:disabled):hover,
+ body.ui-v15 .game-select-item:not(:disabled):hover,
+ body.ui-v15 #hud #direction-control:hover{
+  border-color:#c6a1ff!important;
+  filter:brightness(1.17) saturate(1.23)!important;
+  box-shadow:0 0 0 1px rgba(194,154,255,.56),
+             0 0 16px rgba(143,90,255,.58),
+             0 0 33px rgba(92,46,207,.27),
+             0 7px 19px rgba(3,0,15,.68),
+             inset 0 1px 0 rgba(247,232,255,.23)!important;
+  transition:border-color .16s ease,filter .16s ease,box-shadow .16s ease,background .16s ease!important;
+ }
+ body.ui-v15 #modal button:not(:disabled):not([hidden]):hover svg,
+ body.ui-v15 #hud .v15-hud button:not(:disabled):not([hidden]):hover svg{
+  filter:drop-shadow(0 0 5px rgba(196,163,255,.65));
+ }
+ body.ui-v15 #screen-map .v15-map-details summary:hover{
+  color:#f6eaff!important;
+  text-shadow:0 0 12px rgba(181,132,255,.7);
+ }
+}
+/* Keyboard focus gets the same readable visual feedback as mouse hover. */
+body.ui-v15 #modal button:focus-visible,
+body.ui-v15 #hud .v15-hud button:focus-visible,
+body.ui-v15 .game-select-trigger:focus-visible,
+body.ui-v15 .game-select-item:focus-visible{
+ outline:2px solid #d4b7ff!important;
+ outline-offset:3px!important;
+ box-shadow:0 0 0 4px rgba(104,54,194,.37),0 0 19px rgba(173,118,255,.54)!important;
+}
+/* Native select is retained for form logic; the visible control matches v15. */
+body.ui-v15 #screen-map .v15-map-details .game-select{
+ position:relative;display:block;width:100%!important;
+ max-width:100%!important;min-width:0!important;grid-column:auto;
+}
+body.ui-v15 #screen-map .v15-map-details .game-select-trigger{
+ width:100%;height:37px;min-height:37px;
+ padding:6px 6px 6px 10px;
+ border:1px solid #8061bd;border-bottom:3px solid #4e3187;
+ border-radius:6px;
+ background:linear-gradient(160deg,#342050,#1c1230);
+ color:#ede2ff;text-align:left;
+}
+body.ui-v15 #screen-map .v15-map-details .game-select-value{
+ display:block;overflow:hidden;text-overflow:ellipsis;
+ font-size:11px;font-weight:800;
+}
+body.ui-v15 #screen-map .v15-map-details .game-select-chevron{
+ flex:none;width:24px;height:25px;border-radius:4px;
+ background:#4f317e;color:#efdcff;
+}
+body.ui-v15 .game-select-pop{background:#17102d;border-color:#936cde}
+body.ui-v15 .game-select-item{color:#f0e4ff;max-width:100%}
+body.ui-v15 .game-select-item.is-selected{
+ background:linear-gradient(90deg,#4d2a92,#2b1b54);
+ color:#fff;
+}
+body.ui-v15 .game-select-item:disabled{
+ opacity:.44;cursor:not-allowed;
+}
