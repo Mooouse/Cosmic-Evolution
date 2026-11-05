@@ -2685,6 +2685,76 @@ function rewardsShell(screen,title,subtitle,body){
  $('rewards-tab-daily').onclick=()=>{if(screen!=='daily')showDailyRewards(dailyOrigin);};
  $('rewards-tab-roulette').onclick=()=>{if(screen!=='roulette')showCosmicRoulette(dailyOrigin);};
 }
+// Same sky recipe as gameplay: dense, pixel-aligned stars organized into
+// curved, multicolored stellar associations and soft nebula knots.
+function paintDailyGalaxySky(){
+ const modal=$('modal');
+ if(modal.dataset.screen!=='daily')return;
+ const cv=modal.querySelector('.daily-galaxy-stars');
+ if(!cv||!cv.isConnected)return;
+ const area=cv.closest('.rewards-page-content');
+ const W=Math.min(1280,Math.max(380,Math.ceil(area?.clientWidth||900)));
+ const H=Math.min(1800,Math.max(680,Math.ceil(area?.scrollHeight||720)));
+ cv.width=W;cv.height=H;cv.style.height=H+'px';
+ const c=cv.getContext('2d');if(!c)return;
+ let seed=0x54af319;
+ const rng=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ const gauss=()=>Math.sqrt(-2*Math.log(Math.max(1e-8,rng())))*Math.cos(rng()*Math.PI*2);
+ c.fillStyle='#080c1d';c.fillRect(0,0,W,H);
+ const palettes=[
+  ['#e64684','#ff7ba6','#ffc3db'],['#ff9e40','#ffd16c','#fff1bf'],
+  ['#32cf8b','#72fbb1','#d8ffeb'],['#2ebdf1','#70e0ff','#e3f9ff'],
+  ['#8757ff','#b995ff','#eedfff'],['#ff55c7','#ffa5e6','#ffe2f5'],
+  ['#436af7','#88aaff','#d8e8ff'],['#eecb44','#fff17a','#fffad3']
+ ];
+ const groups=Array.from({length:12},(_,i)=>{
+  const a=rng()*Math.PI*2;
+  return {x:W*(.06+rng()*.88),y:H*(.06+rng()*.88),
+   rx:W*(.04+rng()*.085),ry:H*(.018+rng()*.044),
+   cos:Math.cos(a),sin:Math.sin(a),bend:(rng()-.5)*2.1,
+   palette:palettes[i%palettes.length],
+   knots:Array.from({length:3},()=>({x:(rng()-.5)*2.1,y:(rng()-.5)*1.4}))};
+ });
+ for(const group of groups){
+  for(const knot of group.knots){
+   const u=knot.x*group.rx,v=(knot.y+Math.sin(knot.x*1.9)*group.bend)*group.ry;
+   const x=group.x+u*group.cos-v*group.sin,y=group.y+u*group.sin+v*group.cos;
+   c.save();c.translate(x,y);c.transform(group.cos,group.sin,-group.sin,group.cos,0,0);
+   c.scale(group.rx*.95,group.ry*1.25);
+   const glow=c.createRadialGradient(0,0,0,0,0,1.6);
+   glow.addColorStop(0,group.palette[0]+'99');
+   glow.addColorStop(.35,group.palette[0]+'40');
+   glow.addColorStop(.72,group.palette[1]+'13');
+   glow.addColorStop(1,group.palette[0]+'00');
+   c.fillStyle=glow;c.fillRect(-1.6,-1.6,3.2,3.2);
+   c.restore();
+  }
+ }
+ const count=Math.min(6500,Math.max(1900,Math.floor(W*H/190)));
+ for(let i=0;i<count;i++){
+  let x,y,color;
+  if(rng()<.94){
+   const g=groups[Math.floor(rng()*groups.length)],k=g.knots[Math.floor(rng()*3)];
+   const along=k.x+gauss()*.52,across=k.y+gauss()*.58+Math.sin(along*1.9)*g.bend;
+   const u=along*g.rx,v=across*g.ry;
+   x=g.x+u*g.cos-v*g.sin;y=g.y+u*g.sin+v*g.cos;
+   const n=rng();
+   color=n<.06?'#ffffff':g.palette[Math.floor(rng()*g.palette.length)];
+  }else{
+   x=rng()*W;y=rng()*H;
+   color=['#ffffff','#d9e4ff','#fff1db','#d9f4ff'][i%4];
+  }
+  if(x<0||x>=W||y<0||y>=H)continue;
+  const bright=rng()<.16,s=bright&&rng()<.27?2:1;
+  c.globalAlpha=bright?1:.72+rng()*.28;
+  c.fillStyle=color;c.fillRect(Math.floor(x),Math.floor(y),s,s);
+  if(bright&&rng()<.045){
+   c.globalAlpha=.5;c.fillRect(Math.floor(x)-2,Math.floor(y),5,1);
+   c.fillRect(Math.floor(x),Math.floor(y)-2,1,5);
+  }
+ }
+ c.globalAlpha=1;
+}
 function showDailyRewards(origin){
  dailyOrigin=origin||($('modal').classList.contains('off')?'play':dailyOrigin);
  const meta=window.SpaceMeta;if(!meta)return;
@@ -2701,7 +2771,7 @@ function showDailyRewards(origin){
    '<strong>'+L('DAY ','ДЕНЬ ','DÍA ')+(todayStreak+i)+'</strong>'+
    '<div class="daily-day-reward"><i>✦</i><b>'+fmt(amount)+'</b></div></div>';
  }).join('');
- const body='<div class="daily-streak"><span>'+L('LOGIN STREAK','СЕРИЯ ВХОДОВ','RACHA DIARIA')+
+ const body='<canvas class="daily-galaxy-stars" aria-hidden="true"></canvas><div class="daily-streak"><span>'+L('LOGIN STREAK','СЕРИЯ ВХОДОВ','RACHA DIARIA')+
   '</span><strong>'+state.streak+' '+L('days','дн.','días')+'</strong>'+
   '<span>'+L('Gifts claimed','Получено подарков','Regalos recogidos')+': '+state.claims+'</span></div>'+
   '<div class="rewards-section-caption"><strong>'+L('THE NEXT 7 DAYS','СЛЕДУЮЩИЕ 7 ДНЕЙ','PRÓXIMOS 7 DÍAS')+'</strong><span>'+L('LOGIN BONUSES','БОНУСЫ ЗА ВХОД','BONOS DIARIOS')+'</span></div>'+ 
@@ -2723,6 +2793,7 @@ function showDailyRewards(origin){
   L('Daily rewards','Ежедневные награды','Regalos diarios'),
   L('Log in every day and collect stardust.','Заходи каждый день и получай звёздную пыль.','Entra a diario y recibe polvo estelar.'),
   body);
+ requestAnimationFrame(paintDailyGalaxySky);
  $('daily-claim').onclick=()=>{
   const result=meta.claim(g);if(!result.ok)return;
   save();checkProgression();showDailyRewards(dailyOrigin);
