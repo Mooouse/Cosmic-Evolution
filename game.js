@@ -2370,6 +2370,9 @@ function renderMenuScene(time){
  paintBlackHole(p.x,p.y,R,time);
 }
 function render(time){
+ // Freeze the world behind the death dialog. In a giant rival black hole,
+ // repeated GPU/CPU lensing can saturate the main thread after collision.
+ if(pendingDeath&&!running&&$('modal').dataset.screen==='death')return;
  // The public Canvas retains the previous complete frame throughout every
  // expensive readback, galaxy repaint, and lensing pass.
  ctx=frameCtx;
@@ -3502,6 +3505,9 @@ function dieInAbyss(h){
  g.pendingDeath=pendingDeath;
  g.awaySince=0;
  g.losses++;
+ // Stop immediately rather than rendering the same expensive overlapping lenses.
+ running=false;
+ player.vx=0;player.vy=0;
  showDeathOffer();
 }
 function showDeathOffer(){
