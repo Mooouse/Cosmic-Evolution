@@ -25,13 +25,13 @@ jobs:
       - name: Check final videos
         run: |
           for suffix in 1920x1080 1080x1620; do
-            file="video-export/Infiniti_Space_Gameplay_\${suffix}.mp4"
+            file="video-export/Infiniti_Space_Gameplay_${suffix}.mp4"
             test -s "$file"
             test "$(stat -c%s "$file")" -lt 50000000
-            ffmpeg -hide_banner -i "$file" 2>&1 | tee "$RUNNER_TEMP/video-\${suffix}.txt" || true
-            grep -q 'Duration: 00:00:1' "$RUNNER_TEMP/video-\${suffix}.txt"
-            grep -q 'Video: h264' "$RUNNER_TEMP/video-\${suffix}.txt"
-            if grep -q 'Audio:' "$RUNNER_TEMP/video-\${suffix}.txt"; then exit 1; fi
+            ffmpeg -hide_banner -i "$file" 2>&1 | tee "$RUNNER_TEMP/video-${suffix}.txt" || true
+            grep -q 'Duration: 00:00:1' "$RUNNER_TEMP/video-${suffix}.txt"
+            grep -q 'Video: h264' "$RUNNER_TEMP/video-${suffix}.txt"
+            if grep -q 'Audio:' "$RUNNER_TEMP/video-${suffix}.txt"; then exit 1; fi
           done
       - name: Publish finalized preview files to isolated branch
         run: |
