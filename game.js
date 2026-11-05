@@ -4272,7 +4272,22 @@ addEventListener('keydown',e=>{const k=physicalKey(e);
  if(!e.repeat){if(k==='e')activatePulse();if(k==='shift'||k===' ')activateBoost();if(k==='p')toggleOverlay('menu',showPause);if(k==='escape'){if(running)showPause();else if($('modal').dataset.screen!=='menu'&&navigateOverlayBack)navigateOverlayBack();else resumeGame();}if(k==='m')toggleOverlay('map',showMap);}
 });
 addEventListener('keyup',e=>keys.delete(physicalKey(e)));
-addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
+addEventListener('blur',()=>{
+ keys.clear();clearFlightInput();
+ // Desktop alt-tab can fire blur BEFORE visibilitychange; record the
+ // departure while the flight is still active, before pause sets running=false.
+ if(running){beginAway();showPause();}
+});
+// A window can lose focus without becoming document.hidden (multi-monitor,
+// browser apps, OS task switching). Finish qualifying absences on focus too.
+addEventListener('focus',()=>{
+ if(document.hidden||awaitingAd||window.SpacePlatform?.adBusy)return;
+ const report=completeAway();
+ if(report){
+  showMainMenu(true);
+  toast(L('Drift complete · route saved on the map','Дрейф завершён · маршрут сохранён на карте','Deriva completada · ruta guardada en el mapa'));
+ }
+});
 addEventListener('pagehide',()=>{beginAway();save();});
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden){beginAway();if(running)showPause();}
