@@ -514,37 +514,44 @@ for(const r of [6,300,1e100]){
  const caught={...p1,gravityBound:true};assert.equal(driftBox.driftBody(caught),caught);
  driftBox.g.time=0;
 }
-// Exercise the actual evolve() function at both sides of the timer threshold.
+// Evolution is driven solely by actual collected mass, materials and exploration.
 {
  const gate={
-  MIN_STAGE_SECONDS:600/27,
-  g:{tier:0,endless:false,complete:false,stageElapsed:20,matter:280,unlocks:0,stageCollects:12,stageRare:0,stagePulses:0,stageExplored:0},
+  g:{tier:0,endless:false,complete:false,matter:280,unlocks:0,stageCollects:12,stageRare:0,stagePulses:0,stageExplored:0},
   TA:Array.from({length:28},(_,i)=>({required:280,name:'Form '+i,color:'#b8a5f8'})),
   player:{x:0,y:0,r:10,targetR:10,shield:0},morph:null,screenFlash:0,shake:0,
   shockwaves:[],energyArcs:[],spent:0,
-  spendRecipe(){this.spent++},currentRadius(){return 12},burst(){},popText(){},toast(){},sound(){},renderUI(){}
+  spendRecipe(){},currentRadius(){return 12},burst(){},popText(){},toast(){},sound(){},renderUI(){}
  };
  gate.spendRecipe=()=>{gate.spent++};
  vm.createContext(gate);
  const start=game.indexOf('function evolve(){'),end=game.indexOf('function flashAbilityButton(',start);
  assert.ok(start>0&&end>start,'Evolution function must be directly testable');
  vm.runInContext(game.slice(start,end),gate);
- gate.evolve();assert.equal(gate.g.tier,0,'A stage may not complete before its minimum flight time');
- assert.equal(gate.spent,0,'Recipes may not be spent while timer is locked');
- gate.g.stageElapsed=600/27+.05;gate.evolve();
- assert.equal(gate.g.tier,1,'Ready stage should advance as soon as its timer finishes');
- assert.equal(gate.g.stageElapsed,0,'Every stage must start a new timer');
- assert.equal(gate.spent,1,'Recipe should be spent once after the unlock');
- assert.ok(27*gate.MIN_STAGE_SECONDS>=600,'27 transitions need >=600 seconds of active flight');
+ gate.evolve();
+ assert.equal(gate.g.tier,1,'A ready form must evolve immediately without a timer');
+ assert.equal(gate.spent,1,'Evolution must still spend the recipe exactly once');
+ assert.equal(gate.g.matter,0,'Evolution resets matter while preserving position and mass scale');
 }
-// Keep all 27 pre-black-hole transitions gated, for a strict 600s minimum.
-assert.ok(game.includes('const MIN_STAGE_SECONDS=600/(TA.length-1)'), 'Pre-black-hole stages must total at least 600 seconds');
-assert.ok(game.includes('g.stageElapsed<MIN_STAGE_SECONDS')||game.includes('(g.stageElapsed||0)<MIN_STAGE_SECONDS'), 'Evolution must respect stage time gates');
-assert.ok(game.includes('if(!g.endless)g.stageElapsed=(g.stageElapsed||0)+dt;'), 'Stage clock must accumulate only active gameplay');
-assert.ok(game.includes('g.stageElapsed>=MIN_STAGE_SECONDS)evolve()'), 'A ready stage must complete when its timer expires');
-assert.ok(game.includes('const BH_FEAST=2.5,BH_REWARD_SCALE=1/BH_FEAST'), 'Black-hole appetite must scale reward per object');
+assert.ok(!game.includes('MIN_STAGE_SECONDS')&&!game.includes('stageElapsed'),
+ 'Evolution must never be locked behind an artificial countdown');
+assert.ok(!game.includes('renderAccretionStreams('),
+ 'Do not simulate fake decorative black-hole debris');
+assert.ok(game.includes('*tester.gravity*7/zoom'),
+ 'Black-hole gravity reach must be multiplied by seven');
+assert.ok(game.includes('*4*2.4*7'),
+ 'Black-hole gravitational pull must be multiplied by seven');
+const campaignYields=game.match(/const CAMPAIGN_YIELD=\[([^\]]+)\]/);
+assert.ok(campaignYields,'Campaign yield array missing');
+const yields=campaignYields[1].split(',').map(Number);
+assert.equal(yields.length,27);
+assert.ok(yields.every(x=>x>0&&x<=.08),'Slow progression via earned resources, not an elapsed-time gate');
+assert.ok(yields[8]<.65/6,'Former large mid-game reward spike must be eliminated');
+const evoScreen=game.slice(game.indexOf('function showV15Evolution(){'),game.indexOf('const trackCover=',game.indexOf('function showV15Evolution(){')));
+assert.ok(evoScreen.includes('evo-v2-summary')&&evoScreen.includes('evo-v2-goals')&&evoScreen.includes('evo-v2-form-grid'),
+ 'Evolution screen must explain the current form, resource goals and stage history');
 const stagesCode=game.slice(game.indexOf('function showV15Evolution(){'),game.indexOf('const trackCover=',game.indexOf('function showV15Evolution(){')));
-assert.ok(stagesCode.includes('for(let i=0;i<TA.length;i++)'), 'All 28 evolution forms must be visible, not just three');
+assert.ok(stagesCode.includes('for(let i=0;i<TA.length;i++)'), 'All 28 evolution forms must be visible');
 assert.ok(game.includes("FIELD_GUIDE.push(...TA.map"), 'All current and future forms must be in the bestiary');
 assert.ok(game.includes("flashAbilityButton('pulse')")&&game.includes("flashAbilityButton('dash')"), 'Keyboard abilities must animate their buttons');
 const mapCode=game.slice(game.indexOf('function drawAtlas(){'),game.indexOf('function showMap(){'));
@@ -767,8 +774,8 @@ const lootBox={g:{endless:false,complete:false,tier:0,matter:0,total:0,stageColl
  clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),currentRadius:()=>13,pickupFeedback(){},respawn(){},missionsDone:()=>false,burst(){},MATERIALS:{ore:{color:'#fff'}},energyArcs:[]};
 vm.createContext(lootBox);vm.runInContext(upgradePrelude+game.slice(game.indexOf('const CAMPAIGN_YIELD='),game.indexOf('function absorb(e)'))+absorbCode,lootBox);
 for(let i=0;i<100;i++)lootBox.absorb({value:1,r:6.5,kind:'matter'});
-assert.ok(Math.abs(lootBox.g.matter-100*280*.05*.25)<1e-8);
-assert.ok(Math.abs(lootBox.g.credits-100*280*.05*.25*.75)<1e-8);
+assert.ok(Math.abs(lootBox.g.matter-100*280*.036*.25)<1e-8);
+assert.ok(Math.abs(lootBox.g.credits-100*280*.036*.25*.75)<1e-8);
 assert.ok(Math.abs(lootBox.g.materials.ore-100)<1e-8);
 lootBox.g.endless=true;const beforeLoot=lootBox.g.matter;lootBox.absorb({kind:'matter'});
 assert.ok(Math.abs(lootBox.g.matter-beforeLoot-4)<1e-8,'2.5x capture rate must pay 2.5x less for each black-hole catch');
@@ -788,7 +795,7 @@ cometBox.g.time=nextComet;cometBox.renderBackgroundComets();assert.equal(cometAl
 for(let time=Math.ceil(nextComet)+1;time<120;time++){cometBox.g.time=time;cometBox.renderBackgroundComets();assert.ok(vm.runInContext('backgroundComets.length',cometBox)<=2);}
 assert.equal(cometAllocations,1,'More frequent comets still reuse one texture');
 cometBox.g.time=0;cometBox.renderBackgroundComets();assert.equal(vm.runInContext('backgroundComets.length',cometBox),0);
-console.log('PASS: fourfold gravity, fractional one-tenth loot, rare cached comets and restart cleanup');
+console.log('PASS: gravity, balanced cosmic rewards, reduced campaign yields and cached comets');
 
 // Catalogue holes use their true horizon radius with the player's lens equation.
 const rivalLensBox={W:1920,H:1080,BLACK_HOLE_CORE_FRACTION:.245,camera:{zoom:.5},g:{abyssConsumed:{}},
