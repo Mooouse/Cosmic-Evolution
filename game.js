@@ -4382,5 +4382,19 @@ document.addEventListener('visibilitychange',()=>{
 });
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
+// Browser smoke-test hook is exclusively available under ?tester=1.
+// It executes the REAL rival-hole collision code path rather than drawing a
+// cosmetic death screen. Ordinary players cannot trigger it.
+if(TEST_MODE)Object.defineProperty(window,'InfinitiTestActions',{value:Object.freeze({
+ simulateRivalDeath(){
+  const h=livingAbysses().find(h=>!canEatAbyss(h));
+  if(!h)return false;
+  player.x=h.x+h.r*.93;player.y=h.y;
+  player.vx=player.vy=0;
+  abyssPhysical=[h];abyssTimer=120;
+  return updateAbysses(.025,Math.max(1,flightSpeed()),h.x+h.r*1.15,h.y)===false;
+ },
+ currentScreen(){return {screen:$('modal').dataset.screen,off:$('modal').classList.contains('off'),running,death:!!pendingDeath};}
+})});
 Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:exploredCount(),visitedExactSectors:visitedChunks.size,visitedDiscs:g.discoveryDiscs.length,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,autoQuality:g.autoQuality!==false,pixelRatio:dpr,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,nearbyCollected:g.collects,activeSoundSources:pickupCount,macroPositions:macroEntities.slice(0,5).map(e=>[e.chunk,e.index,e.x,e.y]),visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),lensBackend,absorbingGalaxies:cosmicAbsorptions.length,macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroHoles:macroEntities.filter(e=>e.kind==='blackhole').length,galaxyPalettes:GALAXY_PALETTES.length,macroDepleted:Object.keys(g.depletedMacro).length,cosmicDepleted:Object.keys(g.depletedCosmic).length,cosmicHarvestTimer,complete:g.complete,endless:g.endless,baseRadius:radiusAt(g.tier,0),endlessRadiusMultiplier:g.tier===TA.length-1?currentRadius()/radiusAt(g.tier,0):1,atlasZoom:atlas.zoom,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
 })();
