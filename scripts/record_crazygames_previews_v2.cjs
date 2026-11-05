@@ -51,7 +51,7 @@ async function capture(spec){
    const panel=document.getElementById('tester-panel');
    panel.classList.add('hidden');panel.setAttribute('aria-hidden','true');
   },next);
-  await tier(15);await pause(900);
+  await tier(10);await pause(900);
   const actual=await page.evaluate(()=>({
    canvas:!!document.getElementById('universe'),
    hud:!!document.getElementById('hud'),
@@ -61,7 +61,7 @@ async function capture(spec){
   assert.equal(actual.screen,'play','Gameplay must be active');
   assert.equal(actual.hud,true,'Real HUD must be visible');
   console.log('RECORDING',spec.name,JSON.stringify(actual));
-  const scenes=[{tier:15,duration:4200},{tier:23,duration:8900},{tier:27,duration:4400}];
+  const scenes=[{tier:10,duration:4300},{tier:16,duration:8200},{tier:27,duration:4800}];
   let cycles=0;
   for(const scene of scenes){
    await tier(scene.tier);
@@ -70,6 +70,12 @@ async function capture(spec){
     const clock=Date.now()/1000;
     await page.mouse.move(spec.width*(.54+.3*Math.cos(clock*.8)),spec.height*(.5+.26*Math.sin(clock*.64)));
     if(cycles++%9===0)await page.keyboard.press('e');
+    if(cycles%5===0){
+     const state=await page.evaluate(()=>window.InfinitiTestActions?.currentScreen());
+     if(state?.screen!=='play'||state?.death||!state?.running){
+      throw Error('Captured a non-gameplay screen: '+JSON.stringify(state));
+     }
+    }
     await pause(110);
    }
    console.log('SEGMENT',spec.name,scene.tier,'done');
@@ -121,8 +127,10 @@ function encode(src,spec){
  assert.ok(motion.frames>350,'Video is too short');
  assert.ok(motion.fps>=7,'Video gameplay too jerky: '+JSON.stringify(motion));
  assert.ok(motion.maxStillSeconds<1.0,'Video contains frozen frames: '+JSON.stringify(motion));
- ff(['-hide_banner','-loglevel','error','-y','-ss','10','-i',dest,
-  '-frames:v','1',path.join(root,spec.name+'-frame.jpg')]);
+ for(const second of [3,10,15]){
+  ff(['-hide_banner','-loglevel','error','-y','-ss',String(second),'-i',dest,
+   '-frames:v','1',path.join(root,spec.name+'-frame'+second+'.jpg')]);
+ }
 }
 (async()=>{
  for(const spec of specs)encode(await capture(spec),spec);
