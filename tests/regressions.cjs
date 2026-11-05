@@ -120,7 +120,8 @@ function traceFrame(lensFails=false){
  const screenCtx=mockCtx("front"),frameCtx=mockCtx("back");
  const universe={
   ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},menuVisible:false,pendingDeath:null,
-  dpr:1,W:1920,H:1080,g:{tier:27},TA:Array(28),
+  dpr:1,W:1920,H:1080,g:{tier:27,abyssConsumed:{}},TA:Array(28),
+  abyssPhysical:[],canEatAbyss:()=>false,
   sky(){calls.push("sky")},renderBackgroundComets(){calls.push("comet")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
   renderRivalLensing(){calls.push("rivalLens")},rivalLensMaps:new Map(),rivalLensRetryAt:0,renderBlackHoleLensing(){calls.push("lens");if(lensFails)throw new Error("canvas readback failed")},
