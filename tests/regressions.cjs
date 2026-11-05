@@ -932,7 +932,8 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
  assert.ok(pulse.includes('!canAbsorbBody(e)'));assert.ok(!pulse.includes('camera.zoom'));
  const update=game.slice(game.indexOf('function update(dt)'),game.indexOf('function project('));
  assert.ok(update.includes('flightSpeed()'));assert.ok(game.slice(game.indexOf('function flightSpeed('),game.indexOf('function uiIcon(')).includes('140/physicsZoom()'));assert.ok(!update.includes('140/Math.max(camera.zoom'));
- assert.ok(game.includes('boostTime=2.5'));
+ assert.ok(game.includes('boostTime=BOOST_DURATION')&&game.includes('const speed=flightSpeed()*boostMultiplier()'),
+  'Dash must use an eased start and end instead of instant 2.5x speed');
  console.log('PASS: real forces and horizon identical at 10%, 100%, 1000% zoom; giants pull player and pulse ignores inedible bodies');
 }
 {
