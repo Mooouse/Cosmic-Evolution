@@ -359,12 +359,12 @@ for(const radius of [1e4,1e50,1e110,1e140]){
 }
 console.log('PASS: permanent giant landmarks, safe origin, attraction and swept lethal collision up to 1e140');
 
-// Death pauses the run for an optional ad or stardust revival;
+// Death immediately pauses simulation and offers only rewarded ad revival;
 // restart resets evolution while retaining meta progression.
 const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction dieInAbyss(',resetStart);
 const deathStart=resetStop+1,deathStop=game.indexOf('\nfunction showDeathOffer(',deathStart);
 const freshStart=game.indexOf('const fresh ='),freshStop=game.indexOf('\nlet g =',freshStart);
-const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='';
+const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='',deathTasks=[];
 const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,
  g:{ownedTracks:[2,5],activeTrack:5,achievements:{first:123},bestiary:{planet:true},tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,autoQuality:false,particles:false,controlMode:'keys',flightFeel:'direct',daily:{lastDay:100,claims:5,spins:3},drift:{route:[[1,2],[3,4]]},losses:0},
  cosmicAbsorptions:[{}],absorbingMacroKeys:new Set(['taken']),visitedChunks:new Set(['1,1']),loadedChunks:new Set(['1,1']),distantChunkCache:new Map(),macroLoaded:new Set(),macroCache:new Map(),macroLODCache:new Map(),macroBackdrop:null,macroBackdropOld:null,macroEntities:[{}],entities:[{}],
@@ -372,11 +372,16 @@ const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',re
  $:()=>resetNode,visitPosition(){},streamField(){},renderUI(){},testerRefresh(){},testerToggle(){},clearFlightInput(){},
  fmt:String,timeFmt:String,continueButton:()=>'<button>НАЧАТЬ С НУЛЯ</button>',attachContinue(){},
  pendingDeath:null,showDeathOffer(){deathScreen='ПОГЛОЩЁН БЕЗДНОЙ';resetBox.save();},
+ setTimeout(fn){deathTasks.push(fn);},console:{error(){throw Error('Death fallback invoked');}},
  save(){savedDeath=JSON.parse(JSON.stringify(resetBox.g))},show(html){deathScreen=html},
  running:true,pulseCd:13,boostCd:6,boostTime:1,abyssTimer:0,abyssPhysical:[],abyssVisual:[],abyssNotice:'',lastReveal:{}};
 vm.createContext(resetBox);
 vm.runInContext(game.slice(freshStart,freshStop)+game.slice(resetStart,resetStop)+game.slice(deathStart,deathStop),resetBox);
 resetBox.dieInAbyss({id:'ancient',name:'ЭРЕБ',x:100,y:100,r:400});
+assert.equal(resetBox.running,false,'Physics must stop synchronously before death UI');
+assert.equal(deathTasks.length,1,'Death dialog is queued outside the physics loop');
+deathTasks.shift()();
+
 assert.equal(savedDeath.tier,27,'Do not destroy the run before the user chooses a revival');
 assert.ok(savedDeath.pendingDeath&&savedDeath.pendingDeath.hole.name==='ЭРЕБ');
 assert.equal(savedDeath.losses,1);
@@ -402,7 +407,7 @@ assert.equal(savedDeath.awaySince,0,'New run must not inherit idle timer');
 assert.equal(savedDeath.awayFromFlight,false,'New run must never inherit offline-flight eligibility');
 resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new universe also retains stardust');
 assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
-console.log('PASS: death freezes black-hole rendering and new journeys clear drift history while retaining stardust, music and daily rewards');
+console.log('PASS: death avoids rendering and defers its dialog until physics stops; stardust revival removed');
 
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
@@ -1206,7 +1211,10 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  context.showCosmicRoulette('menu');
  assert.equal(modal.dataset.screen,'roulette');
  assert.equal(modal.dataset.dailyOrigin,'menu');
- assert.ok(modal.innerHTML.includes('data:image/svg+xml'),'Wheel is one cached image');
+ assert.ok(modal.innerHTML.includes('class="roulette-disc-svg"'),
+  'Roulette panel opens immediately without embedding huge generated art');
+assert.ok(!modal.innerHTML.includes('data:image/svg+xml'),
+  'Wheel art must load outside the synchronous navigation click');
  assert.ok(!modal.innerHTML.includes('Today’s spin is used. Come back tomorrow.'),
   'Redundant tomorrow status should not appear above the disabled button');
  get('daily-back').onclick();
@@ -1300,6 +1308,10 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  assert.equal(box.pointer.id,null);
  assert.equal(box.pointer.down,false);
  assert.ok(!game.includes('fit.style.zoom='),'Never apply CSS zoom to reward controls');
+assert.ok(game.includes("if(!running&&['daily','roulette','death'].includes($('modal').dataset.screen))return;"),
+ 'Heavy game canvas is paused behind interactive rewards/death panels');
+assert.ok(!game.includes('revive-coins'),'Stardust revival must be absent from all handlers');
+assert.ok(!game.includes('coinsCost:'),'Dead runs may not cost stardust');
  assert.ok(!game.includes('fit.style.transform='),'Never transform the interactive reward subtree');
  const rewardsCss=fs.readFileSync('galactic-rewards.css','utf8');
  assert.ok(rewardsCss.includes('display:flex!important;'),'Rewards must use native flex flow');
