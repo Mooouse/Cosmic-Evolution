@@ -351,29 +351,43 @@ for(const radius of [1e4,1e50,1e110,1e140]){
 }
 console.log('PASS: permanent giant landmarks, safe origin, attraction and swept lethal collision up to 1e140');
 
-// Run the actual loss/reset path, including the write to the active save.
-const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction testerRefresh()',resetStart);
+// Death pauses the run for an optional ad or stardust revival;
+// restart resets evolution while retaining meta progression.
+const resetStart=game.indexOf('function resetCampaignState('),resetStop=game.indexOf('\nfunction dieInAbyss(',resetStart);
+const deathStart=resetStop+1,deathStop=game.indexOf('\nfunction showDeathOffer(',deathStart);
 const freshStart=game.indexOf('const fresh ='),freshStop=game.indexOf('\nlet g =',freshStart);
 const resetNode={classList:{add(){}},hidden:false};let savedDeath=null,deathScreen='';
-const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,g:{ownedTracks:[2,5],activeTrack:5,achievements:{first:123},bestiary:{planet:true},tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,autoQuality:false,particles:false,controlMode:'keys',flightFeel:'direct'},
+const resetBox={achievementQueue:[],achievementToastAt:0,requirementNotice:'',requirementNoticeAt:0,externalMusic:null,
+ g:{ownedTracks:[2,5],activeTrack:5,achievements:{first:123},bestiary:{planet:true},tier:27,total:1e12,time:7200,matter:1e12,credits:999999,upgrade:{gravity:80},materials:{exotic:55},sound:false,music:false,musicVolume:.2,quality:.5,autoQuality:false,particles:false,controlMode:'keys',flightFeel:'direct',daily:{lastDay:100,claims:5,spins:3},drift:{route:[[1,2],[3,4]]},losses:0},
  cosmicAbsorptions:[{}],absorbingMacroKeys:new Set(['taken']),visitedChunks:new Set(['1,1']),loadedChunks:new Set(['1,1']),distantChunkCache:new Map(),macroLoaded:new Set(),macroCache:new Map(),macroLODCache:new Map(),macroBackdrop:null,macroBackdropOld:null,macroEntities:[{}],entities:[{}],
  TEST_MODE:false,tester:{ring:1.5},player:{x:123,y:456,r:1e20,vx:200,vy:300},camera:{x:123,y:456,zoom:1e-10},particles:[{}],shockwaves:[{}],energyArcs:[{}],texts:[{}],radiusAt:()=>13,
  $:()=>resetNode,visitPosition(){},streamField(){},renderUI(){},testerRefresh(){},testerToggle(){},clearFlightInput(){},
  fmt:String,timeFmt:String,continueButton:()=>'<button>НАЧАТЬ С НУЛЯ</button>',attachContinue(){},
+ pendingDeath:null,showDeathOffer(){deathScreen='ПОГЛОЩЁН БЕЗДНОЙ';resetBox.save();},
  save(){savedDeath=JSON.parse(JSON.stringify(resetBox.g))},show(html){deathScreen=html},
- running:true,pulseCd:13,boostCd:6,boostTime:1};
-vm.createContext(resetBox);vm.runInContext(game.slice(freshStart,freshStop)+game.slice(resetStart,resetStop),resetBox);
-resetBox.dieInAbyss({name:'ЭРЕБ'});
+ running:true,pulseCd:13,boostCd:6,boostTime:1,abyssTimer:0,abyssPhysical:[],abyssVisual:[],abyssNotice:'',lastReveal:{}};
+vm.createContext(resetBox);
+vm.runInContext(game.slice(freshStart,freshStop)+game.slice(resetStart,resetStop)+game.slice(deathStart,deathStop),resetBox);
+resetBox.dieInAbyss({id:'ancient',name:'ЭРЕБ',x:100,y:100,r:400});
+assert.equal(savedDeath.tier,27,'Do not destroy the run before the user chooses a revival');
+assert.ok(savedDeath.pendingDeath&&savedDeath.pendingDeath.hole.name==='ЭРЕБ');
+assert.equal(savedDeath.losses,1);
+assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
+resetBox.resetCampaignState(false);
 assert.equal(savedDeath.tier,0);assert.equal(savedDeath.matter,0);assert.equal(savedDeath.credits,999999);
 assert.equal(savedDeath.upgrade.gravity,0);assert.equal(savedDeath.materials.exotic,0);
 assert.equal(Object.keys(savedDeath.depleted).length,0);assert.equal(resetBox.cosmicAbsorptions.length,0);
 assert.equal(resetBox.player.x,0);assert.equal(resetBox.player.vx,0);assert.equal(resetBox.camera.zoom,1);
 assert.equal(resetBox.running,false);assert.equal(resetBox.boostCd,0);
 assert.equal(savedDeath.autoQuality,false);assert.equal(savedDeath.music,false);assert.equal(savedDeath.controlMode,'keys');
-assert.equal(resetBox.tester.ring,1.5);assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
-assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);assert.deepEqual(savedDeath.achievements,{first:123});assert.deepEqual(savedDeath.bestiary,{planet:true});
-resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new universe also retains stardust');assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
-console.log('PASS: death and restart reset run progression but preserve stardust, purchased music, achievements, bestiary and preferences');
+assert.equal(resetBox.tester.ring,1.5);
+assert.equal(savedDeath.pendingDeath,null);
+assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
+assert.deepEqual(savedDeath.achievements,{first:123});assert.deepEqual(savedDeath.bestiary,{planet:true});
+assert.equal(savedDeath.daily.claims,5);assert.equal(savedDeath.drift.route.length,2);
+resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new universe also retains stardust');
+assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
+console.log('PASS: death offers revival before resetting; restarting preserves stardust, music, daily rewards, route and achievements');
 
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
