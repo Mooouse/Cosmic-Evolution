@@ -2739,6 +2739,43 @@ function installRewardsWheelGuard(){
  },{passive:false});
  rewardsWheelGuardInstalled=true;
 }
+// The reward UI previously lost physical clicks on some browsers after wheel
+// gestures (even though the button remained visible). Handle genuine mouse
+// clicks at capture phase using the button's visible screen rectangle, not the
+// browser's possibly stale hit-test target. This covers both reward tabs and
+// menu shortcuts, even when a decorative canvas or stale layer steals hits.
+// Native keyboard / programmatic actions are deliberately left unchanged.
+let rewardsClickRescueInstalled=false;
+function installRewardsClickRescue(){
+ if(rewardsClickRescueInstalled||typeof document==='undefined'||!document.addEventListener)return;
+ document.addEventListener('click',event=>{
+  if(!event.isTrusted||event.button!==0||event.detail===0||
+     !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return;
+  const modal=$('modal');
+  if(!modal||modal.classList.contains('off'))return;
+  const screen=modal.dataset.screen;
+  const selectors=(screen==='daily'||screen==='roulette')?
+    ['#daily-back','#rewards-tab-daily','#rewards-tab-roulette','#daily-claim','#daily-spin','#daily-ad-spin']:
+    screen==='menu'?['#screen-menu [data-reward-page="roulette"]','#screen-menu [data-reward-page="daily"]']:[];
+  for(const selector of selectors){
+   const button=modal.querySelector(selector);
+   if(!button||button.disabled||button.hidden||typeof button.onclick!=='function')continue;
+   const rect=button.getBoundingClientRect();
+   if(!rect.width||!rect.height||event.clientX<rect.left||event.clientX>=rect.right||
+      event.clientY<rect.top||event.clientY>=rect.bottom)continue;
+   const style=getComputedStyle(button);
+   if(style.visibility==='hidden'||style.display==='none'||style.pointerEvents==='none')continue;
+   // One event => one navigation. Cancel its normal target path so a stale
+   // underlying layer never receives this click and the action cannot double.
+   event.preventDefault();event.stopImmediatePropagation();
+   try{button.onclick.call(button,event);}
+   catch(error){console.error('Reward UI click failed:',selector,error);}
+   return;
+  }
+ },true);
+ rewardsClickRescueInstalled=true;
+}
+installRewardsClickRescue();
 function rewardsShell(screen,title,subtitle,body){
  installRewardsWheelGuard();
  const tabs='<nav class="rewards-tabs" aria-label="'+L('Reward screens','Страницы наград','Pantallas de premios')+'">'+
