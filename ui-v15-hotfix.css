@@ -581,3 +581,145 @@ body.ui-v15 .game-select-item.is-selected{
 body.ui-v15 .game-select-item:disabled{
  opacity:.44;cursor:not-allowed;
 }
+
+
+/* v3.42.6 — precise optical centering of HUD brand and close glyph. */
+body.ui-v15 #hud .v15-hud .hud-left{align-items:center!important}
+body.ui-v15 #hud .v15-hud .hud-left>div{
+ display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+ gap:4px;min-width:0;margin:0!important;
+}
+body.ui-v15 #hud .v15-hud .hud-left .tracking{
+ display:block;line-height:1.15!important;margin:0!important;
+}
+body.ui-v15 #hud .v15-hud .hud-left .hud-sub{
+ display:block;line-height:1.3!important;margin:0!important;
+}
+body.ui-v15 #hud .v15-hud .hud-left .brand-icon{
+ position:relative;display:grid!important;place-items:center!important;
+ flex:0 0 40px!important;width:40px!important;height:40px!important;
+ padding:0!important;margin:0!important;line-height:0!important;
+ box-sizing:border-box!important;
+}
+body.ui-v15 #hud .v15-hud .hud-left .brand-icon .mark.small{
+ position:relative;display:block!important;flex:none!important;
+ width:32px!important;height:32px!important;
+ margin:0!important;padding:0!important;transform:none!important;
+}
+body.ui-v15 #hud .v15-hud .hud-left .brand-icon .mark.small::before{
+ content:'';position:absolute!important;display:block!important;
+ width:27px!important;height:12px!important;
+ left:50%!important;top:50%!important;
+ transform:translate(-50%,-50%) rotate(-28deg)!important;
+ margin:0!important;
+ box-sizing:border-box!important;
+}
+body.ui-v15 #hud .v15-hud .hud-left .brand-icon .mark.small i{
+ position:absolute!important;display:block!important;
+ width:8px!important;height:8px!important;
+ left:50%!important;top:50%!important;
+ transform:translate(-50%,-50%)!important;
+ margin:0!important;
+}
+body.ui-v15 #hud .quick-upgrades .drawer-head{
+ display:flex!important;align-items:center!important;
+ justify-content:space-between!important;gap:8px!important;
+ min-height:32px;line-height:1!important;
+}
+body.ui-v15 #hud .quick-upgrades .drawer-head #upgrades-close{
+ position:relative!important;flex:0 0 32px!important;
+ display:grid!important;place-items:center!important;
+ width:32px!important;height:32px!important;
+ min-width:32px!important;min-height:32px!important;max-height:32px!important;
+ padding:0!important;margin:0!important;
+ font-size:0!important;line-height:0!important;vertical-align:middle!important;
+ border:1px solid #8560c4!important;border-bottom:3px solid #523397!important;
+ border-radius:6px!important;
+ background:linear-gradient(155deg,#42296d,#261542)!important;
+ color:#f2e7ff!important;
+}
+body.ui-v15 #hud .quick-upgrades .drawer-head #upgrades-close .ui-icon{
+ display:block!important;position:absolute!important;
+ left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;
+ width:18px!important;height:18px!important;margin:0!important;
+ stroke-width:3!important;fill:none!important;
+}
+/* Exact desktop center for evolution/progression panel. */
+@media(min-width:801px) and (pointer:fine){
+ body.ui-v15 #hud .v15-hud .hud-bottom .evo-status{
+  position:absolute!important;left:50%!important;right:auto!important;
+  bottom:0!important;top:auto!important;
+  transform:translateX(-50%)!important;
+  width:clamp(290px,32vw,520px)!important;
+  max-width:calc(100vw - 350px)!important;
+  margin:0!important;z-index:10!important;grid-column:auto!important;
+ }
+ body.ui-v15 #hud .v15-hud .hud-bottom .mass-block{
+  grid-column:1!important;justify-self:start!important;
+ }
+ body.ui-v15 #hud .v15-hud .hud-bottom .abilities{
+  grid-column:3!important;justify-self:end!important;
+ }
+}
+@media(min-width:801px) and (max-width:1050px) and (pointer:fine){
+ body.ui-v15 #hud .v15-hud .hud-bottom .evo-status{
+  width:min(410px,47vw)!important;max-width:calc(100vw - 270px)!important;
+ }
+ body.ui-v15 #hud .v15-hud .hud-bottom .abilities{
+  grid-column:2!important;
+ }
+}
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ body.ui-v15 #hud .v15-hud .hud-left .brand-icon{
+  width:40px!important;height:40px!important;flex:0 0 40px!important;
+ }
+ body.ui-v15 #hud .v15-hud .hud-left .hud-sub{display:none!important}
+ body.ui-v15 #hud .v15-hud .evo-status{
+  left:50%!important;right:auto!important;
+  transform:translateX(-50%)!important;
+  width:calc(100vw - 24px)!important;
+  max-width:calc(100vw - 24px)!important;
+ }
+}
+/* Deliberate chunky plus/minus glyphs, not thin inherited line art. */
+body.ui-v15 .zoom-glyph{
+ display:block!important;position:relative!important;
+ width:29px!important;height:29px!important;min-width:29px!important;
+ background:linear-gradient(145deg,#54358e,#2d1b51);
+ border:1px solid #b49bf3;border-bottom:2px solid #6f47ba;
+ border-radius:7px;box-shadow:inset 0 1px #ffffff35,0 3px 9px #0008;
+ margin:auto!important;padding:0!important;
+}
+body.ui-v15 .zoom-glyph::before,body.ui-v15 .zoom-glyph::after{
+ content:'';display:block;position:absolute;left:50%;top:50%;
+ width:18px;height:4px;border-radius:2px;
+ transform:translate(-50%,-50%);background:#f1e7ff;
+ box-shadow:0 0 7px #d8bcff9c,0 1px 0 #160a2a;
+}
+body.ui-v15 .zoom-glyph.zoom-glyph-minus::after{display:none}
+body.ui-v15 .zoom-glyph.zoom-glyph-plus::after{
+ transform:translate(-50%,-50%) rotate(90deg);
+}
+body.ui-v15 #screen-map .map-corner.right button,
+body.ui-v15 #hud .camera-buttons button{
+ display:grid!important;place-items:center!important;
+ width:53px!important;height:53px!important;
+ padding:0!important;border-radius:9px!important;
+ background:linear-gradient(160deg,#352256,#1a112c)!important;
+ border:1px solid #916bd5!important;border-bottom:4px solid #56389d!important;
+ box-shadow:inset 0 1px #ffffff23,0 5px 16px #000b!important;
+}
+body.ui-v15 #screen-map .map-corner.right button:hover .zoom-glyph,
+body.ui-v15 #hud .camera-buttons button:hover .zoom-glyph{
+ background:linear-gradient(145deg,#7049cc,#412475);
+ border-color:#e3cdff;box-shadow:0 0 14px #a56fff94,inset 0 1px #fff5;
+}
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px){
+ body.ui-v15 #screen-map .map-corner.right button,
+ body.ui-v15 #hud .camera-buttons button{
+  width:44px!important;height:44px!important;
+ }
+ body.ui-v15 .zoom-glyph{
+  width:27px!important;height:27px!important;min-width:27px!important;
+ }
+}
