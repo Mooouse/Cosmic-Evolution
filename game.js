@@ -1260,6 +1260,99 @@ function abyssCandidates(x,y,extent=0,minRadius=0){
  // World rendering can cull pixels; neither zoom nor LOD creates new holes.
  return livingAbysses().filter(h=>Math.hypot(h.x-x,h.y-y)<=extent+h.r*7);
 }
+// Offline drift runs once when the player returns. No physics objects are spawned
+// while the tab is closed and, crucially, NO evolution or death can occur.
+let awayReport=null,awaitingAd=false,pendingDeath=null;
+function beginAway(){
+ if(awaitingAd||window.SpacePlatform?.adBusy||pendingDeath||!g.time||g.awaySince)return;
+ g.awaySince=Date.now();save();
+}
+function completeAway(){
+ if(!g.awaySince||awaitingAd||window.SpacePlatform?.adBusy)return null;
+ const elapsed=Date.now()-g.awaySince;g.awaySince=0;
+ if(elapsed<45000){save();return null;}
+ const meta=window.SpaceMeta;if(!meta){save();return null;}
+ const safeHoles=livingAbysses().filter(h=>!canEatAbyss(h));
+ const heading=Number.isFinite(g.drift.heading)?g.drift.heading:
+  Math.hypot(player.vx,player.vy)>10?Math.atan2(player.vy,player.vx):g.headingAngle||0;
+ const path=meta.planDrift({x:player.x,y:player.y,heading,speed:flightSpeed(),
+  seconds:elapsed/1000,radius:player.r,holes:safeHoles,maxHours:12});
+ g.drift.route=meta.addRoute(g.drift.route,path.path);
+ g.drift.seconds=(g.drift.seconds||0)+path.seconds;
+ g.drift.totalDistance=(g.drift.totalDistance||0)+path.distance;
+ g.drift.visits=(g.drift.visits||0)+1;g.drift.heading=path.heading;
+ player.x=path.x;player.y=path.y;player.vx=player.vy=0;
+ player.trail.length=0;camera.x=path.x;camera.y=path.y;
+ // Collect real progression currency through a *bounded* offline estimate.
+ // The simulator has no entity collisions and never unlocks a stage.
+ const gain=g.endless?Math.min(1e280,Math.max(100,g.matter)*path.seconds/65000):
+  meta.driftReward(TA[g.tier].required,g.matter,path.seconds);
+ const before=g.matter;
+ g.matter=Math.min(1e290,g.endless?g.matter+gain:Math.min(TA[g.tier].required,g.matter+gain));
+ const earned=Math.max(0,g.matter-before);
+ g.total=Math.min(1e290,g.total+earned);
+ g.stageCollects=Math.min(1e290,g.stageCollects+earned);
+ g.credits=Math.min(1e290,g.credits+earned*.12);
+ if(!g.endless&&earned>0){
+  const fraction=earned/Math.max(1,TA[g.tier].required);
+  for(const need of stageRecipe()){
+   g.materials[need.type]=Math.min(1e290,(g.materials[need.type]||0)+need.amount*fraction*.9);
+  }
+ }
+ let discoveries=0;
+ for(const p of path.path){
+  if(!p||!p.every(Number.isFinite))continue;
+  const x=Math.floor(p[0]/CHUNK),y=Math.floor(p[1]/CHUNK);
+  const key=chunkKey(x,y);
+  if(visitedChunks.has(key))continue;
+  visitedChunks.add(key);g.visited.push(key);discoveries++;
+ }
+ g.stageExplored=(g.stageExplored||0)+discoveries;
+ if(!g.endless&&g.matter>=TA[g.tier].required)g.awaitingReturnEvolution=true;
+ g.worldX=player.x;g.worldY=player.y;
+ player.targetR=currentRadius();
+ g.drift.last={seconds:path.seconds,gain:earned,credits:earned*.12,
+  distance:path.distance,avoided:path.avoided,discoveries,at:Date.now()};
+ awayReport=g.drift.last;lastReveal={x:Infinity,y:Infinity,r:-Infinity};
+ atlas.dirty=true;refreshAbysses();save();
+ return awayReport;
+}
+function resumeFromAway(){
+ if(g.awaitingReturnEvolution){g.awaitingReturnEvolution=false;save();}
+}
+function drawDriftRoute(c,w,h,scale){
+ const route=g.drift?.route;
+ if(!Array.isArray(route)||route.length<2)return;
+ c.save();c.lineWidth=2.7;c.setLineDash([9,5]);
+ c.strokeStyle='rgba(164,113,255,.95)';c.shadowBlur=12;c.shadowColor='#a876ff';
+ c.beginPath();
+ let connected=false;
+ for(const point of route){
+  const px=w/2+(point[0]-atlas.x)*scale,py=h/2+(point[1]-atlas.y)*scale;
+  if(!Number.isFinite(px)||!Number.isFinite(py)){connected=false;continue;}
+  // Keep path continuity across view boundaries; browser clips canvas itself.
+  if(!connected)c.moveTo(px,py);else c.lineTo(px,py);connected=true;
+ }
+ c.stroke();c.setLineDash([]);
+ const end=route[route.length-1],x=w/2+(end[0]-atlas.x)*scale,y=h/2+(end[1]-atlas.y)*scale;
+ if(Number.isFinite(x)&&Number.isFinite(y)){
+  c.fillStyle='#dfbfff';c.strokeStyle='#322052';c.lineWidth=2;
+  c.beginPath();c.arc(x,y,6,0,TAU);c.fill();c.stroke();
+ }
+ c.restore();
+}
+function atlasFocusDrift(){
+ const route=g.drift?.route;if(!route?.length)return;
+ let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+ for(const [x,y] of route){if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+  minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}
+ if(!Number.isFinite(minX))return;
+ const bounds=$('atlas-canvas')?.getBoundingClientRect();if(!bounds)return;
+ const width=Math.max(CHUNK*2,maxX-minX),height=Math.max(CHUNK*2,maxY-minY);
+ atlas.x=(minX+maxX)/2;atlas.y=(minY+maxY)/2;
+ atlas.zoom=clamp(Math.min(bounds.width/width,bounds.height/height)*.77*CHUNK/27,1e-155,12);
+ atlas.focusTween=null;atlas.dirty=true;
+}
 function nearestAbyss(){
  let nearest=null,distance=Infinity;
  for(const h of livingAbysses()){
@@ -2890,7 +2983,7 @@ function drawAtlas(){
   c.strokeStyle='#a18dbb';c.beginPath();c.arc(origin.x,origin.y,4,0,TAU);c.stroke();
   c.fillStyle='#ac98c7';c.font='10px Inter,sans-serif';c.fillText('НАЧАЛО',origin.x+9,origin.y-7);
  }
- drawMapPins(c,w,h,scale);
+ drawDriftRoute(c,w,h,scale);drawMapPins(c,w,h,scale);
  // Scale bar uses the same light-year conversion as coordinates, sizes and waypoints.
  const barSectors=atlasNiceDistance(Math.min(150,w*.28)/sectorPx),barPx=barSectors*sectorPx;
  c.fillStyle='rgba(25,16,43,.96)';c.fillRect(12,h-59,Math.max(172,barPx+32),47);
@@ -2930,6 +3023,12 @@ function showMap(){
  $('atlas-pin-name').onchange=ev=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){p.name=ev.target.value.trim().slice(0,32)||`Метка ${p.id}`;save();refreshPinPanel();atlas.dirty=true;}};
  $('atlas-pin-edit').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(!p)return;const b=cv.getBoundingClientRect(),z=atlasScale();openPinEditor(b.width/2+(p.x-atlas.x)*z,b.height/2+(p.y-atlas.y)*z,W/2,H/2);};$('atlas-pin-delete').onclick=()=>{removeMapPin(g.activePin);refreshPinPanel();atlas.dirty=true;};
  $('atlas-pin-go').onclick=()=>{const p=g.mapPins.find(p=>p.id===g.activePin);if(p){atlas.x=p.x;atlas.y=p.y;atlas.zoom=p.zoom;atlas.dirty=true;}};
+ const routeButton=document.createElement('button');routeButton.type='button';
+ routeButton.className='secondary-button drift-route-button';
+ routeButton.textContent=L('Show drift route','Маршрут дрейфа','Ruta de deriva');
+ routeButton.disabled=(g.drift?.route?.length||0)<2;
+ routeButton.onclick=atlasFocusDrift;
+ $('atlas-pin-add').parentElement.append(routeButton);
  refreshPinPanel();
  const giant=nearestAbyss();
  $('atlas-threat').textContent=giant?`${giant.name} · диаметр ${lightYears(giant.r*2)} · ${atlasNumber(giant.r/(g.endless?blackHoleCoreWorldRadius():player.r))} раз больше тебя. При гибели звёздная пыль и покупки сохраняются.`:'За горизонтом сверхмассивной дыры весь прогресс теряется.';
@@ -3455,13 +3554,13 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(hud,'#mass-number').innerHTML=esc(g.endless?fmt(solarMass()):fmt(g.total))+(g.endless?' <small>M☉</small>':'');text(hud,'#radius-number',$('radius-value').textContent);text(hud,'.mass-details .mass-detail:last-child strong',Math.round(g.viewZoom*100)+'%');
   text(hud,'.evo-title>span:first-child',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(hud,'.evo-title>span:nth-child(2)',g.endless?'∞':TA[Math.min(27,g.tier+1)].name);text(hud,'.evo-aux b',Math.round(stageFraction()*100)+'%');q(hud,'.progress-bar span').style.width=stageFraction()*100+'%';text(hud,'#player-label-text',TA[g.tier].name);text(hud,'.player-label small',`${g.tier+1} / 28`);text(hud,'#pulse small',$('pulse-cooldown').textContent);text(hud,'#dash small',$('boost-cooldown').textContent);
  }
- const originalResume=resumeGame;resumeGame=function(){navigationStack.length=0;stopMusicPreview();visual?.closeSelect();originalResume();refreshV15();};
+ const originalResume=resumeGame;resumeGame=function(){resumeFromAway();navigationStack.length=0;stopMusicPreview();visual?.closeSelect();originalResume();refreshV15();};
  if(TEST_MODE){const b=document.createElement('button');b.className='v15-tester';b.textContent='</>';b.setAttribute('aria-label','Tester panel');b.onclick=()=>testerToggle();document.body.append(b);}
  document.body.classList.add('ui-v15');
  refreshV15();
 }
 
-showMainMenu();
+completeAway();showMainMenu();
 // Start the selected (free by default) soundtrack on the main menu.
 // Browsers can reject audible autoplay until a real input event; retry on
 // user activation so the first click/tap/keypress starts the music.
@@ -3521,7 +3620,14 @@ addEventListener('keydown',e=>{const k=physicalKey(e);
 });
 addEventListener('keyup',e=>keys.delete(physicalKey(e)));
 addEventListener('blur',()=>{keys.clear();clearFlightInput();if(running)showPause();});
-addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(running)showPause();}});
+addEventListener('pagehide',()=>{beginAway();save();});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){beginAway();if(running)showPause();}
+ else if(!awaitingAd&&!window.SpacePlatform?.adBusy){
+  const report=completeAway();
+  if(report){showMainMenu(true);toast(L('Drift complete · route saved on the map','Дрейф завершён · маршрут сохранён на карте','Deriva completada · ruta guardada en el mapa'));}
+ }
+});
 renderUI();
 // Developer-friendly deterministic smoke checks may inspect this read-only snapshot.
 Object.defineProperty(window,'CosmicEvolutionDebug',{get:()=>({tier:g.tier,matter:g.matter,playerRadius:player.r,targetRadius:player.targetR,cameraZoom:camera.zoom,total:g.total,credits:g.credits,elapsed:g.time,objects:entities.length,particles:particles.length,playerX:player.x,playerY:player.y,loadedSectors:loadedChunks.size,visitedSectors:exploredCount(),visitedExactSectors:visitedChunks.size,visitedDiscs:g.discoveryDiscs.length,depletedSectors:Object.keys(g.depleted).length,music:g.music,running,progress:g.matter/TA[g.tier].required,forms:TA.length,renderTicks,fps:Math.round(frameFps),renderScale:performanceScale,autoQuality:g.autoQuality!==false,pixelRatio:dpr,controlMode:g.controlMode,flightFeel:g.flightFeel,stickActive:stick.active,mouseDown:pointer.down,velocityX:player.vx,velocityY:player.vy,mission:missionReq(),tester:TEST_MODE?{...tester}:null,testMode:TEST_MODE,farSectors:distantChunkCache.size,nearbyCollected:g.collects,activeSoundSources:pickupCount,macroPositions:macroEntities.slice(0,5).map(e=>[e.chunk,e.index,e.x,e.y]),visibleSectorQuota:sectorQuota(chunkInfo(Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),Math.floor(player.x/CHUNK),Math.floor(player.y/CHUNK)),lensBackend,absorbingGalaxies:cosmicAbsorptions.length,macroVisible:macroVisibleCount,macroActive:macroEntities.length,macroHoles:macroEntities.filter(e=>e.kind==='blackhole').length,galaxyPalettes:GALAXY_PALETTES.length,macroDepleted:Object.keys(g.depletedMacro).length,cosmicDepleted:Object.keys(g.depletedCosmic).length,cosmicHarvestTimer,complete:g.complete,endless:g.endless,baseRadius:radiusAt(g.tier,0),endlessRadiusMultiplier:g.tier===TA.length-1?currentRadius()/radiusAt(g.tier,0):1,atlasZoom:atlas.zoom,materials:{...g.materials},recipe:stageRecipe(),stageExplored:g.stageExplored})});
