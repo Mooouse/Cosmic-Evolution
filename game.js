@@ -3602,16 +3602,70 @@ function dieInAbyss(h){
   try{showDeathOffer();}
   catch(error){
    console.error('Infiniti Space death screen:',error);
-   // Keep a usable recovery path even if the detailed death dialog fails.
-   const modal=$('modal');
+   // The fallback MUST preserve the flight results and rewarded-ad revival,
+   // never collapse into the restart-only panel reported by testers.
+   const modal=$('modal'),d=pendingDeath;
+   if(!d)return;
    modal.classList.remove('off');modal.dataset.screen='death';
    modal.innerHTML='<div class="modal-card"><div class="revive-screen">'+
+    '<div class="revive-eyebrow">'+L('EVENT HORIZON CROSSED','ГОРИЗОНТ СОБЫТИЙ ПЕРЕСЕЧЁН','HORIZONTE CRUZADO')+'</div>'+
     '<h2>'+L('SWALLOWED BY THE VOID','ПОГЛОЩЁН БЕЗДНОЙ','DEVORADO POR EL VACÍO')+'</h2>'+
-    '<button id="revive-restart" class="revive-restart" type="button">'+
-    L('START NEW JOURNEY','НАЧАТЬ ЗАНОВО','NUEVO VIAJE')+'</button></div></div>';
+    '<h3 class="revive-results-title">'+L('FLIGHT RESULTS','РЕЗУЛЬТАТЫ ПОЛЁТА','RESULTADOS DEL VUELO')+'</h3>'+
+    '<div class="revive-stats"><span>'+L('TOTAL MASS','ОБЩАЯ МАССА','MASA TOTAL')+
+    ' <strong>'+d.mass+'</strong></span><span>'+L('FLIGHT TIME','ВРЕМЯ ПОЛЁТА','TIEMPO')+
+    ' <strong>'+d.duration+'</strong></span><span>'+L('ABSORBED OBJECTS','ПОГЛОЩЕНО ОБЪЕКТОВ','OBJETOS ABSORBIDOS')+
+    ' <strong>'+fmt(d.absorbed??g.collects??0)+'</strong></span><span>'+
+    L('EVOLUTION FORM','ФОРМА ЭВОЛЮЦИИ','FORMA EVOLUTIVA')+
+    ' <strong>'+((d.tier??g.tier)+1)+' / '+TA.length+'</strong></span><span>'+
+    L('EVOLUTIONS','ЭВОЛЮЦИЙ','EVOLUCIONES')+
+    ' <strong>'+fmt(d.unlocks??g.unlocks??0)+'</strong></span><span>'+
+    L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR')+
+    ' <strong>✦ '+(d.stardust??fmt(g.credits||0))+'</strong></span></div>'+
+    '<div class="revive-actions"><button id="revive-ad" class="revive-ad" type="button">'+
+    L('▶ WATCH AD · REVIVE','▶ РЕКЛАМА · ВОЗРОДИТЬСЯ','▶ VER ANUNCIO · REVIVIR')+
+    '</button><button id="revive-restart" class="revive-restart" type="button">'+
+    L('START NEW JOURNEY','НАЧАТЬ ЗАНОВО','NUEVO VIAJE')+'</button></div>'+
+    '<div class="revive-feedback" id="revive-feedback" role="status"></div></div></div>';
    $('revive-restart').onclick=()=>{resetCampaignState(false);resumeGame();};
+   const ad=$('revive-ad');
+   ad.disabled=!!g.reviveUsed;
+   ad.onclick=async()=>{
+    if(awaitingAd||!pendingDeath||g.reviveUsed)return;
+    const fb=$('revive-feedback');
+    if(!window.SpacePlatform?.adsAvailable){
+     fb.textContent=L('Rewarded ads are only available on CrazyGames.','Рекламное возрождение доступно только на CrazyGames.','Los anuncios solo están disponibles en CrazyGames.');
+     return;
+    }
+    awaitingAd=true;ad.disabled=true;
+    let completed=false;
+    try{completed=await window.SpacePlatform.requestAd('rewarded');}
+    catch(err){console.warn('Rewarded revival failed:',err);}
+    finally{awaitingAd=false;}
+    if(completed){reviveFromDeath();return;}
+    if(ad.isConnected){
+     ad.disabled=false;
+     fb.textContent=L('Ad not completed. You can retry.','Реклама не завершена. Можно попробовать снова.','Anuncio incompleto. Puedes reintentar.');
+    }
+   };
+   setTimeout(()=>{if(pendingDeath)save();},60);
   }
  },0);
+}
+function reviveFromDeath(){
+  if(!pendingDeath||g.reviveUsed)return;
+  const hole=pendingDeath.hole;
+  const dx=player.x-hole.x,dy=player.y-hole.y,distance=Math.hypot(dx,dy);
+  const angle=distance>.0001?Math.atan2(dy,dx):(g.headingAngle||0);
+  const safe=Math.max(hole.r*6.7,hole.r+player.r*8);
+  player.x=hole.x+Math.cos(angle)*safe;
+  player.y=hole.y+Math.sin(angle)*safe;
+  player.vx=Math.cos(angle)*flightSpeed()*.8;
+  player.vy=Math.sin(angle)*flightSpeed()*.8;
+  player.shield=9;camera.x=player.x;camera.y=player.y;
+  g.reviveUsed=true;g.pendingDeath=null;pendingDeath=null;
+  abyssTimer=0;refreshAbysses();atlas.dirty=true;
+  save();resumeGame();
+  toast(L('Revived! Your journey continues.','Возрождение! Путешествие продолжается.','¡Has revivido! El viaje continúa.'));
 }
 function showDeathOffer(){
  if(!pendingDeath)return;
@@ -3659,22 +3713,7 @@ function showDeathOffer(){
   awaitingAd=false;resumeGame();
   toast(L('New journey started · soundtrack and stardust saved','Новое путешествие · музыка и пыль сохранены','Nuevo viaje · música y polvo conservados'));
  };
- const revive=()=>{
-  if(!pendingDeath||g.reviveUsed)return;
-  const hole=pendingDeath.hole;
-  const dx=player.x-hole.x,dy=player.y-hole.y,distance=Math.hypot(dx,dy);
-  const angle=distance>.0001?Math.atan2(dy,dx):(g.headingAngle||0);
-  const safe=Math.max(hole.r*6.7,hole.r+player.r*8);
-  player.x=hole.x+Math.cos(angle)*safe;
-  player.y=hole.y+Math.sin(angle)*safe;
-  player.vx=Math.cos(angle)*flightSpeed()*.8;
-  player.vy=Math.sin(angle)*flightSpeed()*.8;
-  player.shield=9;camera.x=player.x;camera.y=player.y;
-  g.reviveUsed=true;g.pendingDeath=null;pendingDeath=null;
-  abyssTimer=0;refreshAbysses();atlas.dirty=true;
-  save();resumeGame();
-  toast(L('Revived! Your journey continues.','Возрождение! Путешествие продолжается.','¡Has revivido! El viaje continúa.'));
- };
+ const revive=reviveFromDeath;
  const ad=$('revive-ad');
  if(ad)ad.onclick=async()=>{
   if(awaitingAd||!pendingDeath||g.reviveUsed)return;
