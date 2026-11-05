@@ -2395,7 +2395,7 @@ function renderMenuScene(time){
 function render(time){
  // Freeze the world behind the death dialog. In a giant rival black hole,
  // repeated GPU/CPU lensing can saturate the main thread after collision.
- if(pendingDeath&&!running&&$('modal').dataset.screen==='death')return;
+ if(pendingDeath&&!running)return;
  // The public Canvas retains the previous complete frame throughout every
  // expensive readback, galaxy repaint, and lensing pass.
  ctx=frameCtx;
@@ -2494,7 +2494,9 @@ function show(html){
  $('evolution-panel').classList.add('hidden');
  $('modal').dataset.screen='panel';
  $('modal').innerHTML=`<div class="modal-card"><button id="panel-close" class="panel-close" aria-label="Вернуться в игру">${uiIcon('close')}</button>${html}</div>`;
- $('modal').classList.remove('off');$('panel-close').onclick=resumeGame;save();
+ $('modal').classList.remove('off');$('panel-close').onclick=resumeGame;
+ // Avoid serializing an enormous explored universe before the death UI paints.
+ if(!pendingDeath)save();
 }
 function continueButton(label='ПРОДОЛЖИТЬ'){return `<button class="primary-button" id="btn-continue">${label} <span>${uiIcon('arrow')}</span></button>`;}
 function attachContinue(){const b=$('btn-continue');if(b)b.onclick=resumeGame;}
@@ -3514,17 +3516,34 @@ function resetCampaignState(resetModifiers=false){
 function dieInAbyss(h){
  if(pendingDeath)return;
  const safe={id:h.id,name:h.name,x:h.x,y:h.y,r:h.r};
- pendingDeath={hole:safe,mass:fmt(g.total),duration:timeFmt(g.time),coinsCost:Math.max(100,Math.ceil((g.credits||0)*.15)),triedAd:false};
+ pendingDeath={hole:safe,mass:fmt(g.total),duration:timeFmt(g.time),triedAd:false};
  g.pendingDeath=pendingDeath;
  g.awaySince=0;
  g.losses++;
- // Stop immediately rather than rendering the same expensive overlapping lenses.
- running=false;
+ // Stop all physics and GPU lens work before opening any DOM overlay.
+ running=false;menuVisible=false;atlasVisible=false;
  player.vx=0;player.vy=0;
- showDeathOffer();
+ // A busy full-scale lens frame must not be coupled to the death UI;
+ // schedule the dialog as its own task after the current physics update.
+ setTimeout(()=>{
+  if(!pendingDeath)return;
+  try{showDeathOffer();}
+  catch(error){
+   console.error('Infiniti Space death screen:',error);
+   // Keep a usable recovery path even if the detailed death dialog fails.
+   const modal=$('modal');
+   modal.classList.remove('off');modal.dataset.screen='death';
+   modal.innerHTML='<div class="modal-card"><div class="revive-screen">'+
+    '<h2>'+L('SWALLOWED BY THE VOID','ПОГЛОЩЁН БЕЗДНОЙ','DEVORADO POR EL VACÍO')+'</h2>'+
+    '<button id="revive-restart" class="revive-restart" type="button">'+
+    L('START NEW JOURNEY','НАЧАТЬ ЗАНОВО','NUEVO VIAJE')+'</button></div></div>';
+   $('revive-restart').onclick=()=>{resetCampaignState(false);resumeGame();};
+  }
+ },0);
 }
 function showDeathOffer(){
  if(!pendingDeath)return;
+ // An older saved death may still contain obsolete coinsCost; it is ignored.
  const d=pendingDeath,eligible=!g.reviveUsed,ads=!!window.SpacePlatform?.adsAvailable;
  const offeredAd=eligible&&ads?
   '<button id="revive-ad" type="button" class="revive-ad">'+L('▶ WATCH AD · REVIVE','▶ РЕКЛАМА · ВОЗРОДИТЬСЯ','▶ VER ANUNCIO · REVIVIR')+'</button>':
@@ -3536,8 +3555,6 @@ function showDeathOffer(){
   '<div class="revive-stats"><span>'+L('MASS','МАССА','MASA')+' <strong>'+d.mass+'</strong></span><span>'+
   L('FLIGHT TIME','ВРЕМЯ ПОЛЁТА','TIEMPO')+' <strong>'+d.duration+'</strong></span></div>'+
   '<div class="revive-actions">'+offeredAd+
-  (eligible?'<button id="revive-coins" type="button" class="revive-coins" '+(g.credits>=d.coinsCost?'':'disabled')+'>'+
-   L('REVIVE FOR STARDUST','ВОЗРОДИТЬСЯ ЗА ПЫЛЬ','REVIVIR CON POLVO')+' · ✦ '+fmt(d.coinsCost)+'</button>':'')+
   '<button id="revive-restart" type="button" class="revive-restart">'+
   L('START NEW JOURNEY','НАЧАТЬ ЗАНОВО','NUEVO VIAJE')+'</button></div>'+
   '<small>'+L('One revival per run. Reviving preserves your progress. Starting over preserves stardust and owned music.','Одно возрождение за прохождение. При возрождении прогресс сохраняется. При новой игре остаются звёздная пыль и музыка.','Una reanimación por partida. Revivir conserva el progreso; empezar de nuevo conserva polvo y música.')+'</small>'+
@@ -3570,22 +3587,20 @@ function showDeathOffer(){
   save();resumeGame();
   toast(L('Revived! Your journey continues.','Возрождение! Путешествие продолжается.','¡Has revivido! El viaje continúa.'));
  };
- const coin=$('revive-coins');if(coin)coin.onclick=()=>{
-  if(awaitingAd||g.credits<d.coinsCost)return;
-  g.credits-=d.coinsCost;revive();
- };
  const ad=$('revive-ad');
  if(ad)ad.onclick=async()=>{
   if(awaitingAd||!window.SpacePlatform?.adsAvailable)return;
   awaitingAd=true;d.triedAd=true;
   const buttons=[...document.querySelectorAll('.revive-actions button')];buttons.forEach(b=>b.disabled=true);
   $('revive-feedback').textContent=L('Ad request in progress…','Загрузка рекламы…','Cargando anuncio…');
-  const completed=await window.SpacePlatform.requestAd('rewarded');
-  awaitingAd=false;
+  let completed=false;
+  try{completed=await window.SpacePlatform.requestAd('rewarded');}
+  catch(error){console.warn('Rewarded revival unavailable:',error);}
+  finally{awaitingAd=false;}
   if(completed){revive();return;}
   if(!pendingDeath)return;
-  buttons.forEach(b=>b.disabled=b.id==='revive-coins'&&g.credits<d.coinsCost);
-  $('revive-feedback').textContent=L('No ad was shown. You can still revive for stardust or start over.','Реклама недоступна. Можно возродиться за пыль или начать заново.','Anuncio no disponible. Puedes revivir con polvo o empezar otra vez.');
+  buttons.forEach(b=>b.disabled=false);
+  $('revive-feedback').textContent=L('Ad not completed. Start a new journey or retry later.','Реклама не завершена. Начни новое путешествие или попробуй позже.','Anuncio no completado. Inicia otro viaje o inténtalo más tarde.');
   // No adFinished event means no free revival, even if an adblocker was active.
   ad.disabled=true;
  };
