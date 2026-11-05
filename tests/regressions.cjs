@@ -1253,5 +1253,9 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  assert.equal(d.g.awaySince,0,'Qualified absence is consumed only once');
  assert.equal(d.g.awayFromFlight,false,'Validated absence cannot be claimed twice');
  assert.ok(saves>=3);
+ assert.ok(game.includes("if(running){beginAway();showPause();}"),
+  'Alt-tab blur must start the timer BEFORE pausing the flight');
+ assert.ok(game.includes("addEventListener('focus',()=>"),
+  'Returning to a focused but never-hidden browser window must also complete an absence');
  console.log('PASS: offline drift requires an active flight and 5+ real minutes; menu idle cannot generate a route');
 }
