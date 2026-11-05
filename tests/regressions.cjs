@@ -1125,7 +1125,7 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
 {
  const els=new Map(),timeouts=[];
  let modalOff=true,resumed=0,menus=0,reads=0;
- let rewardWheelListener=null;
+ let rewardWheelListener=null,documentWheelListener=null;
  const modal={
   addEventListener(type,listener,opts){
    if(type==='wheel'){rewardWheelListener=listener;assert.equal(opts.passive,false);assert.equal(opts.capture,true);}
@@ -1160,6 +1160,9 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  };
  const context={
   TEST_MODE:false,Math,Date,window:{SpaceMeta:meta,SpacePlatform:{adsAvailable:false}},
+  document:{addEventListener(type,listener,opts){
+   if(type==='wheel'){documentWheelListener=listener;assert.equal(opts.passive,false);assert.equal(opts.capture,true);}
+  }},
   g:{tier:0,time:123,credits:0,ownedTracks:[],daily:{lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0}},
   $:get,L:(en)=>en,fmt:String,MUSIC_TRACKS:[],menuVisible:false,awaitingAd:false,
   renderUI(){reads++;},save(){},checkProgression(){},toast(){},sound(){},
@@ -1182,12 +1185,23 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  context.showDailyRewards('play');
  assert.equal(typeof rewardWheelListener,'function','Wheel handler is attached to modal');
  let prevented=0,stopped=0;
- rewardWheelListener({cancelable:true,preventDefault(){prevented++;},stopPropagation(){stopped++;}});
- assert.equal(prevented,1,'Mouse wheel cannot scroll reward overlays');
- assert.equal(stopped,1,'Mouse wheel cannot leak to world zoom');
+ // Reproduce repeated cursor motion + trackpad wheel gestures.
+ for(let n=0;n<80;n++){
+  const event={cancelable:true,clientX:n*8,clientY:n*5,
+   preventDefault(){prevented++;},stopPropagation(){stopped++;}};
+  rewardWheelListener(event);
+  if(documentWheelListener)documentWheelListener(event);
+ }
+ assert.equal(typeof documentWheelListener,'function','Capture wheels at document level');
+ assert.equal(prevented,160,'All alternating wheel gestures are cancelled');
+ assert.equal(stopped,160,'Wheel events never reach game camera');
+ assert.ok(!modal.innerHTML.includes('rewards-fit-body'),
+  'Interactive reward controls must not live in a zoomed or transformed wrapper');
  assert.equal(modal.dataset.screen,'daily');
  assert.equal(modal.dataset.dailyOrigin,'play');
  assert.ok(modal.innerHTML.includes('daily-galaxy-stars'),'Daily page has colorful sky canvas');
+ assert.ok(modal.innerHTML.includes('class="rewards-page-content"'),
+  'Daily rewards must use normal, unscaled flex layout');
  get('daily-back').onclick();
  assert.equal(resumed,1,'In-game Back must resume flight');
  assert.equal(modal.dataset.screen,'play');
@@ -1218,6 +1232,35 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  assert.equal(modal.dataset.screen,'play');
  assert.ok(reads>=2);
  console.log('PASS: scroll-free clickable rewards, wheel cancellation, safe Back history, repeated roulette and mid-spin tabs');
+}
+
+
+// Active gameplay may capture the mouse pointer. Opening modal panels must
+// release that capture; otherwise clicks continue targeting the world canvas.
+{
+ const start=game.indexOf('function clearFlightInput(){');
+ const end=game.indexOf('function updateFlightMarker(){',start);
+ assert.ok(start>0&&end>start,'Find flight pointer reset logic');
+ let released=0;
+ const box={
+  pointer:{id:15,active:true,down:true},
+  stick:{active:true,id:4,originX:5,originY:5,x:20,y:30},
+  mobileControls:{reset(){}},
+  canvas:{hasPointerCapture(id){return id===15;},releasePointerCapture(id){assert.equal(id,15);released++;}},
+  $:()=>({style:{},classList:{remove(){}}})
+ };
+ vm.createContext(box);
+ vm.runInContext(game.slice(start,end),box);
+ box.clearFlightInput();
+ assert.equal(released,1,'Opening rewards releases canvas capture');
+ assert.equal(box.pointer.id,null);
+ assert.equal(box.pointer.down,false);
+ assert.ok(!game.includes('fit.style.zoom='),'Never apply CSS zoom to reward controls');
+ assert.ok(!game.includes('fit.style.transform='),'Never transform the interactive reward subtree');
+ const rewardsCss=fs.readFileSync('galactic-rewards.css','utf8');
+ assert.ok(rewardsCss.includes('display:flex!important;'),'Rewards must use native flex flow');
+ assert.ok(rewardsCss.includes('pointer-events:none!important;'),'Galaxy canvas never traps clicks');
+ console.log('PASS: mouse capture released; no zoomed reward buttons; wheel+mousemove cannot shift input hit areas');
 }
 
 // Offline drift is earned only after leaving ACTIVE GAMEPLAY for 5+ minutes.
