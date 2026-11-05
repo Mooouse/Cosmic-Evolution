@@ -25,6 +25,7 @@ jobs:
           node --check game.js
           node --check platform.js
           node --check space-meta.js
+          node tests/reward-navigation.cjs
           node tests/meta.cjs
           node tests/regressions.cjs
           node tests/music.cjs

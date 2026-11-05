@@ -2739,37 +2739,62 @@ function installRewardsWheelGuard(){
  },{passive:false});
  rewardsWheelGuardInstalled=true;
 }
-// The reward UI previously lost physical clicks on some browsers after wheel
-// gestures (even though the button remained visible). Handle genuine mouse
-// clicks at capture phase using the button's visible screen rectangle, not the
-// browser's possibly stale hit-test target. This covers both reward tabs and
-// menu shortcuts, even when a decorative canvas or stale layer steals hits.
-// Native keyboard / programmatic actions are deliberately left unchanged.
+// Keep reward navigation on a permanent ancestor. Dialogs and menu buttons
+// are recreated on each visit, so navigation must not depend on an onclick
+// property of a particular node or on a screen captured by an old closure.
+function rewardControlAction(button,screen){
+ if(!button||button.disabled||button.hidden)return null;
+ const from=screen==='menu'?'menu':($('modal').dataset.dailyOrigin==='play'?'play':'menu');
+ if(screen==='menu'){
+  if(button.dataset.rewardPage==='roulette')return ()=>showCosmicRoulette(from);
+  if(button.dataset.rewardPage==='daily')return ()=>showDailyRewards(from);
+ }else if(screen==='daily'||screen==='roulette'){
+  if(button.id==='daily-back')return dailyReturn;
+  if(button.id==='rewards-tab-daily')return ()=>{if(screen!=='daily')showDailyRewards(from);};
+  if(button.id==='rewards-tab-roulette')return ()=>{if(screen!=='roulette')showCosmicRoulette(from);};
+  // Economic actions still belong to the current mounted view.
+  if(['daily-claim','daily-spin','daily-ad-spin'].includes(button.id)&&typeof button.onclick==='function')
+   return ()=>button.onclick.call(button);
+ }
+ return null;
+}
 let rewardsClickRescueInstalled=false;
 function installRewardsClickRescue(){
  if(rewardsClickRescueInstalled||typeof document==='undefined'||!document.addEventListener)return;
  document.addEventListener('click',event=>{
-  if(!event.isTrusted||event.button!==0||event.detail===0||
-     !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return;
+  if(event.button!==0)return;
   const modal=$('modal');
   if(!modal||modal.classList.contains('off'))return;
   const screen=modal.dataset.screen;
+  // Native hit testing is authoritative when it reaches a real control.
+  // This also handles keyboard clicks and replacement button nodes.
+  const target=event.target?.closest?.('button');
+  if(target&&modal.contains(target)){
+   const action=rewardControlAction(target,screen);
+   if(action){
+    event.preventDefault();event.stopImmediatePropagation();
+    action();
+   }
+   return;
+  }
+  // Only use coordinates when a non-button layer actually intercepted a
+  // physical click. Never replace a valid button target with a rectangle guess.
+  if(!event.isTrusted||event.detail===0||
+     !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return;
   const selectors=(screen==='daily'||screen==='roulette')?
     ['#daily-back','#rewards-tab-daily','#rewards-tab-roulette','#daily-claim','#daily-spin','#daily-ad-spin']:
     screen==='menu'?['#screen-menu [data-reward-page="roulette"]','#screen-menu [data-reward-page="daily"]']:[];
   for(const selector of selectors){
    const button=modal.querySelector(selector);
-   if(!button||button.disabled||button.hidden||typeof button.onclick!=='function')continue;
+   const action=rewardControlAction(button,screen);
+   if(!action)continue;
    const rect=button.getBoundingClientRect();
    if(!rect.width||!rect.height||event.clientX<rect.left||event.clientX>=rect.right||
       event.clientY<rect.top||event.clientY>=rect.bottom)continue;
    const style=getComputedStyle(button);
    if(style.visibility==='hidden'||style.display==='none'||style.pointerEvents==='none')continue;
-   // One event => one navigation. Cancel its normal target path so a stale
-   // underlying layer never receives this click and the action cannot double.
    event.preventDefault();event.stopImmediatePropagation();
-   try{button.onclick.call(button,event);}
-   catch(error){console.error('Reward UI click failed:',selector,error);}
+   action();
    return;
   }
  },true);

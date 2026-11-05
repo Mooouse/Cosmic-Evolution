@@ -29,6 +29,16 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   // Daily tab, claim a gift, then move the pointer and wheel back and forth.
   await page.locator('#rewards-tab-daily').click({timeout:10000});
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='daily',null,{timeout:12000});
+  // Wheel below the calendar BEFORE claiming as well as after it.
+  const beforeClaimBox=await page.locator('.daily-calendar').boundingBox();
+  for(let n=0;n<8;n++){
+   await page.mouse.move(beforeClaimBox.x+beforeClaimBox.width*.5,
+    Math.min(740,beforeClaimBox.y+beforeClaimBox.height+18));
+   await page.mouse.wheel(0,n%2?900:-900);
+  }
+  await page.locator('#rewards-tab-roulette').click();
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette');
+  await page.locator('#rewards-tab-daily').click();
   const claim=page.locator('#daily-claim');
   assert.equal(await claim.isEnabled(),true,'Fresh tester save has a daily gift');
   await claim.click({timeout:15000});
@@ -131,6 +141,50 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
     await page.locator('#screen-menu').waitFor({state:'visible',timeout:12000});
   }
   log('PASS: roulette reopens repeatedly from the main menu both DURING and AFTER the spin animation');
+
+
+  // Let a real spin FINISH while its view remains mounted, then traverse
+  // daily -> roulette -> menu -> roulette. Previously timers only expired
+  // after leaving the roulette, which missed the completed-spin path.
+  await page.evaluate(()=>document.getElementById('tester-unlock-spin').click());
+  await page.locator('#screen-menu [data-reward-page="roulette"]').click();
+  await page.locator('#daily-spin').click();
+  await page.locator('.daily-wheel.finished').waitFor({timeout:15000});
+  const spunSave=await page.evaluate(()=>JSON.parse(localStorage.getItem('cosmic-evolution-tester-save-v1')));
+  await page.locator('#rewards-tab-daily').click();
+  const lower=await page.locator('.daily-claim').boundingBox();
+  for(let n=0;n<12;n++){
+   await page.mouse.move(lower.x+lower.width*.5,Math.min(740,lower.y+lower.height+12));
+   await page.mouse.wheel(0,n%2?1100:-1100);
+  }
+  await page.locator('#rewards-tab-roulette').click();
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette');
+  await page.locator('#daily-back').click();
+  await page.locator('#screen-menu [data-reward-page="roulette"]').click();
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette');
+  const reopenedSave=await page.evaluate(()=>JSON.parse(localStorage.getItem('cosmic-evolution-tester-save-v1')));
+  assert.equal(reopenedSave.daily.spins,spunSave.daily.spins,'Reopening does not grant another spin');
+  assert.equal(reopenedSave.credits,spunSave.credits,'Reopening does not grant the prize twice');
+  log('PASS: finished spin -> daily -> lower-page wheel -> roulette -> menu -> roulette');
+
+  // Simulate button nodes reconstructed from markup: navigation lives on
+  // the ancestor, not in the discarded node's onclick property.
+  await page.locator('#rewards-tab-daily').click();
+  await page.evaluate(()=>{
+   const button=document.getElementById('rewards-tab-roulette');
+   button.replaceWith(button.cloneNode(true));
+  });
+  await page.locator('#rewards-tab-roulette').click();
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette');
+  await page.locator('#daily-back').click();
+  await page.evaluate(()=>{
+   const button=document.querySelector('#screen-menu [data-reward-page="roulette"]');
+   button.replaceWith(button.cloneNode(true));
+  });
+  await page.locator('#screen-menu [data-reward-page="roulette"]').click();
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette');
+  await page.locator('#daily-back').click();
+  log('PASS: tabs and menu navigation survive replacement of button nodes');
 
   log('PASS: Back from rewards opened in menu returns to menu');
 
