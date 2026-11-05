@@ -3,6 +3,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const catalog={window:{}};vm.runInNewContext(fs.readFileSync('music-tracks.js','utf8'),catalog);const tracks=catalog.window.SpaceMusicTracks;
 assert.equal(tracks.length,12);assert.equal(new Set(tracks.map(t=>t.title)).size,12);assert.ok(tracks.every(t=>t.id!==0&&t.title!=='First Light'));
 assert.equal(tracks[0].price,0,'starter song is always free');
+assert.deepEqual(tracks.slice(1,5).map(t=>t.price),[10000,75000,250000,1000000],
+ 'The first four premium tracks cost 10k to 1M stardust without affecting purchased track IDs');
 for(const [i,t] of tracks.entries()){assert.ok(fs.statSync(t.src).size>1000000);assert.ok(fs.statSync(t.cover).size>1000);assert.ok(t.duration>100);if(i>0)assert.ok(t.price>tracks[i-1].price);}
 const source=fs.readFileSync('game.js','utf8');const audio=[];let timer;
 class Audio {constructor(src){this.src=src;this.paused=true;audio.push(this)}play(){this.paused=false;return Promise.resolve()}pause(){this.paused=true}}
