@@ -61,6 +61,10 @@ const TA = [
  ['Космическая паутина','Сверхмасштаб','Нити гравитации соединяют всё сущее.','web','#bf9bff'],
  ['БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА','Бесконечность','Поглощай всё вокруг: горизонт событий продолжает расти.','blackhole','#ffb269']
 ].map((a,i)=>({name:a[0],epoch:a[1],desc:a[2],type:a[3],color:a[4],required:Math.round(180+100*Math.pow(i+1,1.47))}));
+// Twenty-seven transitions require at least ten minutes of active flight.
+const MIN_STAGE_SECONDS=600/(TA.length-1);
+// More simultaneous catches, with proportional rewards per consumed object.
+const BH_FEAST=2.5,BH_REWARD_SCALE=1/BH_FEAST;
 const upgrades = [
  {id:'gravity',name:'Гравитация',label:'Радиус притяжения',glyph:'◎',base:35,growth:1.26,max:80},
  {id:'speed',name:'Движение',label:'Скорость полёта',glyph:'➤',base:50,growth:1.29,max:60},
@@ -89,7 +93,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,stageElapsed:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -123,6 +127,7 @@ function normaliseMapPins(value){
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
 
+g.stageElapsed=Number.isFinite(g.stageElapsed)?clamp(g.stageElapsed,0,1e9):0;
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
@@ -398,7 +403,7 @@ function flightSpeed(){
  const power=upgradePower('speed');
  const ordinarySpeed=(230+Math.min(190,power*5.2))*(1+Math.log2(1+player.r/25)*.38);
  const cosmicSpeed=player.r>CHUNK*5?Math.min(1e290,Math.max(ordinarySpeed,140/physicsZoom())):ordinarySpeed;
- return tester.speed*cosmicSpeed*(g.endless?10*(1+power*.01):1+Math.max(0,power-60)*.01);
+ return tester.speed*cosmicSpeed*(g.endless?8.5*(1+power*.01):1+Math.max(0,power-60)*.01);
 }
 function uiIcon(name){
  const shapes={"map": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"m16 8-2.5 5.5L8 16l2.5-5.5Z\"/>", "gravity": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><ellipse cx=\"12\" cy=\"12\" rx=\"10\" ry=\"6\" transform=\"rotate(-35 12 12)\"/>", "speed": "<path d=\"m13 3-9 11h7l-1 7 10-12h-8Z\"/>", "harvest": "<path d=\"m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z\"/>", "shield": "<path d=\"m12 3 8 3v6c0 4-5 7-8 9-3-2-8-5-8-9V6Z\"/><path d=\"m8 12 3 3 5-6\"/>", "music": "<path d=\"M9 18V5l11-2v13M9 9l11-2\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/><ellipse cx=\"17\" cy=\"16\" rx=\"3\" ry=\"2\"/>", "playlist": "<rect x=\"3\" y=\"4\" width=\"14\" height=\"15\" rx=\"2\"/><path d=\"M7 8h6M7 12h6M7 16h4M20 8v10\"/><circle cx=\"18\" cy=\"18\" r=\"2\"/>", "mute": "<path d=\"M9 18v-5m0-6V5l11-2v13M13 8l7-1M3 3l18 18\"/><ellipse cx=\"6\" cy=\"18\" rx=\"3\" ry=\"2\"/>", "pause": "<path d=\"M8 5v14M16 5v14\" stroke-width=\"3\"/>", "settings": "<path d=\"M4 7h16M4 17h16\"/><circle cx=\"9\" cy=\"7\" r=\"3\" fill=\"#0b2031\"/><circle cx=\"16\" cy=\"17\" r=\"3\" fill=\"#0b2031\"/>", "tester": "<path d=\"m8 4-5 8 5 8M16 4l5 8-5 8M14 4l-4 16\"/>", "arrow": "<path d=\"M4 12h16m-6-6 6 6-6 6\"/>", "close": "<path d=\"m6 6 12 12M6 18 18 6\"/>", "chevron": "<path d=\"m14 6-6 6 6 6\"/>", "expand": "<path d=\"M7 17 18 6M7 6h11v11\"/>", "plus": "<path d=\"M12 5v14M5 12h14\"/>", "minus": "<path d=\"M5 12h14\"/>", "center": "<circle cx=\"12\" cy=\"12\" r=\"6\"/><path d=\"M12 2v5m0 10v5M2 12h5m10 0h5\"/>", "achievements": "<path d=\"M8 3h8v5a4 4 0 0 1-8 0ZM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 12v6m-4 3h8m-6-3h4\"/>", "statistics": "<path d=\"M4 20V4m0 16h17M9 16v-5m5 5V7m5 9V3\"/>", "upgrades": "<path d=\"M5 19v-6m7 6V5m7 14v-9M2 13h6m1-8h6m1 5h6\"/>"};
@@ -881,7 +886,7 @@ function harvestCosmicLOD(dt){
  cosmicHarvestTimer+=dt;
  if(cosmicHarvestTimer<.075)return;
  cosmicHarvestTimer=0;
- if(cosmicAbsorptions.length>=160)return;
+ if(cosmicAbsorptions.length>=240)return;
  const core=g.endless?blackHoleCoreWorldRadius():player.r,gravity=g.endless?blackHoleGravityRadius():ordinaryGravityRadius(),view=cosmicVisibleLOD();
  const contacts=[];
  // Select exactly the rendered LOD levels; only force/range use physicsZoom.
@@ -911,9 +916,9 @@ function harvestCosmicLOD(dt){
  // Old row-major budget repeatedly ate distant cells while nearby galaxies
  // appeared immune. Closest-first prevents this at supermassive scales.
  contacts.sort((a,b)=>a.d2-b.d2);
- let budget=Math.min(60,Math.max(18,Math.round(18+Math.log2(1+core/MACRO_SIZE)*1.8)));
+ let budget=Math.min(125,Math.max(45,Math.round(45+Math.log2(1+core/MACRO_SIZE)*4.5)));
  for(const {e,bag,key,opacity} of contacts){
-  if(budget<=0||cosmicAbsorptions.length>=160)break;
+  if(budget<=0||cosmicAbsorptions.length>=240)break;
   if((bag[key]||0)&(1<<e.index)||absorbingMacroKeys.has(absorptionKey(e)))continue;
   if(opacity<.025)continue;
   // Attraction does not deplete a sector; wait until the whole body is inside.
@@ -923,8 +928,8 @@ function harvestCosmicLOD(dt){
  }
 }
 function promoteAbyssMatter(){
- if(!g.endless||!abyssPhysical.length||cosmicAbsorptions.length>=160)return;
- const view=cosmicVisibleLOD();let budget=24;
+ if(!g.endless||!abyssPhysical.length||cosmicAbsorptions.length>=240)return;
+ const view=cosmicVisibleLOD();let budget=42;
  for(const level of view.levels){
   const opacity=level===view.low?1-view.fraction:view.fraction;if(opacity<.025)continue;
   const stride=2**level,firstX=Math.floor(view.left/stride)*stride,firstY=Math.floor(view.top/stride)*stride;
@@ -934,7 +939,7 @@ function promoteAbyssMatter(){
    if(level===0&&macroLoaded.has(key))continue;
    const bag=level===0?g.depletedMacro:g.depletedCosmic,mask=(bag[key]||0)>>>0;
    for(const e of (level===0?macroNodes(gx,gy):macroLODNodes(gx,gy,level))){
-    if(budget<=0||cosmicAbsorptions.length>=160)return;
+    if(budget<=0||cosmicAbsorptions.length>=240)return;
     if((mask&(1<<e.index))||absorbingMacroKeys.has(absorptionKey(e)))continue;
     if(!abyssPhysical.some(h=>Math.hypot(e.x-h.x,e.y-h.y)<h.r*5))continue;
     const body={...e,cosmic:true,gravityBound:true,rivalBound:true,vx:0,vy:0,captureBag:bag,captureKey:key,captureOpacity:opacity};
@@ -952,7 +957,7 @@ function finishCosmicAbsorption(e){
  if(mask&(1<<e.index)){e.dead=true;delete g.freeFlights[flightKey(e)];return;}
  bag[key]=(mask|(1<<e.index))>>>0;
  const value=blackHoleBodyValue(e);
- const amount=value*(1+upgradePower('harvest')*.075)*tester.loot*.1;
+ const amount=value*(1+upgradePower('harvest')*.075)*tester.loot*.1*BH_REWARD_SCALE;
  g.matter=Math.min(1e290,g.matter+amount);g.total=Math.min(1e290,g.total+amount);
  g.stageCollects=Math.min(1e290,g.stageCollects+amount);
  g.credits=Math.min(1e290,g.credits+amount*.4);g.collects++;
@@ -1394,9 +1399,9 @@ function campaignBodyValue(e){
  const ratio=clamp(e.r/Math.max(1,player.r),0,.95);
  return TA[g.tier].required*CAMPAIGN_YIELD[g.tier]*ratio*ratio;
 }
-function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const boost=(1+upgradePower('harvest')*.075)*tester.loot;const val=g.endless?Math.max(1,Math.round(blackHoleBodyValue(e)*boost))*.1:campaignBodyValue(e)*boost;g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
+function absorb(e){advanceHarvestChain();const mat=resourceOf(e);const boost=(1+upgradePower('harvest')*.075)*tester.loot;const val=g.endless?Math.max(1,Math.round(blackHoleBodyValue(e)*boost))*.1*BH_REWARD_SCALE:campaignBodyValue(e)*boost;g.matter=Math.min(1e290,g.matter+val);g.total=Math.min(1e290,g.total+val);g.stageCollects=Math.min(1e290,g.stageCollects+val);g.collects++;if(g.endless)g.endlessGrowth=(g.endlessGrowth||0)+Math.log1p(val)*.0004;
  const gain=mat==='exotic'?3:mat==='plasma'?2:mat==='gas'?2:mat==='crystal'?2:1;
- g.materials[mat]=(g.materials[mat]||0)+gain*(g.endless?.1:1);
+ g.materials[mat]=(g.materials[mat]||0)+gain*(g.endless?.1*BH_REWARD_SCALE:1);
  if(!g.endless&&(mat==='plasma'||mat==='exotic')&&player.r<CHUNK*4)burst(e.x,e.y,9,MATERIALS[mat].color,.7);
  let credits=val*(e.kind==='relic'?1.7:.75);g.credits+=credits;if(e.kind==='relic'){g.materials.exotic=(g.materials.exotic||0)+.1;g.stageRare++;g.rare++;if(!g.endless&&player.r<CHUNK*4)burst(e.x,e.y,22,'#f9d797',.9);pickupFeedback(val,true);}else if(!g.endless&&player.r<CHUNK*4&&Math.random()<.24){burst(e.x,e.y,4,MATERIALS[mat].color,.35);}
  // The current physical size reacts to each collected object, not just to a stage transition.
@@ -1429,9 +1434,10 @@ function collideWithGiant(e,dx,dy,dist){
 function impact(e){if(g.tier===TA.length-1){e.kind='matter';e.material='plasma';e.value=Math.max(15,e.value||0);absorb(e);return;}if(player.shield>0){respawn(e);return;}const reduction=(1-Math.min(g.upgrade.shield,45)*.018)/(1+Math.max(0,upgradePower('shield')-45)*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
 function evolve(){
  if(g.complete)return;
+ if(g.tier<TA.length-1&&(g.stageElapsed||0)<MIN_STAGE_SECONDS)return;
  if(g.tier===TA.length-1){g.complete=true;g.endless=true;save();return;}
  const before=g.tier;
- spendRecipe();g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ spendRecipe();g.tier++;g.unlocks++;g.stageElapsed=0;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  if(g.tier===TA.length-1){g.complete=true;g.endless=true;}
  // Never alter world coordinates, velocity, camera center or nearby sectors on evolution.
  morph={from:before,time:0,duration:2.1};screenFlash=.9;
@@ -1486,7 +1492,7 @@ function gatherBody(e,dt){
 }
 function update(dt){
  harvestChainTime=Math.max(0,harvestChainTime-dt);if(harvestChainTime===0)harvestChain=0;
- g.time+=dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
+ g.time+=dt;if(!g.endless)g.stageElapsed=(g.stageElapsed||0)+dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
  let ax=0,ay=0;
  if(keys.has('w')||keys.has('arrowup'))ay-=1;if(keys.has('s')||keys.has('arrowdown'))ay+=1;
  if(keys.has('a')||keys.has('arrowleft'))ax-=1;if(keys.has('d')||keys.has('arrowright'))ax+=1;
@@ -1518,7 +1524,7 @@ function update(dt){
  // Fixed collection rate, independent of render FPS or the number of bodies
  // touched by the enormous horizon. This prevents a thousand simultaneous
  // harvests and the audible/visual 'batch' stutter every streaming tick.
- absorptionTokens=giantMode?Math.min(12,absorptionTokens+dt*clamp(60+Math.log10(Math.max(1,player.r/CHUNK))*12,60,130)):0;
+ absorptionTokens=giantMode?Math.min(30,absorptionTokens+dt*clamp(150+Math.log10(Math.max(1,player.r/CHUNK))*30,150,325)):0;
  const captureRadius=giantMode?blackHoleCoreWorldRadius():collectR;
  const nearReach=giantMode?captureRadius+MACRO_SIZE:gravRange;
  const nearReachSq=nearReach*nearReach;
@@ -1569,7 +1575,7 @@ function update(dt){
  const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-155),1e-10,1e10);
  camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
  camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
- uiTimer+=dt;if(uiTimer>.3){uiTimer=0;renderUI();checkProgression();}
+ uiTimer+=dt;if(uiTimer>.3){uiTimer=0;if(!g.endless&&g.matter>=TA[g.tier].required&&missionsDone()&&g.stageElapsed>=MIN_STAGE_SECONDS)evolve();renderUI();checkProgression();}
  if(saveTimer>12){saveTimer=0;save();}
 }
 function project(x,y){return {x:(x-camera.x)*camera.zoom+W/2,y:(y-camera.y)*camera.zoom+H/2};}
@@ -2067,7 +2073,6 @@ function paintPlayerForm(x,y,r,time,tier=g.tier){
  if(tier<=6){
   if(tier===0){for(let i=0;i<6;i++){let a=i*TAU/6+time*.22;glowDot(x+Math.cos(a)*r*(.7+i*.12),y+Math.sin(a)*r*(.7+i*.12),Math.max(1,r*.07),t.color,.4);}glowDot(x,y,r*.45,'#d6f9ff',1.3);}
   else paintRock(x,y,r,t.color,phase,1+Math.min(7,tier));
-  if(tier===1||tier===2){ctx.fillStyle='#d8f5ff';ctx.beginPath();ctx.moveTo(x-r*1.15,y);ctx.lineTo(x-r*.22,y-r*.26);ctx.lineTo(x-r*.22,y+r*.26);ctx.fill();}
   if(tier===3||tier===4){for(let i=0;i<tier;i++){let a=i*2.4;glowDot(x+Math.cos(a)*r*.48,y+Math.sin(a)*r*.48,Math.max(1,r*.045),'#edc49b',.3);}}
   if(tier>=5){ctx.strokeStyle=cssColor(t.color,.5);ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r*1.18,-.6,2.9);ctx.stroke();}
   if(tier===6){glowDot(x,y,r*.24,'#ddf8ff',.6);}
@@ -2111,7 +2116,7 @@ function paintEvolutionDetails(x,y,r,time,tier){
  function spark(a,rr,size,col){const px=Math.cos(a)*rr,py=Math.sin(a)*rr;strokePath([[px-Math.cos(a)*size,py-Math.sin(a)*size],[px+Math.cos(a)*size,py+Math.sin(a)*size]],col,Math.max(.7,size*.26));}
  switch(tier){
   case 0: for(let i=0;i<5;i++)moon(rot*.9+i*TAU/5,r*(1.1+i*.12),r*.07,'#b1f4ff');break;
-  case 1: strokePath([[-r*2.2,r*.5],[-r*1.45,r*.2],[-r*.72,0]],'#8ce9ff',r*.19);spark(-1.2,r*1.05,r*.25,'#effaff');break;
+  case 1: for(let i=0;i<3;i++){const a=.9+i*2.14;dot(Math.cos(a)*r*.44,Math.sin(a)*r*.43,r*.09,'#a0c1db');}break;
   case 2: for(let i=0;i<4;i++)moon(rot+i*TAU/4,r*1.18,r*.13,i%2?'#b5c8df':'#8995b4');break;
   case 3: for(let i=0;i<11;i++){let a=i*2.399,rr=r*(.18+.53*(i%4)/4);dot(Math.cos(a)*rr,Math.sin(a)*rr,r*.05,i%3?'#e5d5ba':'#524d63');}break;
   case 4: for(let i=0;i<3;i++){dot(Math.cos(i*2.3)*r*.4,Math.sin(i*2.3)*r*.4,r*.16,'#5b6477');dot(Math.cos(i*2.3)*r*.4-r*.025,Math.sin(i*2.3)*r*.4-r*.03,r*.09,'#9eaab9');}break;
@@ -2197,11 +2202,11 @@ function renderPlayer(time){
  const t=TA[g.tier],p=project(player.x,player.y),r=player.r*camera.zoom;ctx.save();
  for(const tr of (g.endless?[]:player.trail)){let q=project(tr.x,tr.y),alpha=tr.life/.55;ctx.fillStyle=cssColor(t.color,alpha*.1);ctx.beginPath();ctx.arc(q.x,q.y,Math.min(Math.max(W,H)*3,tr.r*camera.zoom*(.45+alpha*.3)),0,TAU);ctx.fill();}
  // Gravity field ring and orbiting shards.
- let range=Math.min(ordinaryGravityRadius()*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);if(!g.endless){ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);}
+ let range=Math.min(ordinaryGravityRadius()*camera.zoom,Math.max(W,H)*3);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(player.rotation*.18);if(!g.endless&&g.tier>=7){ctx.strokeStyle=cssColor(t.color,.11);ctx.lineWidth=1.2;ctx.setLineDash([3,9]);ctx.beginPath();ctx.arc(0,0,range,0,TAU);ctx.stroke();ctx.setLineDash([]);}
  let count=g.endless?0:Math.min(18,3+Math.floor(g.tier/2));for(let i=0;i<count;i++){let a=player.rotation*(i%2?1:-1)*(0.65+(i%4)*.08)+i*TAU/count,R=r*(1.8+(i%3)*.24),xx=Math.cos(a)*R,yy=Math.sin(a)*R*.65;ctx.fillStyle=i%3?'#96baf8':'#ffdcaa';ctx.beginPath();ctx.arc(xx,yy,i%5===0?2.6:1.5,0,TAU);ctx.fill();}ctx.restore();
  if(morph&&!g.endless){let f=clamp(morph.time/morph.duration,0,1);ctx.save();ctx.globalAlpha=(1-f)*.94;paintPlayerForm(p.x,p.y,r*(1.12-f*.12),time,morph.from);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,f*1.65);paintPlayerForm(p.x,p.y,r*(.52+f*.48),time);ctx.restore();}else paintPlayerForm(p.x,p.y,r,time);
  // Swirling energy currents and magnetic filaments.
- if(g.particles&&!g.endless){ctx.save();ctx.globalAlpha=.18+.10*Math.sin(time*1.5);ctx.strokeStyle=t.color;ctx.lineWidth=1.2;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(p.x,p.y,r*(1.7+i*.27),time*.55+i*1.9,time*.55+i*1.9+1.65);ctx.stroke();}ctx.restore();}
+ if(g.particles&&!g.endless&&g.tier>=7){ctx.save();ctx.globalAlpha=.18+.10*Math.sin(time*1.5);ctx.strokeStyle=t.color;ctx.lineWidth=1.2;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(p.x,p.y,r*(1.7+i*.27),time*.55+i*1.9,time*.55+i*1.9+1.65);ctx.stroke();}ctx.restore();}
  if(player.shield>0&&!g.endless){ctx.strokeStyle=`rgba(132,236,255,${.2+.35*Math.sin(time*16)**2})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,r*1.35,0,TAU);ctx.stroke();}
  if(boostTime>0&&!g.endless){ctx.strokeStyle='rgba(187,143,255,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,r*1.55+Math.sin(time*12)*3,0,TAU);ctx.stroke();}
  ctx.restore();}
@@ -2393,6 +2398,7 @@ function checkProgression(){
  for(const a of ACHIEVEMENTS)if(!g.achievements[a[0]]&&achievementProgress(a)>=100){g.achievements[a[0]]=true;achievementQueue.push(a);save();}
  if(achievementQueue.length&&g.time-achievementToastAt>4.5){achievementToastAt=g.time;celebrateAchievement(achievementQueue.shift());}
  if(g.endless||g.matter<TA[g.tier].required){requirementNotice='';return;}
+ if(g.stageElapsed<MIN_STAGE_SECONDS){requirementNotice='';return;}
  const missing=stageRecipe().filter(r=>(g.materials[r.type]||0)<r.amount);
  const explore=Math.max(0,missionReq().explore-g.stageExplored),collect=Math.max(0,missionReq().collect-g.stageCollects);
  const key=g.tier+':'+missing.map(r=>r.type).join(',')+':'+(explore>0)+':'+(collect>0);
@@ -2911,7 +2917,7 @@ function testerToggle(force){
 function testerSetTier(tier){
  const next=clamp(Math.round(tier),0,TA.length-1),from=g.tier;
  if(next===from)return;
- g.tier=next;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ g.tier=next;g.stageElapsed=0;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  morph={from,time:0,duration:1.5};player.targetR=currentRadius();
  player.r=player.targetR;screenFlash=.5;
  // Test jumps must not finish a previous form's in-flight digestion with the
