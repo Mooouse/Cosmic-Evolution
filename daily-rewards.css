@@ -64,6 +64,8 @@ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]){
 body.ui-v15 #modal[data-daily-origin="menu"]:is([data-screen="daily"],[data-screen="roulette"]){
   background:linear-gradient(100deg,#080414cf,#0a0614c8 65%,#0e0617a8);
 }
+body.ui-v15 #modal[data-screen="daily"] .modal-card:has(.daily-screen),
+body.ui-v15 #modal[data-screen="roulette"] .modal-card:has(.daily-screen),
 body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .modal-card,
 body.ui-v15 #modal[data-screen="daily"] .modal-card,
 body.ui-v15 #modal[data-screen="roulette"] .modal-card{
@@ -397,6 +399,8 @@ body.ui-v15 #modal[data-screen="roulette"] .daily-spin:disabled{
 }
 @media(max-width:640px){
   body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]){padding:7px!important}
+  body.ui-v15 #modal[data-screen="daily"] .modal-card:has(.daily-screen),
+  body.ui-v15 #modal[data-screen="roulette"] .modal-card:has(.daily-screen),
   body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .modal-card,
   body.ui-v15 #modal[data-screen="daily"] .modal-card,
   body.ui-v15 #modal[data-screen="roulette"] .modal-card{
