@@ -2659,7 +2659,7 @@ let testerPrizeOverride=null;
 function dailyReturn(){
  const from=dailyOrigin;
  dailyOrigin='menu';
- if(from==='play')resumeGame();else showMainMenu(true);
+ if(from==='play'){resumeGame();renderUI(true);}else showMainMenu(true);
 }
 function rewardsShell(screen,title,subtitle,body){
  const tabs='<nav class="rewards-tabs" aria-label="'+L('Reward screens','Страницы наград','Pantallas de premios')+'">'+
@@ -2727,55 +2727,89 @@ function showDailyRewards(origin){
 // The wheel is built from the REAL prize weights; the visible wedge size and
 // the pointer landing angle agree with the random selection logic.
 const ROULETTE_GALAXY_COLORS=['#ee4e6d','#ffa439','#f7d44a','#41d184','#31bddb','#438ef4','#e969c4','#ffe4a0'];
+// Uses the same layered star-association design as makeSkyDepthTexture:
+// thousands of pinpoints across the game, with colorful clustered galaxies
+// and deep black gaps. Each weighted prize slice is its own clipped starfield.
 function rouletteWheelArtwork(prizes){
- const cx=180,cy=180,r=156;
+ const cx=180,cy=180,r=156,TAU2=Math.PI*2;
+ let seed=0x72b4a31;
+ const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ const gauss=()=>Math.sqrt(-2*Math.log(Math.max(1e-7,rand())))*Math.cos(TAU2*rand());
+ const polar=(deg,dist)=>({x:cx+Math.sin(deg*Math.PI/180)*dist,y:cy-Math.cos(deg*Math.PI/180)*dist});
+ const num=x=>x.toFixed(2);
  let angle=0;
- const defs=ROULETTE_GALAXY_COLORS.map((color,i)=>
-  '<linearGradient id="cosmic-prize-'+i+'" x1="0%" y1="0%" x2="100%" y2="100%">'+
-  '<stop offset="0%" stop-color="'+color+'"/><stop offset="55%" stop-color="'+color+'"/>'+
-  '<stop offset="100%" stop-color="#130c2a" stop-opacity=".94"/></linearGradient>').join('');
- const polar=(deg,rad)=>({x:cx+Math.sin(deg*Math.PI/180)*rad,y:cy-Math.cos(deg*Math.PI/180)*rad});
- const arcs=prizes.map((prize,i)=>{
+ const defs=[],sectors=[];
+ prizes.forEach((prize,i)=>{
   const start=angle;angle+=prize.weight*3.6;
-  const end=angle,a=polar(start,r),b=polar(end,r);
-  const d='M '+cx+' '+cy+' L '+a.x.toFixed(3)+' '+a.y.toFixed(3)+' A '+r+' '+r+' 0 '+(end-start>180?1:0)+' 1 '+b.x.toFixed(3)+' '+b.y.toFixed(3)+' Z';
-  const count=Math.max(1,Math.min(6,Math.floor(prize.weight/5)));
-  const stars=Array.from({length:count},(_,k)=>{
-   const deg=start+(k+1)*(end-start)/(count+1),rad=82+((k*37+i*17)%57),p=polar(deg,rad);
-   const sz=k%3===0?2.5:1.25;
-   return '<circle cx="'+p.x.toFixed(2)+'" cy="'+p.y.toFixed(2)+'" r="'+sz+'" fill="#ffffff" opacity="'+(k%2===0?'.85':'.48')+'"/>';
+  const end=angle,mid=(start+end)*.5;
+  const a=polar(start,r),b=polar(end,r);
+  const path='M'+cx+' '+cy+' L'+num(a.x)+' '+num(a.y)+' A'+r+' '+r+
+   ' 0 '+(end-start>180?1:0)+' 1 '+num(b.x)+' '+num(b.y)+' Z';
+  const color=ROULETTE_GALAXY_COLORS[i],secondary=ROULETTE_GALAXY_COLORS[(i+3)%ROULETTE_GALAXY_COLORS.length];
+  defs.push('<clipPath id="wheel-clip-'+i+'"><path d="'+path+'"/></clipPath>'+
+   '<radialGradient id="wheel-nebula-'+i+'">'+
+   '<stop offset="0%" stop-color="'+color+'" stop-opacity=".80"/>'+
+   '<stop offset="32%" stop-color="'+color+'" stop-opacity=".42"/>'+
+   '<stop offset="70%" stop-color="'+secondary+'" stop-opacity=".14"/>'+
+   '<stop offset="100%" stop-color="'+color+'" stop-opacity="0"/></radialGradient>');
+  const knots=Array.from({length:4},(_,k)=>({
+   angle:start+(end-start)*(.10+.78*(k+.5)/4),
+   radius:83+rand()*49
+  }));
+  const haze=knots.map((k,j)=>{
+   const p=polar(k.angle,k.radius),size=prize.weight>15?73:prize.weight>6?52:31;
+   return '<ellipse cx="'+num(p.x)+'" cy="'+num(p.y)+'" rx="'+size+'" ry="'+num(size*.33)+
+    '" transform="rotate('+num(k.angle-50+j*17)+' '+num(p.x)+' '+num(p.y)+
+    ')" fill="url(#wheel-nebula-'+i+')" opacity=".85"/>';
   }).join('');
-  const label=prize.id==='track'?'♫':'×'+prize.mult,showLabel=prize.weight>=8;
-  const p=polar((start+end)/2,prize.weight<13?118:110);
-  return '<path d="'+d+'" fill="url(#cosmic-prize-'+i+')" stroke="#140b26" stroke-width="3.5"/>'+
-   '<path d="'+d+'" fill="none" stroke="'+ROULETTE_GALAXY_COLORS[i]+'" stroke-opacity=".5" stroke-width="1.2"/>'+stars+
-   (showLabel?'<text x="'+p.x.toFixed(2)+'" y="'+p.y.toFixed(2)+'" text-anchor="middle" dominant-baseline="middle"'+
-    ' fill="'+(i===2?'#2a1934':'#fff6ff')+'" font-family="system-ui" font-size="'+(prize.weight<13?23:25)+
-    '" font-weight="950" paint-order="stroke" stroke="#150b26" stroke-width=".85">'+label+'</text>':'');
+  let stars='';
+  const count=Math.max(18,Math.round(16+prize.weight*11));
+  for(let k=0;k<count;k++){
+   const group=knots[Math.floor(rand()*knots.length)];
+   const spread=Math.max(.6,(end-start)*.1);
+   const deg=rand()<.94?Math.min(end-.08,Math.max(start+.08,group.angle+gauss()*spread)):start+rand()*(end-start);
+   const distance=Math.min(153,Math.max(67,group.radius+gauss()*22));
+   const p=polar(deg,distance),field=rand()<.12,bright=rand()<.14;
+   const colorStar=field?'#fafcff':rand()<.6?color:rand()<.68?secondary:'#ffffff';
+   const size=bright?(.87+rand()*.54):(.33+rand()*.43);
+   stars+='<circle cx="'+num(p.x)+'" cy="'+num(p.y)+'" r="'+num(size)+
+    '" fill="'+colorStar+'" opacity="'+(bright?'.99':num(.61+rand()*.38))+'"/>';
+   if(bright&&rand()<.12)stars+='<path d="M'+num(p.x-2.4)+' '+num(p.y)+'h4.8 M'+num(p.x)+
+    ' '+num(p.y-2.4)+'v4.8" stroke="#ffffff" stroke-width=".55" opacity=".7"/>';
+  }
+  // Prize lettering remains visible, while the sector itself stays starry.
+  const label=prize.id==='track'?'♫':'×'+prize.mult;
+  const showLabel=prize.weight>=8,lp=polar(mid,prize.weight<13?118:110);
+  sectors.push('<path d="'+path+'" fill="#060b1c" stroke="#281534" stroke-width="2"/>'+
+   '<g clip-path="url(#wheel-clip-'+i+')">'+haze+stars+'</g>'+
+   '<path d="'+path+'" fill="none" stroke="'+color+'" stroke-opacity=".8" stroke-width="2"/>'+
+   (showLabel?'<text x="'+num(lp.x)+'" y="'+num(lp.y)+
+    '" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="system-ui"'+
+    ' font-size="'+(prize.weight<13?22:25)+'" font-weight="950" paint-order="stroke"'+
+    ' stroke="#050611" stroke-width="3">'+label+'</text>':''));
+ });
+ const rim=Array.from({length:48},(_,i)=>{
+  const angle=i*TAU2/48,x1=180+Math.sin(angle)*160,y1=180-Math.cos(angle)*160;
+  const x2=180+Math.sin(angle)*(i%6===0?170:165),y2=180-Math.cos(angle)*(i%6===0?170:165);
+  return '<path d="M'+num(x1)+' '+num(y1)+' L'+num(x2)+' '+num(y2)+'" stroke="'+
+   (i%6===0?'#f5d7ff':'#9476bb')+'" stroke-width="'+(i%6===0?3:1.3)+'"/>';
  }).join('');
- const perimeter=Array.from({length:48},(_,i)=>{
-  const rad=i*Math.PI/24,x1=180+Math.sin(rad)*160,y1=180-Math.cos(rad)*160;
-  const x2=180+Math.sin(rad)*(i%6===0?170:165),y2=180-Math.cos(rad)*(i%6===0?170:165);
-  return '<path d="M '+x1.toFixed(2)+' '+y1.toFixed(2)+' L '+x2.toFixed(2)+' '+y2.toFixed(2)+
-    '" stroke="'+(i%6===0?'#ffeac0':'#a688d8')+'" stroke-width="'+(i%6===0?3:1.3)+'"/>';
- }).join('');
+ // Regular 8-point star: all 8 rays exactly identical, no wordmark.
+ const starPath=Array.from({length:16},(_,i)=>{
+  const rad=-Math.PI/2+i*Math.PI/8,dist=i%2===0?32:12;
+  const x=180+Math.cos(rad)*dist,y=180+Math.sin(rad)*dist;
+  return (i===0?'M':'L')+num(x)+' '+num(y);
+ }).join(' ')+' Z';
  return '<svg viewBox="0 0 360 360" class="roulette-disc-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
-  '<defs>'+defs+
-  '<radialGradient id="cosmic-wheel-lens" cx="36%" cy="23%" r="78%">'+
-  '<stop offset="0%" stop-color="#ffffff" stop-opacity=".25"/>'+
-  '<stop offset="58%" stop-color="#ffffff" stop-opacity="0"/>'+
-  '<stop offset="100%" stop-color="#050512" stop-opacity=".3"/></radialGradient>'+
-  '<radialGradient id="cosmic-wheel-hub"><stop offset="0%" stop-color="#6140a4"/><stop offset="75%" stop-color="#271642"/>'+
-  '<stop offset="100%" stop-color="#130d27"/></radialGradient></defs>'+
-  '<circle cx="180" cy="180" r="177" fill="#201336" stroke="#8c72bd" stroke-width="4"/>'+
-  '<circle cx="180" cy="180" r="171" fill="#100b21" stroke="#c7aaf8" stroke-opacity=".8" stroke-width="2"/>'+
-  arcs+'<circle cx="180" cy="180" r="'+r+'" fill="url(#cosmic-wheel-lens)"/>'+
-  '<circle cx="180" cy="180" r="158" fill="none" stroke="#efd8ff" stroke-width="3"/>'+
-  perimeter+
-  '<circle cx="180" cy="180" r="63" fill="#160e2b" stroke="#c4a5ee" stroke-width="6"/>'+
-  '<circle cx="180" cy="180" r="53" fill="url(#cosmic-wheel-hub)" stroke="#7453ab" stroke-width="2"/>'+
-  '<path d="M180 146l7 22 22 12-22 7-7 22-8-22-21-7 21-12z" fill="#fff4d3" opacity=".9"/>'+
-  '<text x="180" y="216" text-anchor="middle" fill="#e3d4fa" font-family="system-ui" font-size="10" font-weight="900" letter-spacing="2">INFINITI</text>'+
+  '<defs>'+defs.join('')+
+  '<radialGradient id="wheel-hub"><stop offset="0%" stop-color="#4c3296"/>'+
+  '<stop offset="75%" stop-color="#21143e"/><stop offset="100%" stop-color="#0e0c22"/></radialGradient>'+
+  '</defs><circle cx="180" cy="180" r="177" fill="#18122c" stroke="#937ac8" stroke-width="4"/>'+
+  '<circle cx="180" cy="180" r="171" fill="#060a1b" stroke="#ad90d8" stroke-width="2"/>'+
+  sectors.join('')+'<circle cx="180" cy="180" r="158" fill="none" stroke="#e7d9ff" stroke-width="3"/>'+
+  rim+'<circle cx="180" cy="180" r="63" fill="#100d25" stroke="#bfa3eb" stroke-width="6"/>'+
+  '<circle cx="180" cy="180" r="53" fill="url(#wheel-hub)" stroke="#7150a7" stroke-width="2"/>'+
+  '<path d="'+starPath+'" fill="#fff1bf" stroke="#f9d897" stroke-width="1.4"/>'+
   '</svg>';
 }
 function showCosmicRoulette(origin){
@@ -3573,6 +3607,9 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   ({menu:showMainMenu,play:resumeGame,map:showMap,settings:showSettings,evolution:showV15Evolution,achievements:showAchievements,bestiary:showBestiary,statistics:showStatistics,music:showMusicShop,tutorial:showTutorial}[name]||resumeGame)();
  }
  function navigateBack(){
+  // Rewards are not in the ordinary navigation stack. Use their explicit
+  // opening origin, otherwise Escape can jump to the menu during gameplay.
+  if(['daily','roulette'].includes($('modal').dataset.screen)){dailyReturn();return;}
   const destination=navigationStack.pop()||'menu';
   restoringScreen=true;
   try{navigate(destination);}finally{restoringScreen=false;}
