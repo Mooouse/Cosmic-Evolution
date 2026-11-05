@@ -2666,6 +2666,34 @@ function dailyReturn(){
  if(from==='play'){resumeGame();renderUI(true);}
  else showMainMenu(g.time>0);
 }
+// Fit every reward control into the visible panel: no inner scrollbars.
+function fitRewardsContent(){
+ const modal=$('modal');
+ if(!['daily','roulette'].includes(modal.dataset.screen))return;
+ const area=modal.querySelector('.rewards-page-content'),fit=area?.querySelector('.rewards-fit-body');
+ if(!area||!fit)return;
+ fit.style.transform='none';
+ fit.style.width='100%';
+ fit.style.marginLeft='0';
+ const height=area.clientHeight,width=area.clientWidth;
+ if(height<60||width<100)return;
+ const required=fit.scrollHeight;
+ const scale=Math.min(1,height/Math.max(height,required));
+ if(scale<.999){
+  fit.style.width=(100/scale).toFixed(3)+'%';
+  fit.style.marginLeft=((100-100/scale)/2).toFixed(3)+'%';
+  fit.style.transform='scale('+scale.toFixed(5)+')';
+ }
+ fit.dataset.fitScale=scale.toFixed(3);
+}
+window.addEventListener?.('resize',()=>{
+ const screen=$('modal').dataset.screen;
+ if(screen!=='daily'&&screen!=='roulette')return;
+ requestAnimationFrame(()=>{
+  fitRewardsContent();
+  if(screen==='daily')paintDailyGalaxySky();
+ });
+});
 function rewardsShell(screen,title,subtitle,body){
  const tabs='<nav class="rewards-tabs" aria-label="'+L('Reward screens','Страницы наград','Pantallas de premios')+'">'+
   '<button type="button" id="rewards-tab-daily" class="'+(screen==='daily'?'selected':'')+'" aria-current="'+(screen==='daily'?'page':'false')+'">✦ '+L('Daily gifts','Ежедневные награды','Regalos diarios')+'</button>'+
@@ -2674,7 +2702,7 @@ function rewardsShell(screen,title,subtitle,body){
   '<header class="rewards-header"><div><div class="daily-eyebrow">INFINITI SPACE / '+L('REWARDS','НАГРАДЫ','RECOMPENSAS')+'</div>'+
   '<h2>'+title+'</h2><p>'+subtitle+'</p></div>'+
   '<button type="button" id="daily-back" class="daily-back">'+L('← BACK','← НАЗАД','← VOLVER')+'</button></header>'+
-  tabs+'<main class="rewards-page-content">'+body+'</main></div>');
+  tabs+'<main class="rewards-page-content"><div class="rewards-fit-body">'+body+'</div></main></div>');
  $('modal').dataset.screen=screen;
  $('modal').dataset.dailyOrigin=dailyOrigin;
  // Main-menu shortcuts keep the animated black hole and comets, not the live game.
@@ -2684,6 +2712,8 @@ function rewardsShell(screen,title,subtitle,body){
  $('daily-back').onclick=dailyReturn;
  $('rewards-tab-daily').onclick=()=>{if(screen!=='daily')showDailyRewards(dailyOrigin);};
  $('rewards-tab-roulette').onclick=()=>{if(screen!=='roulette')showCosmicRoulette(dailyOrigin);};
+ fitRewardsContent();
+ requestAnimationFrame(fitRewardsContent);
 }
 // Same sky recipe as gameplay: dense, pixel-aligned stars organized into
 // curved, multicolored stellar associations and soft nebula knots.
@@ -2693,9 +2723,9 @@ function paintDailyGalaxySky(){
  const cv=modal.querySelector('.daily-galaxy-stars');
  if(!cv||!cv.isConnected)return;
  const area=cv.closest('.rewards-page-content');
- const W=Math.min(1280,Math.max(380,Math.ceil(area?.clientWidth||900)));
- const H=Math.min(1800,Math.max(680,Math.ceil(area?.scrollHeight||720)));
- cv.width=W;cv.height=H;cv.style.height=H+'px';
+ const W=Math.min(1280,Math.max(300,Math.ceil(area?.clientWidth||900)));
+ const H=Math.min(1280,Math.max(300,Math.ceil(area?.clientHeight||720)));
+ cv.width=W;cv.height=H;cv.style.height='100%';
  const c=cv.getContext('2d');if(!c)return;
  let seed=0x54af319;
  const rng=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
