@@ -3371,6 +3371,28 @@ function testerRefresh(){
   const input=panel.querySelector(`[data-test="${k}"]`),label=panel.querySelector(`[data-test-value="${k}"]`);
   input.value=tester[k];label.textContent=k==='density'?`${tester[k]}/32`:`${tester[k]}×`;
  }
+ testerRewardsRefresh();
+}
+function testerRewardsRefresh(){
+ if(!TEST_MODE||!window.SpaceMeta)return;
+ const meta=window.SpaceMeta,d=meta.state(g),today=meta.dayIndex();
+ const el=$('tester-daily-status');
+ if(el){
+  const claim=meta.canClaim(g)?'ДОСТУПЕН':'ПОЛУЧЕН';
+  const spin=meta.canSpin(g)?'ДОСТУПЕН':'НЕДОСТУПЕН';
+  el.textContent='Сегодня: подарок '+claim+' / спин '+spin+
+   ' · Серия '+d.streak+' дн. · Получено '+d.claims+
+   ' · Прокруток '+d.spins+' · Треков '+d.musicWins+
+   ' · Бонус '+fmt(meta.baseReward(g,d.lastDay===today?d.streak:d.lastDay===today-1?d.streak+1:1))+' ✦';
+ }
+ const streakInput=$('tester-daily-streak');
+ if(streakInput&&document.activeElement!==streakInput)streakInput.value=String(d.streak);
+ for(const key of ['rewardMultiplier','trackChance']){
+  const input=document.querySelector('[data-reward-tune="'+key+'"]');
+  const label=document.querySelector('[data-reward-value="'+key+'"]');
+  if(input&&document.activeElement!==input)input.value=String(tester[key]);
+  if(label)label.textContent=key==='trackChance'?tester[key].toFixed(1)+'%':tester[key].toFixed(1)+'×';
+ }
 }
 function testerToggle(force){
  if(!TEST_MODE)return;
@@ -3407,6 +3429,75 @@ function testerInit(){
  $('tester-close').onclick=()=>testerToggle(false);
  tier.onchange=()=>testerSetTier(Number(tier.value));
  $('tester-credits').onchange=ev=>{g.credits=clamp(Number(ev.target.value)||0,0,1e12);renderUI(true);testerRefresh();};
+
+ // Test actions never modify the production save: TEST_MODE has a separate SAVE_KEY.
+ const rewardMeta=window.SpaceMeta;
+ const rewardUpdate=()=>{save();renderUI(true);testerRefresh();};
+ const rewardDay=()=>rewardMeta.dayIndex();
+ const rewardState=()=>rewardMeta.state(g);
+ const rewardOpenOrigin=()=>$('modal').dataset.screen==='menu'?'menu':'play';
+ $('tester-daily-streak').onchange=e=>{
+  rewardState().streak=clamp(Math.floor(Number(e.target.value)||0),0,99999);
+  rewardUpdate();
+ };
+ document.querySelectorAll('#tester-panel [data-reward-tune]').forEach(input=>{
+  input.oninput=()=>{
+   const key=input.dataset.rewardTune,value=Number(input.value);
+   if(!Number.isFinite(value))return;
+   tester[key]=key==='trackChance'?clamp(value,.1,25):clamp(value,.1,20);
+   rewardMeta.setTesterTuning({rewardMultiplier:tester.rewardMultiplier,trackChance:tester.trackChance});
+   saveTester();rewardUpdate();
+  };
+ });
+ $('tester-open-daily').onclick=()=>{
+  const origin=rewardOpenOrigin();testerToggle(false);showDailyRewards(origin);
+ };
+ $('tester-open-wheel').onclick=()=>{
+  const origin=rewardOpenOrigin();testerToggle(false);showCosmicRoulette(origin);
+ };
+ $('tester-unlock-daily').onclick=()=>{
+  const d=rewardState(),today=rewardDay();
+  d.lastDay=today-1;d.spinDay=today-1;
+  rewardUpdate();toast('Новый тестовый день: подарок снова доступен');
+ };
+ $('tester-claim-daily').onclick=()=>{
+  const result=rewardMeta.claim(g);
+  if(!result.ok){toast('Подарок сегодня уже получен');return;}
+  rewardUpdate();toast('Тестовый подарок: ✦ '+fmt(result.amount));
+ };
+ $('tester-unlock-spin').onclick=()=>{
+  const d=rewardState(),today=rewardDay();
+  d.lastDay=today;d.spinDay=today-1;
+  rewardUpdate();toast('Тестовая попытка разблокирована');
+ };
+ $('tester-force-spin').onclick=()=>{
+  const d=rewardState(),today=rewardDay(),origin=rewardOpenOrigin();
+  d.lastDay=today;d.spinDay=today-1;
+  testerPrizeOverride=$('tester-force-prize').value||null;
+  rewardUpdate();testerToggle(false);showCosmicRoulette(origin);
+  $('daily-spin')?.click();
+ };
+ $('tester-odds-sim').onclick=()=>{
+  const counts=new Map(rewardMeta.PRIZES.map(p=>[p.id,0]));
+  for(let n=0;n<1000;n++){
+   let roll=Math.random()*100;
+   for(const prize of rewardMeta.PRIZES){
+    roll-=prize.weight;
+    if(roll<0){counts.set(prize.id,counts.get(prize.id)+1);break;}
+   }
+  }
+  $('tester-odds-result').textContent='1000 виртуальных спинов (без выдачи):\n'+
+   rewardMeta.PRIZES.map(p=>p.id+': '+counts.get(p.id)+' / '+p.weight.toFixed(1)+'% ожид.').join('\n');
+  toast('Симуляция 1000 прокруток выполнена');
+ };
+ $('tester-reset-daily').onclick=()=>{
+  if(!confirm('Сбросить серию входов и статистику наград ТОЛЬКО в тестовом сохранении? Купленные треки и звёздная пыль останутся.'))return;
+  g.daily={lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0};
+  testerPrizeOverride=null;
+  $('tester-odds-result').textContent='';
+  rewardUpdate();toast('Тестовые награды сброшены');
+ };
+
  document.querySelectorAll('#tester-panel [data-test]').forEach(input=>{
   input.oninput=()=>{
    const key=input.dataset.test,value=Number(input.value);
@@ -3431,7 +3522,7 @@ function testerInit(){
   visitPosition();testerRemakeNearby();renderUI(true);toast('Перемещение на 10 св. лет (тест)');};
  $('tester-abyss').onclick=testerVisitAbyss;
  $('tester-reset-mods').onclick=()=>{
-  Object.assign(tester,TEST_DEFAULTS);saveTester();testerRemakeNearby();testerRefresh();
+  Object.assign(tester,TEST_DEFAULTS);window.SpaceMeta?.setTesterTuning({rewardMultiplier:1,trackChance:.8});saveTester();testerRemakeNearby();testerRefresh();
   toast('Тестовые множители сброшены');};
  $('tester-new-game').onclick=restartCampaign;
  $('tester-copy-save').onclick=()=>{
