@@ -1103,3 +1103,93 @@ for(let tier=0;tier<27;tier++){
  assert.ok(peer>tiny*2000);assert.ok(peer<1000*.25);assert.ok(Number.isFinite(tiny)&&tiny>0);
 }
 console.log('PASS: all 27 campaign forms have size-weighted rewards without a flat progress floor');
+
+
+// Daily screens must reopen from the menu or HUD, preserve the correct Back
+// origin, and NEVER lock navigation for the seven-second wheel animation.
+{
+ const els=new Map(),timeouts=[];
+ let modalOff=true,resumed=0,menus=0,reads=0;
+ const modal={
+  dataset:{screen:'menu'},classList:{
+   contains(key){return key==='off'?modalOff:false},
+   add(key){if(key==='off')modalOff=true;},
+   remove(key){if(key==='off')modalOff=false;}
+  },
+  querySelector(){return null;}
+ };
+ const get=id=>{
+  if(id==='modal')return modal;
+  if(!els.has(id))els.set(id,{
+   id,disabled:false,hidden:false,isConnected:true,
+   classList:{add(){},remove(){}},
+   style:{setProperty(){}},onclick:null,textContent:''
+  });
+  return els.get(id);
+ };
+ const meta={
+  PRIZES:[{id:'dust-1',weight:29,mult:1},{id:'dust-2',weight:25,mult:2},
+   {id:'dust-3',weight:20,mult:3},{id:'dust-5',weight:13,mult:5},
+   {id:'dust-8',weight:8,mult:8},{id:'dust-15',weight:3,mult:15},
+   {id:'dust-30',weight:1.2,mult:30},{id:'track',weight:.8,mult:0}],
+  state(g){return g.daily;},dayIndex(){return 1;},
+  canClaim(g){return g.daily.lastDay!==1;},
+  canSpin(g){return g.daily.lastDay===1&&g.daily.spinDay!==1;},
+  canAdSpin(){return false;},baseReward(){return 100;},
+  claim(g){g.daily.lastDay=1;g.daily.streak=1;g.daily.claims++;return {ok:true,amount:100};},
+  roll(g){g.daily.spinDay=1;g.daily.spins++;return {ok:true,type:'credits',amount:100,prize:'dust-1'};}
+ };
+ const context={
+  TEST_MODE:false,Math,Date,window:{SpaceMeta:meta,SpacePlatform:{adsAvailable:false}},
+  g:{tier:0,time:123,credits:0,ownedTracks:[],daily:{lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0}},
+  $:get,L:(en)=>en,fmt:String,MUSIC_TRACKS:[],menuVisible:false,awaitingAd:false,
+  renderUI(){reads++;},save(){},checkProgression(){},toast(){},sound(){},
+  setNavigationState(){},requestAnimationFrame(){},
+  setTimeout(fn,ms){timeouts.push({fn,ms});},
+  resumeGame(){resumed++;modalOff=true;modal.dataset.screen='play';},
+  showMainMenu(){menus++;modalOff=false;modal.dataset.screen='menu';},
+  show(html){
+   for(const n of els.values())n.isConnected=false;
+   els.clear();modal.dataset.screen='panel';modalOff=false;modal.innerHTML=html;
+   const ids=html.matchAll(/\bid="([^"]+)"/g);
+   for(const m of ids)get(m[1]);
+  }
+ };
+ vm.createContext(context);
+ const start=game.indexOf("let dailyOrigin='menu';");
+ const stop=game.indexOf("function showMainMenu(paused=false){",start);
+ assert.ok(start>0&&stop>start,'Reward navigation source extract');
+ vm.runInContext(game.slice(start,stop),context);
+ context.showDailyRewards('play');
+ assert.equal(modal.dataset.screen,'daily');
+ assert.equal(modal.dataset.dailyOrigin,'play');
+ assert.ok(modal.innerHTML.includes('daily-galaxy-stars'),'Daily page has colorful sky canvas');
+ get('daily-back').onclick();
+ assert.equal(resumed,1,'In-game Back must resume flight');
+ assert.equal(modal.dataset.screen,'play');
+ context.showCosmicRoulette('menu');
+ assert.equal(modal.dataset.screen,'roulette');
+ assert.equal(modal.dataset.dailyOrigin,'menu');
+ assert.ok(modal.innerHTML.includes('data:image/svg+xml'),'Wheel is one cached image');
+ get('daily-back').onclick();
+ assert.equal(menus,1,'Menu Back must return to menu');
+ context.showDailyRewards('play');
+ get('daily-claim').onclick();
+ get('rewards-tab-roulette').onclick();
+ assert.equal(modal.dataset.screen,'roulette','The roulette tab must open from daily rewards');
+ const wheel=get('daily-wheel');
+ get('daily-spin').onclick();
+ assert.equal(wheel.classList!==undefined,true);
+ assert.notEqual(get('daily-back').disabled,true,'Back must remain usable mid-spin');
+ assert.notEqual(get('rewards-tab-daily').disabled,true,'Tabs must remain usable mid-spin');
+ get('rewards-tab-daily').onclick();
+ assert.equal(modal.dataset.screen,'daily','Daily tab must open during a spin');
+ get('rewards-tab-roulette').onclick();
+ assert.equal(modal.dataset.screen,'roulette','Roulette must reopen even after leaving mid-spin');
+ get('daily-back').onclick();
+ assert.equal(resumed,2,'Back must still resume when roulette was reopened');
+ for(const timer of timeouts)timer.fn(); // detached animation must not mutate the next screen.
+ assert.equal(modal.dataset.screen,'play');
+ assert.ok(reads>=2);
+ console.log('PASS: daily/roulette open repeatedly, full HUD/menu Back history, switch during spin, cached SVG and sky');
+}
