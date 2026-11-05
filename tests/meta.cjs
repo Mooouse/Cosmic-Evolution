@@ -74,6 +74,28 @@ const tuningTrack=testMeta.roll(tuningGame,[{id:'free',price:0},{id:'paid',price
 assert.equal(tuningTrack.type,'track','Tester music odds should affect the real reward result');
 assert.ok(tuningGame.ownedTracks.includes('paid'));
 console.log('PASS: tester-only multiplier, weighted roulette chance, prize award and production isolation');
+// A completed rewarded ad unlocks one extra attempt, not an unlimited wheel.
+const secondSpinGame={tier:1,credits:0,ownedTracks:[]};
+assert.equal(meta.canAdSpin(secondSpinGame,d0),false,'Cannot watch for bonus before first spin');
+meta.claim(secondSpinGame,d0);
+assert.equal(meta.canAdSpin(secondSpinGame,d0),false,'Must use the daily spin first');
+assert.equal(meta.roll(secondSpinGame,[],d0,()=>.01).ok,true);
+assert.equal(meta.canSpin(secondSpinGame,d0),false);
+assert.equal(meta.canAdSpin(secondSpinGame,d0),true);
+assert.equal(meta.grantAdSpin(secondSpinGame,d0).ok,true,'Confirmed video unlocks one bonus spin');
+assert.equal(meta.canSpin(secondSpinGame,d0),true,'Bonus persists as available entitlement');
+assert.equal(meta.grantAdSpin(secondSpinGame,d0).ok,false,'Cannot earn a second ad spin today');
+assert.equal(meta.roll(secondSpinGame,[],d0,()=>.01).ok,true,'Bonus wheel roll is allowed');
+assert.equal(meta.canSpin(secondSpinGame,d0),false,'Two spins used means no more today');
+assert.equal(meta.roll(secondSpinGame,[],d0,()=>.01).ok,false,'Third attempt is rejected');
+assert.equal(secondSpinGame.daily.spins,2,'Both rewards counted once');
+assert.equal(meta.canAdSpin(secondSpinGame,d1),false,'Next daily gift required');
+meta.claim(secondSpinGame,d1);
+assert.equal(meta.canAdSpin(secondSpinGame,d1),false,'Use next day free spin first');
+assert.equal(meta.roll(secondSpinGame,[],d1,()=>.01).ok,true);
+assert.equal(meta.canAdSpin(secondSpinGame,d1),true,'Next day grants new ad opportunity');
+console.log('PASS: rewarded-ad bonus spin is saved, limited to one extra per day, and cannot repeat');
+
 console.log('PASS: daily rollover, streak, no duplicate spins, 0.8% music prize, paid-track fallback and drift avoidance');
 
 // Exercise the SDK callbacks with a fake CrazyGames host. Playback remains paused
