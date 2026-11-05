@@ -510,6 +510,12 @@ const mapCode=game.slice(game.indexOf('function drawAtlas(){'),game.indexOf('fun
 assert.ok(!mapCode.includes('clamp(bodyRadius,10,26)'), 'Atlas must not clamp the physical player radius to a fixed-size avatar');
 assert.ok(mapCode.includes('paintAbyss(c,playerPoint.x,playerPoint.y,bodyRadius,w,h)'), 'Black-hole map core must use original physical radius');
 assert.ok(mapCode.includes('paintPlayerForm(playerPoint.x,playerPoint.y,bodyRadius,0,g.tier)'), 'Non-black-hole forms must use original physical map radius');
+assert.ok(!mapCode.includes('avatarRadius'), 'Map label must not refer to removed avatarRadius (was crashing the whole map render)');
+const mapPinsCode=game.slice(game.indexOf('function drawMapPins(c,w,h,scale){'),game.indexOf('let atlasExplorationSurface=null;'));
+assert.ok(mapPinsCode.includes('for(const pin of g.mapPins)'), 'Atlas and in-flight HUD must render all saved markers');
+assert.ok(!mapPinsCode.includes("const pin=g.mapPins.find(p=>p.id===g.activePin);if(!pin)return;"), 'Only rendering the active pin hides other saved waypoints');
+assert.ok(mapPinsCode.includes('pins.length>1'), 'Overlapping saved markers should be clustered with a visible count');
+
 const selectBehavior=fs.readFileSync('ui-v15-behaviors.js','utf8');
 assert.ok(game.includes('visual?.enhanceSelects(details)'), 'Marker picker must use the game-themed dropdown');
 assert.ok(selectBehavior.includes("childList:true,subtree:true,characterData:true"), 'Marker dropdown options must refresh after adding and renaming pins');
