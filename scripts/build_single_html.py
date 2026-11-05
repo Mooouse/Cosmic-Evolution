@@ -12,8 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "single-file" / "index.html"
-MAX_BYTES = 49_000_000
-AUDIO_BITRATE = "64k"
+MAX_BYTES = 19_500_000
+AUDIO_BITRATE = "40k"
 def read(path):
     return (ROOT / path).read_text(encoding="utf-8")
 
