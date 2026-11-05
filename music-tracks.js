@@ -11,7 +11,7 @@ window.SpaceMusicTracks = [
   {
     "id": 2,
     "title": "Deep Space Transit",
-    "price": 10000000000,
+    "price": 10000,
     "src": "assets/music/track-02.mp3",
     "cover": "assets/music/track-02.jpg",
     "duration": 247.63,
@@ -20,7 +20,7 @@ window.SpaceMusicTracks = [
   {
     "id": 3,
     "title": "Old Piano, New Dust",
-    "price": 100000000000000,
+    "price": 75000,
     "src": "assets/music/track-03.mp3",
     "cover": "assets/music/track-03.jpg",
     "duration": 184.03,
@@ -29,7 +29,7 @@ window.SpaceMusicTracks = [
   {
     "id": 4,
     "title": "Rainy Afternoon Lo-fi",
-    "price": 1000000000000000000,
+    "price": 250000,
     "src": "assets/music/track-04.mp3",
     "cover": "assets/music/track-04.jpg",
     "duration": 200.04,
@@ -38,7 +38,7 @@ window.SpaceMusicTracks = [
   {
     "id": 5,
     "title": "lofi happy",
-    "price": 10000000000000000000000,
+    "price": 1000000,
     "src": "assets/music/track-05.mp3",
     "cover": "assets/music/track-05.jpg",
     "duration": 170.04,
