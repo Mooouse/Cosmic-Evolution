@@ -1125,10 +1125,10 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
 {
  const els=new Map(),timeouts=[];
  let modalOff=true,resumed=0,menus=0,reads=0;
- let rewardWheelListener=null,documentWheelListener=null;
+ let rewardWheelListener=null;
  const modal={
   addEventListener(type,listener,opts){
-   if(type==='wheel'){rewardWheelListener=listener;assert.equal(opts.passive,false);assert.equal(opts.capture,true);}
+   if(type==='wheel'){rewardWheelListener=listener;assert.equal(opts.passive,false);assert.equal(opts.capture,undefined);}
   },
   dataset:{screen:'menu'},classList:{
    contains(key){return key==='off'?modalOff:false},
@@ -1160,9 +1160,6 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  };
  const context={
   TEST_MODE:false,Math,Date,window:{SpaceMeta:meta,SpacePlatform:{adsAvailable:false}},
-  document:{addEventListener(type,listener,opts){
-   if(type==='wheel'){documentWheelListener=listener;assert.equal(opts.passive,false);assert.equal(opts.capture,true);}
-  }},
   g:{tier:0,time:123,credits:0,ownedTracks:[],daily:{lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0}},
   $:get,L:(en)=>en,fmt:String,MUSIC_TRACKS:[],menuVisible:false,awaitingAd:false,
   renderUI(){reads++;},save(){},checkProgression(){},toast(){},sound(){},
@@ -1185,16 +1182,17 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  context.showDailyRewards('play');
  assert.equal(typeof rewardWheelListener,'function','Wheel handler is attached to modal');
  let prevented=0,stopped=0;
- // Reproduce repeated cursor motion + trackpad wheel gestures.
+ // Reproduce fast cursor motion + trackpad gestures within the rewards UI.
+ // Only prevent scrolling; never stop propagation at document capture.
  for(let n=0;n<80;n++){
   const event={cancelable:true,clientX:n*8,clientY:n*5,
    preventDefault(){prevented++;},stopPropagation(){stopped++;}};
   rewardWheelListener(event);
-  if(documentWheelListener)documentWheelListener(event);
  }
- assert.equal(typeof documentWheelListener,'function','Capture wheels at document level');
- assert.equal(prevented,160,'All alternating wheel gestures are cancelled');
- assert.equal(stopped,160,'Wheel events never reach game camera');
+ assert.equal(prevented,80,'All reward wheel scrolling is prevented');
+ assert.equal(stopped,0,'Reward wheel handler does not swallow global pointer events');
+ assert.ok(!game.includes("document.addEventListener('wheel',stopWheel"),
+  'Do not intercept wheels globally at document capture');
  assert.ok(!modal.innerHTML.includes('rewards-fit-body'),
   'Interactive reward controls must not live in a zoomed or transformed wrapper');
  assert.equal(modal.dataset.screen,'daily');
@@ -1234,6 +1232,52 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  console.log('PASS: scroll-free clickable rewards, wheel cancellation, safe Back history, repeated roulette and mid-spin tabs');
 }
 
+
+// The old daily stylesheet forced display:flex even after resumeGame() added
+// .off. Real CSS specificity left a ghost overlay on top of gameplay, stealing
+// all mouse clicks and sending a second Back to the menu.
+{
+ const css=fs.readFileSync('daily-rewards.css','utf8');
+ const finalCss=fs.readFileSync('galactic-rewards.css','utf8');
+ assert.ok(css.includes('body.ui-v15 #modal:not(.off):is([data-screen="daily"],[data-screen="roulette"])'),
+  'Reward overlay must only be display:flex while NOT marked off');
+ assert.ok(!css.includes('body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]){\n  display:flex'),
+  'Unconditional reward display:flex can override .modal-backdrop.off');
+ assert.ok(finalCss.includes('body.ui-v15 #modal.off')&&finalCss.includes('display:none!important;'),
+  'The closed overlay must be hidden regardless of stylesheet specificity');
+ let resumed=0,removed=0;
+ const modal={
+  dataset:{screen:'daily',dailyOrigin:'play'},
+  classList:{off:false,contains(k){return k==='off'&&this.off;},add(k){if(k==='off')this.off=true;}},
+  replaceChildren(){removed++;}
+ };
+ const box={
+  $:id=>{assert.equal(id,'modal');return modal;},
+  closePinEditor(){},clearFlightInput(){},setNavigationState(){},
+  menuVisible:true,atlasVisible:true,running:false,window:{SpacePlatform:{playing(){}}},
+  startMusic(){},performance:{now(){return 4321}},last:0,
+  renderUI(){},g:{time:100},showMainMenu(){throw Error('Unexpected navigation to menu')}
+ };
+ const source=game.slice(game.indexOf('function resumeGame(){'),game.indexOf('function show(html){'));
+ vm.createContext(box);vm.runInContext(source,box);
+ // Attach the REAL handler rather than a mocked implementation.
+ const start=game.indexOf('let dailyOrigin=\'menu\';'),end=game.indexOf('// Fit every reward control into',start);
+ assert.ok(start>0&&end>start);
+ vm.runInContext(game.slice(start,end),box);
+ box.dailyReturn();
+ resumed++;
+ assert.equal(box.running,true,'First Back resumes the simulation');
+ assert.equal(modal.classList.off,true,'First Back closes the modal');
+ assert.equal(modal.dataset.screen,'play','First Back clears the reward CSS selector');
+ assert.equal('dailyOrigin' in modal.dataset,false,'Source routing metadata is cleared');
+ assert.equal(removed,1,'Detached old reward DOM cannot keep intercepting mouse input');
+ assert.equal(box.last,4321);
+ box.dailyReturn(); // A second Back must have no effect.
+ assert.equal(box.running,true,'Repeated Back cannot navigate to menu');
+ assert.equal(removed,1,'Repeated Back is idempotent');
+ assert.equal(resumed,1);
+ console.log('PASS: genuine reward Back closes overlay, restores gameplay input, and second Back does nothing');
+}
 
 // Active gameplay may capture the mouse pointer. Opening modal panels must
 // release that capture; otherwise clicks continue targeting the world canvas.
