@@ -2466,6 +2466,57 @@ const FIELD_GUIDE=[
  ['galaxy',22,['Galaxies & clusters','Галактики и скопления','Galaxias y cúmulos'],['Billions of stars form galaxies. The atlas reveals their scale before you reach them. A black hole draws the whole body behind its horizon.','Миллиарды звёзд образуют галактики. Карта заранее показывает их масштаб. Чёрная дыра втягивает всё тело за горизонт событий.','Miles de millones de estrellas forman galaxias. El atlas muestra su escala por adelantado. Un agujero negro absorbe todo el cuerpo tras su horizonte.']],
  ['blackhole',27,['Black holes: mass & radius','Чёрные дыры: масса и радиус','Agujeros negros: masa y radio'],['M☉ means one solar mass. Mass is not size: radius is shown separately in light-years (ly). For a non-rotating black hole, the Schwarzschild radius is about 2.953 km per M☉. This game uses that relation as a scale model. Its lensing ring is an optical effect, not the event horizon. Smaller black holes are prey; entering a larger horizon resets your run.','M☉ — одна масса Солнца. Масса не является размером: радиус отдельно показан в световых годах. Для невращающейся дыры радиус Шварцшильда — примерно 2,953 км на M☉. Игра использует эту связь как модель масштаба. Кольцо искажения — оптический эффект, а не горизонт событий. Меньшие дыры — добыча; вход за горизонт большей дыры обнуляет прохождение.','M☉ significa una masa solar. La masa no es el tamaño: el radio se muestra aparte en años luz (al). Para un agujero negro sin rotación, el radio de Schwarzschild es de unos 2,953 km por M☉. El juego usa esta relación como modelo de escala. El anillo es un efecto óptico, no el horizonte. Puedes devorar agujeros menores; entrar en uno mayor reinicia la partida.']]
 ];
+// The field guide includes every playable form, all collectible resources and
+// rare phenomena in addition to the seven original astronomical chapters.
+const FORM_NAME_EN=["Cosmic dust","Micrometeor","Rock fragment","Chondrite","Asteroid","Large asteroid","Planetesimal","Dwarf planet","Ice world","Ocean planet","Rocky planet","Gas giant","Ice giant","Brown dwarf","Red dwarf","Star","Red giant","Supergiant","Hypergiant","Stellar nebula","Star cluster","Star system","Protogalaxy","Spiral galaxy","Galaxy group","Galaxy cluster","Cosmic web","Infinite black hole"];
+const FORM_NAME_ES=["Polvo cósmico","Micrometeorito","Fragmento rocoso","Condrita","Asteroide","Asteroide grande","Planetesimal","Planeta enano","Mundo helado","Planeta oceánico","Planeta rocoso","Gigante gaseoso","Gigante helado","Enana marrón","Enana roja","Estrella","Gigante roja","Supergigante","Hipergigante","Nebulosa estelar","Cúmulo estelar","Sistema estelar","Protogalaxia","Galaxia espiral","Grupo de galaxias","Cúmulo galáctico","Red cósmica","Agujero negro infinito"];
+const RESOURCE_NOTES={
+ ore:['Common mineral matter found in small asteroids.','Основные минералы, встречающиеся в астероидах и каменных мирах.','Minerales abundantes en asteroides y mundos rocosos.'],
+ crystal:['Precise crystal fragments become important during asteroid evolution.','Кристаллы помогают формировать более сложные тела с пятой стадии.','Fragmentos cristalinos necesarios durante la evolución de los asteroides.'],
+ ice:['Frozen worlds and drifting comets carry water ice.','Лёд встречается не только возле ледяных планет, но и в потоках космической материи.','El hielo se encuentra también en corrientes de materia cósmica.'],
+ gas:['A raw material of giant atmospheres and protostars.','Газ необходим для массивных атмосфер и формирования звёзд.','Gas imprescindible en grandes atmósferas y protoestrellas.'],
+ plasma:['Hot ionized matter is collected in stellar epochs.','Раскалённая плазма приходит вместе со звёздами и их энергией.','Plasma caliente que se recoge en etapas estelares.'],
+ exotic:['Rare exotic material at galaxy-sized scales.','Экзоматерия — редкий материал поздних галактических эпох.','Materia exótica que aparece en las épocas galácticas.']
+};
+const RESOURCE_FIRST_TIER={ore:0,crystal:4,ice:8,gas:12,plasma:17,exotic:22};
+FIELD_GUIDE.push(...TA.map((stage,i)=>[
+ 'form-'+i,i,[FORM_NAME_EN[i],stage.name,FORM_NAME_ES[i]],
+ ['Form '+(i+1)+' of 28. '+({dust:'A scattering of luminous grains.',rock:'A solid body shaped by countless impacts.',planet:'A growing world with terrain and satellites.',gas:'A giant with churning atmospheric layers.',star:'Hot matter radiates energy through stellar space.',nebula:'Enormous clouds where new stars are born.',cluster:'Gravity binds many separate celestial systems.',galaxy:'Billions of stars form spiral structures.',web:'Cosmic filaments connect distant galaxy clusters.',blackhole:'An event horizon draws entire worlds inward.'}[stage.type]||'Explore the next cosmic scale.'),
+  stage.desc,
+  'Forma '+(i+1)+' de 28. '+({dust:'Partículas luminosas.',rock:'Roca formada por impactos.',planet:'Un mundo con superficie y satélites.',gas:'Un gigante de gas.',star:'Una estrella radiante.',nebula:'Nubes de estrellas.',cluster:'Muchos cuerpos ligados.',galaxy:'Miles de millones de estrellas.',web:'Filamentos cósmicos.',blackhole:'Un horizonte que absorbe mundos.'}[stage.type]||'Explora la siguiente etapa.')],i
+]));
+FIELD_GUIDE.push(...MATERIAL_KEYS.map(type=>[
+ 'resource-'+type,RESOURCE_FIRST_TIER[type],
+ [({ore:'Minerals',crystal:'Crystals',ice:'Ice',gas:'Gas',plasma:'Plasma',exotic:'Exotic matter'})[type],MATERIALS[type].label,
+  ({ore:'Minerales',crystal:'Cristales',ice:'Hielo',gas:'Gas',plasma:'Plasma',exotic:'Materia exótica'})[type]],
+ RESOURCE_NOTES[type],null
+]));
+FIELD_GUIDE.push(
+ ['comet',0,['Background comets','Фоновые кометы','Cometas de fondo'],['Comet trails cross the distant starfield and show the direction of cosmic motion.','Кометы оставляют тонкие световые следы на фоне огромной Вселенной.','Los cometas dibujan rastros luminosos en el universo.'],null],
+ ['gravity',2,['Gravity and capture','Гравитация и поглощение','Gravedad y captura'],['Smaller objects fall toward you; bigger bodies pull you away.','Объекты меньше тебя притягиваются, а массивные соседи способны изменить твой полёт.','Los objetos pequeños caen hacia ti; los grandes te atraen.'],null],
+ ['lensing',19,['Gravitational lensing','Гравитационное линзирование','Lente gravitacional'],['A black hole bends the light behind it; the optical ring is outside its true horizon.','Чёрная дыра искривляет свет позади себя. Видимое кольцо искажения не является горизонтом событий.','Un agujero negro curva la luz; su anillo óptico no es el horizonte.'],null],
+ ['rival',27,['Ancient giant black holes','Древние гигантские чёрные дыры','Agujeros negros gigantes'],['Supermassive rivals are visible from afar. Devour smaller horizons; evade larger ones.','Сверхмассивные соперники видны издалека. Меньшие горизонты можно поглотить, большие — смертельно опасны.','Los rivales supermasivos se ven desde lejos. Devora los menores y evita los mayores.'],null]
+);
+// Render a real miniature of the playable form, not an unrelated generic
+// sphere; stage preview drawings never change game state or current tier.
+function paintStagePortrait(canvas,tier){
+ if(!canvas)return;
+ const w=92,h=92,scale=1.5;
+ canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+ const c=canvas.getContext('2d');if(!c)return;
+ c.setTransform(scale,0,0,scale,0,0);
+ const bg=c.createRadialGradient(46,43,7,46,46,64);
+ bg.addColorStop(0,'#342454');bg.addColorStop(.67,'#1a1131');bg.addColorStop(1,'#100b22');
+ c.fillStyle=bg;c.fillRect(0,0,w,h);
+ for(let i=0;i<13;i++){const x=(i*47+17)%92,y=(i*31+13)%92;
+  c.fillStyle=i%4===0?'#a9d9ff':'#7962a8';c.fillRect(x,y,1.1,1.1);
+ }
+ const old=ctx;ctx=c;
+ try{
+  if(tier===TA.length-1)paintAbyss(c,46,46,24,w,h);
+  else paintPlayerForm(46,46,tier>=23?22:tier>=19?21:23,2.4,tier);
+ }finally{ctx=old;}
+}
 function showBestiary(){
  show(`<div class="eyebrow">${L('FIELD GUIDE / 07 ENTRIES','СПРАВОЧНИК / 07 ЗАПИСЕЙ','GUÍA / 07 ENTRADAS')}</div><div class="overlay-title">${L('COSMIC BESTIARY','КОСМИЧЕСКИЙ БЕСТИАРИЙ','BESTIARIO CÓSMICO')}</div><div class="bestiary-grid">${FIELD_GUIDE.map(([id,t,title,desc])=>`<article class="bestiary-entry"><div class="bestiary-orb orb-${id}" aria-hidden="true"></div><div><small>${g.tier>=t?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR')} · ${String(t+1).padStart(2,'0')}</small><h3>${L(...title)}</h3><p>${L(...desc)}</p></div></article>`).join('')}</div><p class="overlay-copy">${L('Number scale: K = 10³ · M = 10⁶ · B = 10⁹ · T = 10¹² · Qa = 10¹⁵. After Dc the scale continues with aa, ab… Every step is ×1000.','Сокращения: K = 10³ · M = 10⁶ · B = 10⁹ · T = 10¹² · Qa = 10¹⁵. После Dc идут aa, ab… Каждый шаг — ×1000.','Escala: K = 10³ · M = 10⁶ · B = 10⁹ · T = 10¹² · Qa = 10¹⁵. Después de Dc sigue aa, ab… Cada paso es ×1000.')}</p><div class="modal-actions">${continueButton()}</div>`);attachContinue();
 }
