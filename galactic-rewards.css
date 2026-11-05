@@ -457,3 +457,24 @@ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-f
   padding:9px!important;
  }
 }
+
+
+/* v3.54 — use native zoom rather than a transformed hit-test layer.
+   The wheel event is cancelled in game.js, including trackpad gestures. */
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-fit-body{
+ transform:none!important;
+ transform-origin:initial!important;
+ will-change:auto!important;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-page-content{
+ overflow:hidden!important;
+ overscroll-behavior:none!important;
+ touch-action:manipulation;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) :is(.daily-back,.rewards-tabs>button,.daily-claim,.daily-spin,.roulette-ad-spin){
+ touch-action:manipulation;
+ pointer-events:auto;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-result[hidden]{
+ display:none!important;
+}
