@@ -2667,7 +2667,7 @@ function rewardsShell(screen,title,subtitle,body){
   '<header class="rewards-header"><div><div class="daily-eyebrow">INFINITI SPACE / '+L('REWARDS','НАГРАДЫ','RECOMPENSAS')+'</div>'+
   '<h2>'+title+'</h2><p>'+subtitle+'</p></div>'+
   '<button type="button" id="daily-back" class="daily-back">'+L('← BACK','← НАЗАД','← VOLVER')+'</button></header>'+
-  tabs+body+'</div>');
+  tabs+'<main class="rewards-page-content">'+body+'</main></div>');
  $('modal').dataset.screen=screen;
  $('modal').dataset.dailyOrigin=dailyOrigin;
  // Main-menu shortcuts keep the animated black hole and comets, not the live game.
@@ -2697,6 +2697,7 @@ function showDailyRewards(origin){
  const body='<div class="daily-streak"><span>'+L('LOGIN STREAK','СЕРИЯ ВХОДОВ','RACHA DIARIA')+
   '</span><strong>'+state.streak+' '+L('days','дн.','días')+'</strong>'+
   '<span>'+L('Gifts claimed','Получено подарков','Regalos recogidos')+': '+state.claims+'</span></div>'+
+  '<div class="rewards-section-caption"><strong>'+L('THE NEXT 7 DAYS','СЛЕДУЮЩИЕ 7 ДНЕЙ','PRÓXIMOS 7 DÍAS')+'</strong><span>'+L('LOGIN BONUSES','БОНУСЫ ЗА ВХОД','BONOS DIARIOS')+'</span></div>'+ 
   '<div class="daily-calendar">'+futureDays+'</div>'+
   '<p class="daily-calendar-note">'+
   L('Rewards assume daily logins at your current evolution stage. Skipping a day resets the streak.',
@@ -2742,7 +2743,7 @@ function showCosmicRoulette(origin){
   '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true">▼</div>'+
   '<div class="daily-wheel" id="daily-wheel" role="img" aria-label="'+L('Weighted prize roulette','Колесо с вероятностями призов','Ruleta de premios ponderados')+'">'+
   '<div class="daily-wheel-center"><span>✦</span><small>IS</small></div></div></div>'+
-  '<div class="roulette-prizes"><div class="roulette-prizes-title">'+L('POSSIBLE REWARDS','ВОЗМОЖНЫЕ НАГРАДЫ','POSIBLES PREMIOS')+
+  '<div class="roulette-prizes"><div class="roulette-prizes-title">'+L('PRIZES AND ODDS','ПРИЗЫ И ШАНСЫ','PREMIOS Y PROBABILIDADES')+
   '</div><div class="daily-wheel-legend">'+prizeRows+'</div></div></div>'+
   '<p class="daily-prize-note">♫ '+L('Track chance: 0.8%. If you own every paid track, receive the price of a random paid track instead.',
     'Шанс трека — 0,8%. Если все платные треки куплены, выдаётся стоимость случайного трека.',
