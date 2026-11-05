@@ -44,7 +44,7 @@ async function capture(spec){
   await play.waitFor({state:'visible',timeout:35000});await play.click({timeout:20000});
   if(await page.locator('#tutorial-skip').isVisible())await page.locator('#tutorial-skip').click();
   await page.waitForFunction(()=>document.getElementById('modal')?.classList.contains('off'),null,{timeout:30000});
-  await page.addStyleTag({content:'*, *::before, *::after{cursor:none!important}'});
+  await page.addStyleTag({content:'*, *::before, *::after{cursor:none!important} #btn-tester, #tester-panel{display:none!important}'});
   const tier=async next=>page.evaluate(next=>{
    const el=document.getElementById('tester-tier');el.value=String(next);
    el.dispatchEvent(new Event('change',{bubbles:true}));
