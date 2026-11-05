@@ -1492,3 +1492,63 @@ body.ui-v15 #screen-evolution .evo-v2-meter-eternal i{
 @media(prefers-reduced-motion:reduce){
  body.ui-v15 #screen-evolution .evo-v2-meter-eternal i{animation:none}
 }
+
+
+/* v3.59: Results are visible even when ad inventory is unavailable.
+   Six concrete run counters survive death without resetting progression. */
+body.ui-v15 #modal[data-screen="death"] .revive-screen{
+ gap:12px!important;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-results-title{
+ margin:10px 0 0;
+ font-size:13px;letter-spacing:.09em;font-weight:950;
+ color:#f3d8ff;text-transform:uppercase;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-stats{
+ grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:8px!important;margin:3px 0 9px!important;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-stats span{
+ min-width:0;
+ min-height:62px;
+ padding:11px 12px!important;
+ gap:6px;
+ border:2px solid #7b5ab3!important;
+ border-bottom:4px solid #4b2b7f!important;
+ background:linear-gradient(145deg,#30204c,#19132c)!important;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-stats strong{
+ max-width:100%;
+ font-size:clamp(13px,1.5vw,20px)!important;
+ overflow-wrap:anywhere;word-break:break-word;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-actions{
+ grid-template-columns:1fr!important;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-actions .revive-ad{
+ grid-column:1/-1;
+ min-height:54px;
+ border:2px solid #d1a9ff!important;
+ border-bottom:5px solid #6833b5!important;
+ background:linear-gradient(125deg,#6a38c7,#44218a)!important;
+ font-size:14px;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-ad-note{
+ margin:0;
+ color:#d1bfe5;
+ font-size:11px;line-height:1.5;
+}
+body.ui-v15 #modal[data-screen="death"] .revive-feedback{
+ min-height:18px;
+}
+@media(max-width:600px){
+ body.ui-v15 #modal[data-screen="death"] .revive-stats{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ body.ui-v15 #modal[data-screen="death"] .revive-stats span{
+  min-height:51px;padding:9px!important;
+ }
+ body.ui-v15 #modal[data-screen="death"] .revive-results-title{
+  font-size:12px;
+ }
+}
