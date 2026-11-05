@@ -3444,7 +3444,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const menuGrid=q(root,'.menu-grid');
   const dailyBtn=document.createElement('button');dailyBtn.type='button';dailyBtn.className='daily-menu-link';
   dailyBtn.innerHTML='<span class="daily-link-icon">✦</span><span class="daily-link-copy"><strong>'+
-   L('DAILY GIFTS','ЕЖЕДНЕВНЫЕ НАГРАДЫ','REGALOS DIARIOS')+'</strong><small>'+
+   L('DAILY GIFTS','НАГРАДЫ','REGALOS')+'</strong><small>'+
    (dailyReady?L('Collect your gift','Забрать подарок','Recoger regalo'):
     L('See next rewards','Будущие награды','Ver próximos regalos'))+
    '</small></span><span class="daily-link-status">'+(dailyReady?'●':'↗')+'</span>';
