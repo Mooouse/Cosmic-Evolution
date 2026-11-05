@@ -1,0 +1,142 @@
+/* Infiniti Space v3.50 — galactic rainbow roulette & expanded tester */
+body.ui-v15 #modal:is([data-screen="roulette"],[data-screen="daily"]) .modal-card:has(.daily-screen){
+ background:
+  radial-gradient(ellipse at 87% 13%,rgba(100,40,169,.22),transparent 43%),
+  radial-gradient(ellipse at 4% 87%,rgba(26,80,165,.16),transparent 44%),
+  linear-gradient(145deg,#110b24 0%,#100c1f 60%,#151029 100%)!important;
+}
+body.ui-v15 #modal:is([data-screen="roulette"],[data-screen="daily"]) .daily-screen::before{
+ content:"";position:absolute;inset:5px;z-index:0;pointer-events:none;opacity:.45;
+ background-image:
+  radial-gradient(circle at 9% 11%,#d5b9ff 0 1px,transparent 1.8px),
+  radial-gradient(circle at 24% 68%,#a4caff 0 1px,transparent 1.8px),
+  radial-gradient(circle at 60% 7%,#fff0c1 0 1px,transparent 1.8px),
+  radial-gradient(circle at 83% 77%,#efb2e9 0 1px,transparent 1.8px),
+  radial-gradient(circle at 46% 54%,#ac94df 0 .6px,transparent 1.6px),
+  radial-gradient(circle at 73% 41%,#ffffff 0 1px,transparent 2px);
+ background-size:330px 240px,270px 210px,370px 280px,260px 320px,190px 230px,430px 300px;
+}
+body.ui-v15 #modal:is([data-screen="roulette"],[data-screen="daily"]) .daily-screen>*{
+ position:relative;z-index:1;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-roulette-body{
+ background:
+  radial-gradient(ellipse at 16% 55%,rgba(30,96,186,.17),transparent 41%),
+  radial-gradient(ellipse at 55% 35%,rgba(155,56,175,.10),transparent 60%);
+ border-radius:8px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage:before{
+ width:340px;max-width:100%;
+ box-shadow:0 0 65px #4940c388,0 0 95px #118dca30,0 0 150px #d047ad1c;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-disc-svg{
+ filter:drop-shadow(0 0 11px #543aa6aa) drop-shadow(0 7px 16px #040211bd);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-pointer span{
+ background:linear-gradient(125deg,#fff1b3,#ffc96b 48%,#df8149);
+ filter:drop-shadow(0 0 6px #fbc97866);
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-wheel-base{
+ background:radial-gradient(ellipse,#9967df88,#2954c54a 36%,transparent 74%);
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-prizes-title{
+ color:#e5daff;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+ background:linear-gradient(155deg,rgba(36,24,63,.92),rgba(17,16,38,.95))!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(1) i{background:#ee4e6d;box-shadow:0 0 10px #ee4e6d55}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(2) i{background:#ffa439;box-shadow:0 0 10px #ffa43955}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(3) i{background:#f7d44a;box-shadow:0 0 10px #f7d44a55}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(4) i{background:#41d184;box-shadow:0 0 10px #41d18455}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(5) i{background:#31bddb;box-shadow:0 0 10px #31bddb55}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(6) i{background:#438ef4;box-shadow:0 0 10px #438ef455}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(7) i{background:#e969c4;box-shadow:0 0 10px #e969c455}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(8) i{background:#ffe4a0;box-shadow:0 0 10px #ffe4a077}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:last-child{
+ background:linear-gradient(135deg,#533b36,#27203e)!important;
+ border-color:#bc9466!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item.daily-wheel-winner{
+ background:linear-gradient(135deg,#503e70,#261b46)!important;
+ border-color:#ffe4a0!important;
+ box-shadow:0 0 19px #dbae6880!important;
+}
+/* Expanded test controls: visible only on ?tester=1 because the whole panel is hidden there otherwise. */
+body.ui-v15 .tester-panel{
+ width:min(414px,calc(100vw - 22px));
+ background:linear-gradient(155deg,#1b112f,#110c21 90%)!important;
+ border:2px solid #674699!important;border-bottom:4px solid #3e2467!important;
+ box-shadow:0 28px 75px #000b;
+ scrollbar-color:#7250ad transparent;
+}
+body.ui-v15 .tester-panel .tester-header{
+ border-color:#5b437f;
+}
+body.ui-v15 .tester-panel .tester-line{
+ border-color:#37244f;
+ font-size:12px;
+}
+body.ui-v15 .tester-panel .tester-line b{color:#d1b2ff}
+body.ui-v15 .tester-panel .tester-line input[type=number],
+body.ui-v15 .tester-panel .tester-line select{
+ background:#231637;color:#f5eaff;
+ border:1px solid #7253a3;border-bottom:3px solid #402b62;border-radius:5px;
+ min-height:40px;
+}
+body.ui-v15 .tester-panel .tester-line input[type=range]{
+ accent-color:#8e62e7;
+}
+body.ui-v15 .tester-rewards{
+ margin:18px 0 14px;padding:15px 12px;
+ background:linear-gradient(160deg,#241735,#170f28);
+ border:1px solid #5f4489;border-bottom:4px solid #3d275e;border-radius:7px;
+}
+body.ui-v15 .tester-rewards h3{
+ margin:0 0 11px;font-size:15px;line-height:1.2;font-weight:950;
+ color:#f3eaff;letter-spacing:.035em;
+}
+body.ui-v15 .tester-rewards-status{
+ padding:11px;margin:0 0 8px;
+ border-radius:5px;border-left:4px solid #9f78dc;
+ background:#34224f;color:#eadbff;
+ font-size:11px;line-height:1.5;font-weight:700;
+}
+body.ui-v15 .tester-reward-buttons{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;
+ margin:12px 0 0;
+}
+body.ui-v15 .tester-reward-buttons button{
+ display:flex;align-items:center;justify-content:center;
+ min-height:46px;padding:9px 7px;
+ border:1px solid #8060b3;border-bottom:4px solid #493072;border-radius:5px;
+ background:linear-gradient(150deg,#382250,#25193e);
+ color:#f1e9ff;font-size:11px;font-weight:850;line-height:1.25;
+ cursor:pointer;
+ transition:background .15s,transform .15s;
+}
+body.ui-v15 .tester-reward-buttons button:hover{
+ background:linear-gradient(150deg,#58338b,#32205a);
+ border-color:#ba9bf8;transform:translateY(-1px);
+}
+body.ui-v15 .tester-reward-buttons #tester-force-spin{
+ background:linear-gradient(120deg,#6532c1,#48208e);
+ border-color:#aa85f0;
+}
+body.ui-v15 .tester-reward-buttons button.danger{
+ color:#ffc8cc;background:#512739;border-color:#a45678;border-bottom-color:#652337;
+}
+body.ui-v15 .tester-odds-result{
+ white-space:pre-line;overflow-wrap:anywhere;
+ margin-top:10px;color:#d7c8e9;font-size:11px;line-height:1.65;
+}
+body.ui-v15 .tester-reward-note{
+ color:#aa95c3;font-size:11px;line-height:1.45;margin:10px 0 0;
+}
+@media(max-width:500px){
+ body.ui-v15 .tester-panel{right:5px;top:62px;max-height:calc(100dvh - 67px);width:calc(100vw - 10px)}
+ body.ui-v15 .tester-reward-buttons button{font-size:11px;min-height:47px}
+}
+@media(prefers-reduced-motion:reduce){
+ body.ui-v15 .tester-reward-buttons button{transition:none}
+}
