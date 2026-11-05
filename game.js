@@ -81,7 +81,7 @@ function stageRecipe(t=g.tier){
 const TEST_MODE = new URLSearchParams(location.search).get('tester')==='1';
 const SAVE_KEY = TEST_MODE?'cosmic-evolution-tester-save-v1':'cosmic-evolution-save-v1';
 const TEST_KEY = 'cosmic-evolution-tester-v1';
-const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,ring:1,density:16,showStats:true});
+const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,ring:1,density:16,showStats:true,rewardMultiplier:1,trackChance:.8});
 let tester={...TEST_DEFAULTS};
 try {
  const savedTester=JSON.parse(localStorage.getItem(TEST_KEY)||'null');
@@ -125,6 +125,7 @@ function normaliseMapPins(value){
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
 globalThis.SpaceMeta?.state(g);
+if(TEST_MODE)globalThis.SpaceMeta?.setTesterTuning({rewardMultiplier:tester.rewardMultiplier,trackChance:tester.trackChance});
 if(!g.drift||typeof g.drift!=='object')g.drift={route:[],seconds:0,totalDistance:0,visits:0,last:null};
 if(!Array.isArray(g.drift.route))g.drift.route=[];
 g.awaySince=Number.isFinite(g.awaySince)?Math.max(0,g.awaySince):0;
@@ -2654,6 +2655,7 @@ function showMusicShop(){
 // Daily login gift plus one wheel spin per calendar day. Roulette prizes are
 // granted atomically before the visual spin and remain owned after any death.
 let dailyOrigin='menu';
+let testerPrizeOverride=null;
 function dailyReturn(){
  const from=dailyOrigin;
  dailyOrigin='menu';
@@ -2724,36 +2726,56 @@ function showDailyRewards(origin){
 }
 // The wheel is built from the REAL prize weights; the visible wedge size and
 // the pointer landing angle agree with the random selection logic.
+const ROULETTE_GALAXY_COLORS=['#ee4e6d','#ffa439','#f7d44a','#41d184','#31bddb','#438ef4','#e969c4','#ffe4a0'];
 function rouletteWheelArtwork(prizes){
- const cx=180,cy=180,r=156,colors=['#4d22c6','#6040bf','#8255d5','#9b6de1','#b58bdb','#d6aa86','#f6c67c','#ffefbd'];
+ const cx=180,cy=180,r=156;
  let angle=0;
+ const defs=ROULETTE_GALAXY_COLORS.map((color,i)=>
+  '<linearGradient id="cosmic-prize-'+i+'" x1="0%" y1="0%" x2="100%" y2="100%">'+
+  '<stop offset="0%" stop-color="'+color+'"/><stop offset="55%" stop-color="'+color+'"/>'+
+  '<stop offset="100%" stop-color="#130c2a" stop-opacity=".94"/></linearGradient>').join('');
+ const polar=(deg,rad)=>({x:cx+Math.sin(deg*Math.PI/180)*rad,y:cy-Math.cos(deg*Math.PI/180)*rad});
  const arcs=prizes.map((prize,i)=>{
   const start=angle;angle+=prize.weight*3.6;
-  const end=angle,polar=(deg,rad)=>({x:cx+Math.sin(deg*Math.PI/180)*rad,y:cy-Math.cos(deg*Math.PI/180)*rad});
-  const a=polar(start,r),b=polar(end,r);
+  const end=angle,a=polar(start,r),b=polar(end,r);
   const d='M '+cx+' '+cy+' L '+a.x.toFixed(3)+' '+a.y.toFixed(3)+' A '+r+' '+r+' 0 '+(end-start>180?1:0)+' 1 '+b.x.toFixed(3)+' '+b.y.toFixed(3)+' Z';
-  const label=prize.id==='track'?'♫':'×'+prize.mult;
-  const showLabel=prize.weight>=8;
-  const p=polar((start+end)/2,prize.weight<13?119:111);
-  return '<path d="'+d+'" fill="'+colors[i]+'" stroke="#211130" stroke-width="2.8"/>'+
-    (showLabel?'<text x="'+p.x.toFixed(2)+'" y="'+p.y.toFixed(2)+'" text-anchor="middle" dominant-baseline="middle" fill="'+
-     (i>=5?'#291d36':'#f9f4ff')+'" font-size="'+(prize.weight<13?23:25)+'" font-weight="950" paint-order="stroke" stroke="#170e29" stroke-width="1.5">'+label+'</text>':'');
+  const count=Math.max(1,Math.min(6,Math.floor(prize.weight/5)));
+  const stars=Array.from({length:count},(_,k)=>{
+   const deg=start+(k+1)*(end-start)/(count+1),rad=82+((k*37+i*17)%57),p=polar(deg,rad);
+   const sz=k%3===0?2.5:1.25;
+   return '<circle cx="'+p.x.toFixed(2)+'" cy="'+p.y.toFixed(2)+'" r="'+sz+'" fill="#ffffff" opacity="'+(k%2===0?'.85':'.48')+'"/>';
+  }).join('');
+  const label=prize.id==='track'?'♫':'×'+prize.mult,showLabel=prize.weight>=8;
+  const p=polar((start+end)/2,prize.weight<13?118:110);
+  return '<path d="'+d+'" fill="url(#cosmic-prize-'+i+')" stroke="#140b26" stroke-width="3.5"/>'+
+   '<path d="'+d+'" fill="none" stroke="'+ROULETTE_GALAXY_COLORS[i]+'" stroke-opacity=".5" stroke-width="1.2"/>'+stars+
+   (showLabel?'<text x="'+p.x.toFixed(2)+'" y="'+p.y.toFixed(2)+'" text-anchor="middle" dominant-baseline="middle"'+
+    ' fill="'+(i===2?'#2a1934':'#fff6ff')+'" font-family="system-ui" font-size="'+(prize.weight<13?23:25)+
+    '" font-weight="950" paint-order="stroke" stroke="#150b26" stroke-width=".85">'+label+'</text>':'');
  }).join('');
- const marks=Array.from({length:48},(_,i)=>{
+ const perimeter=Array.from({length:48},(_,i)=>{
   const rad=i*Math.PI/24,x1=180+Math.sin(rad)*160,y1=180-Math.cos(rad)*160;
   const x2=180+Math.sin(rad)*(i%6===0?170:165),y2=180-Math.cos(rad)*(i%6===0?170:165);
-  return '<path d="M '+x1.toFixed(2)+' '+y1.toFixed(2)+' L '+x2.toFixed(2)+' '+y2.toFixed(2)+'" stroke="'+(i%6===0?'#d5b7ff':'#78619f')+'" stroke-width="'+(i%6===0?3:1.5)+'"/>';
+  return '<path d="M '+x1.toFixed(2)+' '+y1.toFixed(2)+' L '+x2.toFixed(2)+' '+y2.toFixed(2)+
+    '" stroke="'+(i%6===0?'#ffeac0':'#a688d8')+'" stroke-width="'+(i%6===0?3:1.3)+'"/>';
  }).join('');
  return '<svg viewBox="0 0 360 360" class="roulette-disc-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
-  '<defs><radialGradient id="roulette-shine" cx="38%" cy="27%" r="78%"><stop offset="0%" stop-color="#fff" stop-opacity=".22"/>'+
-  '<stop offset="55%" stop-color="#fff" stop-opacity="0"/><stop offset="100%" stop-color="#0b0618" stop-opacity=".55"/></radialGradient></defs>'+
-  '<circle cx="180" cy="180" r="177" fill="#23163c" stroke="#7450ab" stroke-width="4"/>'+
-  arcs+'<circle cx="180" cy="180" r="'+r+'" fill="url(#roulette-shine)"/>'+
-  '<circle cx="180" cy="180" r="158" fill="none" stroke="#d6bcfa" stroke-width="4"/>'+
-  marks+'<circle cx="180" cy="180" r="63" fill="#190e2e" stroke="#a785e7" stroke-width="6"/>'+
-  '<circle cx="180" cy="180" r="53" fill="#2d1850" stroke="#67439f" stroke-width="2"/>'+
-  '<text x="180" y="185" text-anchor="middle" fill="#fff3d0" font-family="system-ui" font-size="47" font-weight="850">✦</text>'+
-  '<text x="180" y="209" text-anchor="middle" fill="#c7b1ec" font-family="system-ui" font-size="11" font-weight="900" letter-spacing="3">SPACE</text>'+
+  '<defs>'+defs+
+  '<radialGradient id="cosmic-wheel-lens" cx="36%" cy="23%" r="78%">'+
+  '<stop offset="0%" stop-color="#ffffff" stop-opacity=".25"/>'+
+  '<stop offset="58%" stop-color="#ffffff" stop-opacity="0"/>'+
+  '<stop offset="100%" stop-color="#050512" stop-opacity=".3"/></radialGradient>'+
+  '<radialGradient id="cosmic-wheel-hub"><stop offset="0%" stop-color="#6140a4"/><stop offset="75%" stop-color="#271642"/>'+
+  '<stop offset="100%" stop-color="#130d27"/></radialGradient></defs>'+
+  '<circle cx="180" cy="180" r="177" fill="#201336" stroke="#8c72bd" stroke-width="4"/>'+
+  '<circle cx="180" cy="180" r="171" fill="#100b21" stroke="#c7aaf8" stroke-opacity=".8" stroke-width="2"/>'+
+  arcs+'<circle cx="180" cy="180" r="'+r+'" fill="url(#cosmic-wheel-lens)"/>'+
+  '<circle cx="180" cy="180" r="158" fill="none" stroke="#efd8ff" stroke-width="3"/>'+
+  perimeter+
+  '<circle cx="180" cy="180" r="63" fill="#160e2b" stroke="#c4a5ee" stroke-width="6"/>'+
+  '<circle cx="180" cy="180" r="53" fill="url(#cosmic-wheel-hub)" stroke="#7453ab" stroke-width="2"/>'+
+  '<path d="M180 146l7 22 22 12-22 7-7 22-8-22-21-7 21-12z" fill="#fff4d3" opacity=".9"/>'+
+  '<text x="180" y="216" text-anchor="middle" fill="#e3d4fa" font-family="system-ui" font-size="10" font-weight="900" letter-spacing="2">INFINITI</text>'+
   '</svg>';
 }
 function showCosmicRoulette(origin){
@@ -2766,7 +2788,7 @@ function showCosmicRoulette(origin){
   const track=p.id==='track';
   const reward=track?L('RANDOM MUSIC TRACK','СЛУЧАЙНЫЙ ТРЕК','PISTA ALEATORIA'):'✦ '+fmt(base*p.mult);
   return '<div class="daily-wheel-legend-item" data-prize="'+p.id+'"><i></i><b>'+reward+'</b><strong>'+
-   String(p.weight).replace('.',',')+'%</strong></div>';
+   Number(p.weight.toFixed(1)).toLocaleString('ru-RU')+'%</strong></div>';
  }).join('');
  const hint=canClaim?
   L('Claim today’s gift to unlock your spin.','Сначала забери ежедневную награду, чтобы открыть попытку.','Recoge el regalo diario para desbloquear el giro.'):
@@ -2792,7 +2814,19 @@ function showCosmicRoulette(origin){
   L('Spin for stardust or a rare music track.','Крути колесо ради звёздной пыли или редкого музыкального трека.','Gira para ganar polvo estelar o una pista musical rara.'),
   body);
  $('daily-spin').onclick=()=>{
-  const result=meta.roll(g,MUSIC_TRACKS);
+  let rouletteRandom=Math.random;
+  if(TEST_MODE&&testerPrizeOverride){
+   const desired=testerPrizeOverride;
+   testerPrizeOverride=null;
+   const prizeIndex=meta.PRIZES.findIndex(p=>p.id===desired);
+   if(prizeIndex>=0){
+    const start=meta.PRIZES.slice(0,prizeIndex).reduce((sum,p)=>sum+p.weight,0);
+    const pct=(start+meta.PRIZES[prizeIndex].weight/2)/100;
+    let first=true;
+    rouletteRandom=()=>{if(first){first=false;return pct;}return Math.random();};
+   }
+  }
+  const result=meta.roll(g,MUSIC_TRACKS,Date.now(),rouletteRandom);
   if(!result.ok)return;
   save();checkProgression();
   const spin=$('daily-spin');spin.disabled=true;
