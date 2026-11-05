@@ -70,7 +70,7 @@ async function testSDK(){
  };
  const window={CrazyGames:{SDK:sdk},dispatchEvent(ev){if(ev.type==='space-platform-audio')audioEvents++;}};
  const ctx={window,location:{hostname:'localhost',search:''},performance:{now:()=>0},
-  Event:class Event{constructor(type){this.type=type}},setTimeout,clearTimeout};
+  Event:class Event{constructor(type){this.type=type}},URLSearchParams,setTimeout,clearTimeout};
  vm.createContext(ctx);vm.runInContext(original,ctx);
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(window.SpacePlatform.status,'ready');
@@ -85,7 +85,7 @@ async function testSDK(){
  assert.equal(window.SpacePlatform.muted,false);
  assert.ok(audioEvents>=4,'Audio responds to start, finish and error callbacks');
  const disabled={window:{CrazyGames:{SDK:{...sdk,environment:'disabled'}}},location:{hostname:'mooouse.github.io',search:''},
-  performance:{now:()=>0},Event:ctx.Event,setTimeout,clearTimeout};
+  performance:{now:()=>0},Event:ctx.Event,URLSearchParams,setTimeout,clearTimeout};
  disabled.window.dispatchEvent=()=>{};
  vm.createContext(disabled);vm.runInContext(original,disabled);
  await new Promise(resolve=>setImmediate(resolve));
