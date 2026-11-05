@@ -2499,11 +2499,27 @@ const ACHIEVEMENTS=[
  ['mass30',4,['Beyond imagination','За гранью воображения','Más allá de la imaginación'],'solar',1e30],
  ['mass60',5,['Impossible horizon','Невозможный горизонт','Horizonte imposible'],'solar',1e60],
  ['mass100',5,['Googol suns','Гугол солнц','Un gúgol de soles'],'solar',1e100],
- ['dust30',5,['Stardust empire','Империя звёздной пыли','Imperio de polvo estelar'],'credits',1e30]
+ ['dust30',5,['Stardust empire','Империя звёздной пыли','Imperio de polvo estelar'],'credits',1e30],
+
+ ['tracks2',2,['Radio operator','Радиооператор','Operador de radio'],'tracks',2],
+ ['tracks5',3,['Cosmic playlist','Космический плейлист','Lista cósmica'],'tracks',5],
+ ['tracksall',5,['Complete soundtrack','Полная музыкальная коллекция','Banda sonora completa'],'tracks',12],
+ ['daily3',2,['Regular visitor','Постоянный путешественник','Visitante habitual'],'dailyClaims',3],
+ ['daily7',3,['A week among stars','Неделя среди звёзд','Una semana entre estrellas'],'dailyStreak',7],
+ ['daily30',4,['Orbit of habit','Орбита привычки','Órbita de hábito'],'dailyClaims',30],
+ ['rouletteTrack',5,['Song of fortune','Песня удачи','Canción de la fortuna'],'musicWins',1],
 ];
-function achievementValue(key){return key==='solar'?(g.endless?solarMass():0):key==='holes'?Object.keys(g.abyssConsumed).length:key==='explored'?exploredCount():Math.max(0,g[key]||0);}
+function achievementValue(key){if(key==='tracks')return g.ownedTracks?.length||0;
+ if(key==='dailyClaims')return g.daily?.claims||0;
+ if(key==='dailyStreak')return g.daily?.streak||0;
+ if(key==='musicWins')return g.daily?.musicWins||0;
+ return key==='solar'?(g.endless?solarMass():0):key==='holes'?Object.keys(g.abyssConsumed).length:key==='explored'?exploredCount():Math.max(0,g[key]||0);}
 function achievementProgress(a){return clamp(achievementValue(a[3])/a[4]*100,0,100);}
-function goalLabel(key){return ({collects:L('objects','объектов','objetos'),bestChain:L('chain','цепочка','cadena'),tier:L('evolution stage','стадия','etapa'),explored:L('ly² explored','св. лет² изучено','al² explorados'),rare:L('relics','реликвий','reliquias'),pulses:L('pulses','импульсов','pulsos'),holes:L('black holes','чёрных дыр','agujeros negros'),solar:'M☉',credits:L('stardust','звёздной пыли','polvo estelar')})[key];}
+function goalLabel(key){return ({collects:L('objects','объектов','objetos'),bestChain:L('chain','цепочка','cadena'),tier:L('evolution stage','стадия','etapa'),explored:L('ly² explored','св. лет² изучено','al² explorados'),rare:L('relics','реликвий','reliquias'),pulses:L('pulses','импульсов','pulsos'),holes:L('black holes','чёрных дыр','agujeros negros'),solar:'M☉',credits:L('stardust','звёздной пыли','polvo estelar'),
+ tracks:L('tracks','треков','pistas'),
+ dailyClaims:L('daily gifts','подарков','regalos'),
+ dailyStreak:L('days in a row','дней подряд','días seguidos'),
+ musicWins:L('roulette tracks','треков с рулетки','pistas de ruleta')})[key];}
 let achievementQueue=[],achievementToastAt=-10,requirementNotice='',requirementNoticeAt=-100;
 function checkProgression(){
  g.achievements??={};
@@ -2635,10 +2651,72 @@ function chooseTrack(track){
 function showMusicShop(){
  show(`<div class="eyebrow">${L('SIGNALS FROM THE VOID','СИГНАЛЫ ИЗ ПУСТОТЫ','SEÑALES DEL VACÍO')}</div><div class="overlay-title">${L('MUSIC COLLECTION','КОЛЛЕКЦИЯ МУЗЫКИ','COLECCIÓN DE MÚSICA')}</div><p class="overlay-copy">${L('Unlock tracks with stardust to listen. Purchased tracks remain yours after death and in a new universe.','Купи треки за звёздную пыль, чтобы слушать их. Покупки сохраняются после смерти и в новой Вселенной.','Compra pistas con polvo estelar para escucharlas. Se conservan tras morir y en un nuevo universo.')}</p><div class="track-list">${MUSIC_TRACKS.map(t=>`<div class="track-row"><span>${String(t.id+1).padStart(2,'0')}</span><div><strong>${t.title}</strong><small>${t.id===STARTER_TRACK?.id?L('Free · base soundtrack','Бесплатно · базовый трек','Gratis · pista básica'):`✦ ${fmt(t.price)}`}</small></div><button class="secondary-button" data-track="${t.id}" ${!t.src?'disabled':''}>${!t.src?L('COMING SOON','СКОРО','PRÓXIMAMENTE'):g.activeTrack===t.id?L('PLAYING','ИГРАЕТ','SONANDO'):g.ownedTracks.includes(t.id)?L('PLAY','СЛУШАТЬ','ESCUCHAR'):L('UNLOCK','КУПИТЬ','DESBLOQUEAR')}</button></div>`).join('')}</div><div class="modal-actions">${continueButton()}</div>`);attachContinue();document.querySelectorAll('[data-track]').forEach(b=>b.onclick=()=>{if(chooseTrack(MUSIC_TRACKS.find(t=>t.id===+b.dataset.track)))showMusicShop();});
 }
+// Daily login gift plus one wheel spin per calendar day. Roulette prizes are
+// granted atomically before the visual spin and remain owned after any death.
+let dailyOrigin='menu';
+function dailyReturn(){const from=dailyOrigin;dailyOrigin='menu';if(from==='play')resumeGame();else showMainMenu(true);}
+function showDailyRewards(origin){
+ dailyOrigin=origin||($('modal').classList.contains('off')?'play':'menu');
+ const meta=window.SpaceMeta;if(!meta)return;
+ const state=meta.state(g),canClaim=meta.canClaim(g),canSpin=meta.canSpin(g);
+ const prizes=meta.PRIZES.map(p=>'<div class="daily-wheel-prize">'+
+  (p.id==='track'?'♫':p.mult+'×')+'</div>').join('');
+ show('<div class="daily-screen">'+
+  '<div class="daily-eyebrow">'+L('DAILY COSMIC REWARDS','ЕЖЕДНЕВНЫЕ НАГРАДЫ','RECOMPENSAS DIARIAS')+'</div>'+
+  '<h2>'+L('Stardust & luck','Звёздная пыль и удача','Polvo estelar y suerte')+'</h2>'+
+  '<p>'+L('Claim a gift every day, then spin the wheel once. The rarest prize is a random paid music track.','Получай награду каждый день и один раз крути рулетку. Самый редкий приз — случайный платный музыкальный трек.','Recoge un regalo cada día y gira la ruleta una vez. El premio más raro es una pista de música aleatoria.')+'</p>'+
+  '<div class="daily-streak"><span>'+L('STREAK','СЕРИЯ','RACHA')+'</span><strong>'+
+  state.streak+' '+L('days','дней','días')+'</strong><span>'+
+  L('Claims: ','Получено: ','Reclamos: ')+state.claims+'</span></div>'+
+  '<button class="daily-claim" id="daily-claim" '+(canClaim?'':'disabled')+'>'+
+  (canClaim?L('CLAIM DAILY STARDUST','ЗАБРАТЬ ЕЖЕДНЕВНУЮ НАГРАДУ','RECOGER REGALO DIARIO'):
+   L('GIFT CLAIMED TODAY','ПОДАРОК СЕГОДНЯ ПОЛУЧЕН','REGALO RECOGIDO HOY'))+'</button>'+
+  '<div class="daily-wheel-stage"><div class="daily-wheel-pointer">▼</div>'+
+  '<div class="daily-wheel" id="daily-wheel"><div class="daily-wheel-center">✦</div>'+
+  '<div class="daily-wheel-prizes">'+prizes+'</div></div></div>'+
+  '<div class="daily-prize-note">'+L('Rare jackpot: random music track · 0.8%','Редкий джекпот: случайный трек · 0,8%','Premio raro: pista musical · 0,8%')+'</div>'+
+  '<div id="daily-result" class="daily-result" role="status" aria-live="polite">'+
+  (canClaim?L('Collect the daily gift to unlock the wheel.','Забери ежедневную награду, чтобы открыть рулетку.','Recoge el regalo para desbloquear la ruleta.'):
+   canSpin?L('The wheel is ready!','Рулетка готова!','¡La ruleta está lista!'):
+   L('Come back tomorrow for the next spin.','Возвращайся завтра за следующей попыткой.','Regresa mañana para otro giro.'))+'</div>'+
+  '<div class="daily-actions"><button id="daily-spin" class="daily-spin" '+(canSpin?'':'disabled')+'>'+
+  L('SPIN THE WHEEL','КРУТИТЬ РУЛЕТКУ','GIRAR LA RULETA')+'</button>'+
+  '<button id="daily-back" class="daily-back">'+L('BACK','НАЗАД','VOLVER')+'</button></div></div>');
+ $('modal').dataset.screen='daily';$('panel-close').onclick=dailyReturn;
+ $('daily-back').onclick=dailyReturn;
+ $('daily-claim').onclick=()=>{
+  const result=meta.claim(g);if(!result.ok)return;
+  save();checkProgression();showDailyRewards(dailyOrigin);
+  toast(L('Daily gift: ','Ежедневная награда: ','Regalo diario: ')+'✦ '+fmt(result.amount));
+ };
+ $('daily-spin').onclick=()=>{
+  const result=meta.roll(g,MUSIC_TRACKS);
+  if(!result.ok)return;
+  save();checkProgression();
+  const spin=$('daily-spin');spin.disabled=true;spin.textContent=L('SPINNING…','ВРАЩЕНИЕ…','GIRANDO…');
+  const claim=$('daily-claim');claim.disabled=true;
+  const wheel=$('daily-wheel');
+  const sector=Math.max(0,window.SpaceMeta.PRIZES.findIndex(p=>p.id===result.prize||
+   (result.prize==='track-value'&&p.id==='track')));
+  wheel.style.setProperty('--wheel-turn',(1800+360-sector*45-22.5)+'deg');
+  wheel.classList.add('spinning');
+  const label=result.type==='track'?
+   L('NEW TRACK','НОВЫЙ ТРЕК','PISTA NUEVA')+': '+result.track.title:
+   '✦ '+fmt(result.amount)+(result.prize==='track-value'?
+    ' · '+L('Collection complete: track value','Коллекция полная: стоимость трека','Colección completa: valor de la pista'):'');
+  $('daily-result').textContent=label;
+  sound(590,'triangle',.20,.04);
+  setTimeout(()=>{if(wheel.isConnected)wheel.classList.add('finished');},2300);
+ };
+}
 function showMainMenu(paused=false){
  show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.44.0 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
+ const dailyMenuBtn=document.createElement('button');dailyMenuBtn.id='menu-daily';
+ dailyMenuBtn.innerHTML='✦ '+L('Daily rewards & roulette','Ежедневные награды и рулетка','Recompensas y ruleta');
+ dailyMenuBtn.onclick=()=>showDailyRewards('menu');
+ $('menu-map').parentElement.insertBefore(dailyMenuBtn,$('menu-map').nextSibling);
  $('menu-bestiary').onclick=showBestiary;$('menu-achievements').onclick=showAchievements;$('menu-statistics').onclick=showStatistics;$('menu-settings').onclick=showSettings;
 }
 // The atlas reads the exact same deterministic sector data as gameplay; it is not an evolution-level menu.
@@ -3211,6 +3289,11 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
   q(root,'.primary.big-play').onclick=()=>g.tutorialDone?resumeGame():showTutorial();q(root,'.quiet-btn').onclick=restartCampaign;
+  const dailyBtn=document.createElement('button');dailyBtn.type='button';dailyBtn.className='daily-menu-link';
+  dailyBtn.innerHTML='<span class="daily-link-icon">✦</span><span>'+L('Daily rewards & roulette','Ежедневные награды и рулетка','Recompensas y ruleta')+'</span><span>↗</span>';
+  dailyBtn.onclick=()=>showDailyRewards('menu');
+  const menuGrid=q(root,'.menu-grid');menuGrid.append(dailyBtn);
+  if(window.SpaceMeta?.canClaim(g))dailyBtn.classList.add('daily-new');
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
@@ -3520,6 +3603,12 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   '<button type="button" class="icon-btn" data-audio-action="collection" aria-label="'+L('Music collection','Коллекция музыки','Colección de música')+'" title="'+L('Music collection','Коллекция музыки','Colección de música')+'">'+uiIcon('playlist')+'</button>'+
   '<button type="button" class="icon-btn" data-audio-action="mute" aria-label="'+L('Mute all sounds','Выключить весь звук','Silenciar todo')+'" title="'+L('Mute all sounds','Выключить весь звук','Silenciar todo')+'">'+uiIcon('music')+'</button>';
  q(hud,'.hud-commands').prepend(soundControls);
+ const dailyShortcut=document.createElement('button');dailyShortcut.type='button';
+ dailyShortcut.className='icon-btn daily-hud-button';dailyShortcut.innerHTML='✦';
+ dailyShortcut.title=L('Daily rewards','Ежедневные награды','Recompensas diarias');
+ dailyShortcut.setAttribute('aria-label',dailyShortcut.title);
+ dailyShortcut.onclick=()=>showDailyRewards('play');
+ q(hud,'.hud-commands').prepend(dailyShortcut);
  q(soundControls,'[data-audio-action="collection"]').onclick=()=>navigate('music');
  q(soundControls,'[data-audio-action="mute"]').onclick=()=>{const enabled=!(g.music||g.sound);g.music=enabled;g.sound=enabled;initAudio();setMusicVolume();save();refreshV15();};
  const activate=(id,fn)=>{const b=q(hud,id);b.onclick=fn;
