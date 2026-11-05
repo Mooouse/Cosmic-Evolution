@@ -13,6 +13,8 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
  try{
   const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1});
   const page=await context.newPage();
+  // The real report came from the RU interface; do not only test EN labels.
+  await page.addInitScript(()=>localStorage.setItem('infiniti-space-language','ru'));
   page.on('pageerror',e=>{errors.push(String(e.stack||e));log('PAGE ERROR:',String(e.stack||e).slice(0,1000));});
   page.on('console',m=>{if(m.type()==='error')log('BROWSER CONSOLE:',m.text().slice(0,700));});
   await page.goto(base+'/?tester=1',{waitUntil:'domcontentloaded',timeout:60000});
