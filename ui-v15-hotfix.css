@@ -1230,3 +1230,171 @@ body.ui-v15 #screen-evolution .evo-v2-back-current{
  body.ui-v15 #screen-evolution .evo-v2-inspector{flex-direction:column}
  body.ui-v15 #screen-evolution .evo-v2-back-current{width:100%;flex-basis:auto}
 }
+
+
+/* v3.45 — in-game retention: daily wheel, revival offer and safe drift route. */
+body.ui-v15 #screen-menu .menu-grid .daily-menu-link{
+ display:flex;align-items:center;gap:10px;min-width:0;
+ text-align:left;color:#f0ddff;
+ border:1px solid #a07ced;border-bottom:3px solid #6046a5;
+ background:linear-gradient(115deg,#422670,#251543);
+}
+body.ui-v15 #screen-menu .menu-grid .daily-menu-link .daily-link-icon{
+ display:grid;place-items:center;
+ width:29px;height:29px;border-radius:6px;flex:none;
+ color:#fff2c8;background:#7650b9;font-size:20px;
+ box-shadow:0 0 12px #b47ef770;
+}
+body.ui-v15 #screen-menu .menu-grid .daily-menu-link span:nth-child(2){flex:1;min-width:0}
+body.ui-v15 #screen-menu .menu-grid .daily-menu-link.daily-new{
+ border-color:#d9b178;box-shadow:0 0 14px #d7a46755;
+}
+body.ui-v15 .hud-commands .daily-hud-button{
+ font-size:22px;font-weight:950;
+ color:#f5ddff;background:linear-gradient(130deg,#51348b,#291946);
+ text-shadow:0 0 9px #9b6ff6;
+}
+body.ui-v15 #modal .modal-card:has(.daily-screen),
+body.ui-v15 #modal .modal-card:has(.revive-screen){
+ display:flex;align-items:stretch;justify-content:center;
+ max-width:670px;width:min(670px,calc(100vw - 18px));
+ max-height:calc(100dvh - 18px);overflow-y:auto;
+ margin:auto;padding:0!important;
+ border:1px solid #7452ae;border-bottom:3px solid #4c2e88;
+ border-radius:15px;background:linear-gradient(155deg,#241638,#130c24);
+ box-shadow:0 24px 90px #000d,0 0 35px #7239c338;
+ scrollbar-width:thin;scrollbar-color:#795ab5 transparent;
+}
+body.ui-v15 #modal .modal-card:has(.daily-screen) #panel-close,
+body.ui-v15 #modal .modal-card:has(.revive-screen) #panel-close{
+ position:absolute;top:10px;right:10px;z-index:8;
+}
+body.ui-v15 #modal .daily-screen,body.ui-v15 #modal .revive-screen{
+ display:flex;align-items:stretch;flex-direction:column;
+ width:100%;max-width:100%;gap:12px;
+ padding:27px clamp(15px,4vw,33px) 22px;
+ color:#eee2ff;
+}
+body.ui-v15 #modal .daily-screen h2,body.ui-v15 #modal .revive-screen h2{
+ margin:0;color:#faf3ff;line-height:1.12;
+ font-weight:950;font-size:clamp(25px,4vw,37px);
+}
+body.ui-v15 #modal .daily-screen p,body.ui-v15 #modal .revive-screen p{
+ margin:0;color:#b8a8d3;font-size:12px;line-height:1.6;
+}
+body.ui-v15 #modal .daily-eyebrow,body.ui-v15 #modal .revive-eyebrow{
+ color:#be9afa;font:900 10px/1.4 system-ui,sans-serif;letter-spacing:.15em;
+}
+body.ui-v15 #modal .daily-streak{
+ display:flex;align-items:center;flex-wrap:wrap;gap:12px;
+ padding:10px 13px;border:1px solid #7353a1;border-radius:8px;
+ background:#211434;
+}
+body.ui-v15 #modal .daily-streak>span{
+ font-size:10px;font-weight:850;color:#bfaadb;letter-spacing:.06em;
+}
+body.ui-v15 #modal .daily-streak>strong{
+ flex:1;color:#fff1dc;font-weight:950;font-size:15px;
+}
+body.ui-v15 #modal .daily-claim,body.ui-v15 #modal .daily-spin,
+body.ui-v15 #modal .revive-ad{
+ min-height:44px;border:1px solid #c8abff;border-bottom:4px solid #6640ae;
+ border-radius:8px;background:linear-gradient(130deg,#7245ca,#4d278f);
+ color:#fff;font-size:12px;font-weight:950;
+ box-shadow:0 6px 17px #3e167044;
+}
+body.ui-v15 #modal .daily-claim:disabled,body.ui-v15 #modal .daily-spin:disabled{
+ opacity:.58;cursor:not-allowed;background:#32234b;
+}
+body.ui-v15 #modal .daily-wheel-stage{
+ position:relative;display:grid;place-items:center;
+ min-height:255px;padding:8px;
+}
+body.ui-v15 #modal .daily-wheel-pointer{
+ position:absolute;z-index:4;left:50%;top:0;
+ transform:translateX(-50%);
+ color:#ffecc0;font-size:30px;
+ filter:drop-shadow(0 0 9px #ffca68);
+}
+body.ui-v15 #modal .daily-wheel{
+ --wheel-turn:0deg;position:relative;
+ width:236px;height:236px;flex:none;border-radius:50%;
+ border:7px solid #8b69c4;
+ /* Unequal slices reflect the REAL prize weights. Last 0.8% is a track. */
+ background:conic-gradient(#5330a3 0% 29%,#7850b5 29% 54%,#9065c9 54% 74%,#a475d6 74% 87%,#ce9bda 87% 95%,#d9b378 95% 98%,#ffdc8a 98% 99.2%,#fbefb5 99.2% 100%);
+ box-shadow:0 0 0 5px #29173c,0 0 32px #8052bf77,inset 0 0 30px #190d2888;
+ transform:rotate(0deg);
+}
+body.ui-v15 #modal .daily-wheel.spinning{
+ transition:transform 2.3s cubic-bezier(.13,.64,.17,1);
+ transform:rotate(var(--wheel-turn));
+}
+body.ui-v15 #modal .daily-wheel-center{
+ position:absolute;left:50%;top:50%;
+ transform:translate(-50%,-50%);
+ width:79px;height:79px;display:grid;place-items:center;
+ background:radial-gradient(circle,#2e1c52,#150e29);
+ border:5px solid #b28cef;border-radius:50%;
+ font-size:31px;color:#f9e6ff;
+ box-shadow:0 0 13px #ac7fea88;
+}
+body.ui-v15 #modal .daily-wheel-prizes{
+ position:absolute;inset:0;display:none;
+}
+body.ui-v15 #modal .daily-prize-note{
+ text-align:center;color:#d8bbec;font-size:11px;font-weight:800;
+}
+body.ui-v15 #modal .daily-result{
+ min-height:37px;display:grid;place-items:center;
+ padding:8px 10px;border-radius:7px;
+ border:1px solid #64478c;background:#201432;
+ color:#f1e8ff;text-align:center;line-height:1.5;
+ font-size:12px;font-weight:850;
+}
+body.ui-v15 #modal .daily-actions{
+ display:grid;grid-template-columns:1fr 1fr;gap:9px;
+}
+body.ui-v15 #modal .daily-back,body.ui-v15 #modal .revive-restart,
+body.ui-v15 #modal .revive-coins{
+ min-height:44px;padding:9px;border:1px solid #886abb;border-bottom:3px solid #563b88;
+ border-radius:8px;background:#2d1e47;color:#f4eaff;font-size:11px;font-weight:900;
+}
+body.ui-v15 #modal .revive-screen .revive-stats{
+ display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:9px 0;
+}
+body.ui-v15 #modal .revive-stats span{
+ display:flex;align-items:flex-start;flex-direction:column;gap:7px;
+ padding:15px;border-radius:9px;border:1px solid #684994;
+ background:#1b1230;color:#bba8d3;font-size:10px;font-weight:800;
+}
+body.ui-v15 #modal .revive-stats strong{
+ color:#f1eaff;font-size:19px;line-height:1.2;font-variant-numeric:tabular-nums;
+}
+body.ui-v15 #modal .revive-actions{
+ display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;
+}
+body.ui-v15 #modal .revive-actions .revive-ad{grid-column:1/-1}
+body.ui-v15 #modal .revive-actions button:disabled{opacity:.52;cursor:not-allowed}
+body.ui-v15 #modal .revive-screen>small{
+ color:#a99cbf;font-size:10px;line-height:1.5;
+}
+body.ui-v15 #modal .revive-feedback{
+ min-height:22px;color:#ffcadb;font-size:11px;font-weight:750;
+}
+body.ui-v15 #modal .ad-note{grid-column:1/-1}
+body.ui-v15 .drift-route-button{
+ width:100%;min-height:36px;margin-top:8px;padding:8px;
+ border:1px solid #ad89e2;border-bottom:3px solid #5c378a;
+ border-radius:7px;background:#32204f;
+ color:#f3e7ff;font-size:11px;font-weight:850;
+}
+body.ui-v15 .drift-route-button:disabled{opacity:.47}
+@media(max-width:600px){
+ body.ui-v15 #modal .daily-screen,body.ui-v15 #modal .revive-screen{padding:25px 14px 16px}
+ body.ui-v15 #modal .daily-wheel-stage{min-height:220px}
+ body.ui-v15 #modal .daily-wheel{width:204px;height:204px}
+ body.ui-v15 #modal .daily-wheel-center{width:66px;height:66px}
+ body.ui-v15 #modal .daily-actions{grid-template-columns:1fr}
+ body.ui-v15 #modal .revive-actions{grid-template-columns:1fr}
+ body.ui-v15 #modal .revive-actions .revive-ad{grid-column:auto}
+}
