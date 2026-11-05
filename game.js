@@ -1475,8 +1475,15 @@ function evolve(){
  toast(`✦ НОВАЯ ФОРМА: ${TA[g.tier].name.toUpperCase()}`,'golden');sound(440,'triangle',.6,.055);
  renderUI(true);
 }
+function flashAbilityButton(id){
+ const b=document.querySelector('#hud .v15-hud #'+id);if(!b)return;
+ b.classList.remove('ability-fired');
+ void b.offsetWidth; // replay animation even for keyboard activation
+ b.classList.add('ability-fired');
+ setTimeout(()=>b.classList.remove('ability-fired'),650);
+}
 function activatePulse(){
- if(!running||pulseCd>0)return;pulseCd=13;g.pulses++;g.stagePulses++;
+ if(!running||pulseCd>0)return;pulseCd=13;flashAbilityButton('pulse');g.pulses++;g.stagePulses++;
  const range=Math.max(270+upgradePower('gravity')*7,ordinaryGravityRadius()*1.25);
  shockwaves.push({x:player.x,y:player.y,r:player.r,max:1.2,life:1.2,color:'#84dfff',range});
  for(const e of [...entities,...macroEntities,...cosmicAbsorptions]){
@@ -1489,7 +1496,7 @@ function activatePulse(){
  }
  shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();
 }
-function activateBoost(){if(!running||boostCd>0)return;boostCd=6;boostTime=2.5;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
+function activateBoost(){if(!running||boostCd>0)return;boostCd=6;flashAbilityButton('dash');boostTime=2.5;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
 // A finite field changes momentum; it does not attach a body to the player.
 // driftBody/freeFlightAt already advanced the inertial position to this time.
 function deflectResource(e,dt,range){
@@ -3234,7 +3241,10 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  q(hud,'.hud-commands').prepend(soundControls);
  q(soundControls,'[data-audio-action="collection"]').onclick=()=>navigate('music');
  q(soundControls,'[data-audio-action="mute"]').onclick=()=>{const enabled=!(g.music||g.sound);g.music=enabled;g.sound=enabled;initAudio();setMusicVolume();save();refreshV15();};
- const activate=(id,fn)=>{const b=q(hud,id);b.onclick=()=>{fn();b.style.borderColor='#906BFF';setTimeout(()=>b.style.borderColor='',550);};};activate('#pulse',activatePulse);activate('#dash',activateBoost);q(hud,'#view-mode').remove();
+ const activate=(id,fn)=>{const b=q(hud,id);b.onclick=fn;
+  const badge=document.createElement('span');badge.className='ability-cooldown-label';
+  badge.setAttribute('aria-live','off');b.append(badge);
+ };activate('#pulse',activatePulse);activate('#dash',activateBoost);q(hud,'#view-mode').remove();
  // No duplicate camera toggle: desktop uses wheel / existing zoom buttons; phone uses two-finger pinch.
 
  const info=q(hud,'.evo-status');info.setAttribute('role','button');info.tabIndex=0;info.setAttribute('aria-label',L('Evolution recipe','Рецепт эволюции','Receta de evolución'));info.onclick=e=>{if(!e.target.closest('button'))showV15Evolution();};info.onkeydown=e=>{if(e.key==='Enter')showV15Evolution();};
@@ -3248,7 +3258,15 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
    qa(hud,'[data-quick-qty]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.quickQty===String(g.buyAmount))));
    const mute=q(hud,'[data-audio-action="mute"]');
    if(mute){const audible=g.music||g.sound;mute.setAttribute('aria-pressed',String(audible));mute.setAttribute('aria-label',audible?L('Mute all sounds','Выключить весь звук','Silenciar todo'):L('Enable all sounds','Включить весь звук','Activar sonido'));mute.title=mute.getAttribute('aria-label');mute.innerHTML=uiIcon(audible?'music':'mute');}
-  q(hud,'#pulse').dataset.cooling=String(pulseCd>0);q(hud,'#dash').dataset.cooling=String(boostCd>0);
+  for(const [id,remaining,duration,hotkey] of [['pulse',pulseCd,13,'E'],['dash',boostCd,6,'Shift']]){
+   const btn=q(hud,'#'+id),cooling=remaining>.02;
+   btn.dataset.cooling=String(cooling);
+   btn.setAttribute('aria-label',id==='pulse'?L('Gravity pulse','Гравитационный импульс','Pulso gravitatorio'):L('Dash','Рывок','Impulso'));
+   btn.setAttribute('aria-description',cooling?L('Cooldown','Перезарядка','Recarga')+' '+remaining.toFixed(1)+' s':L('Ready','Готово','Listo')+' · '+hotkey);
+   btn.style.setProperty('--ability-ready',Math.round((1-remaining/duration)*100)+'%');
+   const badge=q(btn,'.ability-cooldown-label');
+   if(badge)badge.textContent=cooling?remaining.toFixed(1)+'с':L('READY','ГОТОВО','LISTO');
+  }
   const visible=$('modal').classList.contains('off');hud.style.display=visible?'block':'none';
   const resources=qa(hud,'.hud-resources strong');resources[0].textContent=$('matter-value').textContent;resources[1].textContent=fmt(g.credits);resources[2].textContent=timeFmt(g.time);
   text(hud,'.hud-resources small',g.endless?L('BLACK HOLE MASS','МАССА ЧЁРНОЙ ДЫРЫ','MASA DEL AGUJERO NEGRO'):L('MATTER','МАТЕРИЯ','MATERIA'));text(hud,'.hud-sub',TA[g.tier].epoch);text(hud,'.world-coords',$('world-subtitle').textContent);
