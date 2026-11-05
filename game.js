@@ -3549,7 +3549,9 @@ function resetCampaignState(resetModifiers=false){
 function dieInAbyss(h){
  if(pendingDeath)return;
  const safe={id:h.id,name:h.name,x:h.x,y:h.y,r:h.r};
- pendingDeath={hole:safe,mass:fmt(g.total),duration:timeFmt(g.time),triedAd:false};
+ pendingDeath={hole:safe,mass:fmt(g.total),duration:timeFmt(g.time),
+  absorbed:Math.max(0,Math.floor(g.collects||0)),unlocks:Math.max(0,Math.floor(g.unlocks||0)),
+  tier:g.tier,stardust:fmt(g.credits||0),triedAd:false};
  g.pendingDeath=pendingDeath;
  g.awaySince=0;
  g.losses++;
@@ -3578,18 +3580,31 @@ function showDeathOffer(){
  if(!pendingDeath)return;
  // An older saved death may still contain obsolete coinsCost; it is ignored.
  const d=pendingDeath,eligible=!g.reviveUsed,ads=!!window.SpacePlatform?.adsAvailable;
- const offeredAd=eligible&&ads?
-  '<button id="revive-ad" type="button" class="revive-ad">'+L('▶ WATCH AD · REVIVE','▶ РЕКЛАМА · ВОЗРОДИТЬСЯ','▶ VER ANUNCIO · REVIVIR')+'</button>':
-  eligible?'<p class="ad-note">'+L('Video revival is available on CrazyGames when ads are enabled.','Возрождение за рекламу доступно на CrazyGames при включённой рекламе.','El anuncio para revivir está disponible en CrazyGames cuando hay anuncios.')+'</p>':'';
+ // Always show the rewarded-revival option, including on the GitHub tester.
+ // An unavailable SDK must not silently remove the user's only revival choice.
+ const offeredAd='<button id="revive-ad" type="button" class="revive-ad"'+
+   (!eligible?' disabled aria-disabled="true"':'')+'>'+
+   L('▶ WATCH AD · REVIVE','▶ РЕКЛАМА · ВОЗРОДИТЬСЯ','▶ VER ANUNCIO · REVIVIR')+'</button>';
+ const adExplanation=!eligible?
+  L('Revival has already been used in this run.','Возрождение уже использовано в этом прохождении.','La reanimación ya se usó en esta partida.'):
+  !ads?L('Ads are available when playing on CrazyGames. On GitHub Pages you can test the death screen, but an ad cannot start.',
+  'Реклама доступна на CrazyGames. На GitHub Pages можно проверить экран смерти, но запустить рекламу нельзя.',
+  'Los anuncios están disponibles en CrazyGames. En GitHub Pages no se pueden iniciar anuncios.') :'';
  show('<div class="revive-screen"><div class="revive-eyebrow">'+
   L('EVENT HORIZON CROSSED','ГОРИЗОНТ СОБЫТИЙ ПЕРЕСЕЧЁН','HORIZONTE CRUZADO')+'</div>'+
   '<h2>'+L('SWALLOWED BY THE VOID','ПОГЛОЩЁН БЕЗДНОЙ','DEVORADO POR EL VACÍO')+'</h2>'+
   '<p>'+L('The black hole pulled you beyond its horizon. Choose how to continue.','Чёрная дыра затянула тебя за горизонт. Выбери, как продолжить.','El agujero negro te absorbió. Elige cómo continuar.')+'</p>'+
-  '<div class="revive-stats"><span>'+L('MASS','МАССА','MASA')+' <strong>'+d.mass+'</strong></span><span>'+
-  L('FLIGHT TIME','ВРЕМЯ ПОЛЁТА','TIEMPO')+' <strong>'+d.duration+'</strong></span></div>'+
+  '<h3 class="revive-results-title">'+L('FLIGHT RESULTS','РЕЗУЛЬТАТЫ ПОЛЁТА','RESULTADOS DEL VUELO')+'</h3>'+
+  '<div class="revive-stats"><span>'+L('TOTAL MASS','ОБЩАЯ МАССА','MASA TOTAL')+' <strong>'+d.mass+'</strong></span><span>'+
+  L('FLIGHT TIME','ВРЕМЯ ПОЛЁТА','TIEMPO')+' <strong>'+d.duration+'</strong></span><span>'+
+  L('ABSORBED OBJECTS','ПОГЛОЩЕНО ОБЪЕКТОВ','OBJETOS ABSORBIDOS')+' <strong>'+fmt(d.absorbed??g.collects??0)+'</strong></span><span>'+
+  L('EVOLUTION FORM','ФОРМА ЭВОЛЮЦИИ','FORMA EVOLUTIVA')+' <strong>'+((d.tier??g.tier)+1)+' / '+TA.length+'</strong></span><span>'+
+  L('EVOLUTIONS','ЭВОЛЮЦИЙ','EVOLUCIONES')+' <strong>'+fmt(d.unlocks??g.unlocks??0)+'</strong></span><span>'+
+  L('STARDUST','ЗВЁЗДНАЯ ПЫЛЬ','POLVO ESTELAR')+' <strong>✦ '+(d.stardust??fmt(g.credits||0))+'</strong></span></div>'+
   '<div class="revive-actions">'+offeredAd+
   '<button id="revive-restart" type="button" class="revive-restart">'+
   L('START NEW JOURNEY','НАЧАТЬ ЗАНОВО','NUEVO VIAJE')+'</button></div>'+
+  (adExplanation?'<p class="revive-ad-note">'+adExplanation+'</p>':'')+
   '<small>'+L('One revival per run. Reviving preserves your progress. Starting over preserves stardust and owned music.','Одно возрождение за прохождение. При возрождении прогресс сохраняется. При новой игре остаются звёздная пыль и музыка.','Una reanimación por partida. Revivir conserva el progreso; empezar de nuevo conserva polvo y música.')+'</small>'+
   '<div class="revive-feedback" id="revive-feedback" aria-live="polite"></div></div>');
  $('modal').dataset.screen='death';$('panel-close').onclick=()=>{$('revive-restart').click();};
@@ -3625,7 +3640,13 @@ function showDeathOffer(){
  };
  const ad=$('revive-ad');
  if(ad)ad.onclick=async()=>{
-  if(awaitingAd||!window.SpacePlatform?.adsAvailable)return;
+  if(awaitingAd||!pendingDeath||g.reviveUsed)return;
+  if(!window.SpacePlatform?.adsAvailable){
+   $('revive-feedback').textContent=L('Rewarded ads are only available inside CrazyGames.',
+    'Рекламное возрождение доступно только на CrazyGames.',
+    'La reanimación por anuncio solo está disponible en CrazyGames.');
+   return;
+  }
   awaitingAd=true;d.triedAd=true;
   const buttons=[...document.querySelectorAll('.revive-actions button')];buttons.forEach(b=>b.disabled=true);
   $('revive-feedback').textContent=L('Ad request in progress…','Загрузка рекламы…','Cargando anuncio…');
@@ -3637,8 +3658,9 @@ function showDeathOffer(){
   if(!pendingDeath)return;
   buttons.forEach(b=>b.disabled=false);
   $('revive-feedback').textContent=L('Ad not completed. Start a new journey or retry later.','Реклама не завершена. Начни новое путешествие или попробуй позже.','Anuncio no completado. Inicia otro viaje o inténtalo más tarde.');
-  // No adFinished event means no free revival, even if an adblocker was active.
-  ad.disabled=true;
+  // No adFinished event means no free revival. Let the player retry if the
+  // platform reports that the rewarded ad is available again.
+  ad.disabled=!window.SpacePlatform?.adsAvailable;
  };
 }
 function restartCampaign(){
