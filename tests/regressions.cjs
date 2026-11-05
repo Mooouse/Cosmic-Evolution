@@ -1259,3 +1259,70 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
   'Returning to a focused but never-hidden browser window must also complete an absence');
  console.log('PASS: offline drift requires an active flight and 5+ real minutes; menu idle cannot generate a route');
 }
+
+
+// The displayed version must be the actually loaded game.js cache key.
+{
+ const begin=game.indexOf('const GAME_BUILD_VERSION=(()=>{');
+ const end=game.indexOf('const TEST_KEY =',begin);
+ assert.ok(begin>0&&end>begin);
+ const box={document:{querySelector(){return {getAttribute(){return 'game.js?v='+gameVersion;}}}}};
+ vm.createContext(box);
+ vm.runInContext(game.slice(begin,end)+'\nglobalThis.displayedBuild=GAME_BUILD_VERSION;',box);
+ assert.equal(box.displayedBuild,'v'+gameVersion);
+ assert.ok(!game.includes('v3.45.0'),'Stale hardcoded menu/footer version is forbidden');
+ assert.ok((game.match(/GAME_BUILD_VERSION/g)||[]).length>=5);
+ console.log('PASS: main-menu version is read from the deployed game.js URL');
+}
+
+// Test the actual evolution markup builder on the last and penultimate forms.
+{
+ const start=game.indexOf("  current.innerHTML='<div class=\"evo-v2-kicker\"");
+ const stop=game.indexOf("  paintStagePortrait(q(current,'.evo-v2-current-portrait'),tier);",start);
+ assert.ok(start>0&&stop>start);
+ const box={current:{innerHTML:''},tier:27,
+  stage:{name:'БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА',epoch:'Бесконечность',desc:'Космос'},
+  next:undefined,L:(en,ru)=>ru,esc:String,lightYears:()=> '100 св. лет',blackHoleCoreWorldRadius:()=>50};
+ vm.createContext(box);
+ vm.runInContext(game.slice(start,stop),box);
+ assert.ok(box.current.innerHTML.includes('ПОСЛЕДНЯЯ ФОРМА ДОСТИГНУТА'));
+ assert.ok(box.current.innerHTML.includes('БЕСКОНЕЧНЫЙ РОСТ'));
+ assert.ok(box.current.innerHTML.includes('МАССА ЧЁРНОЙ ДЫРЫ'));
+ assert.ok(box.current.innerHTML.includes('100 св. лет'));
+ assert.ok(!box.current.innerHTML.includes('evo-v2-next"'),'Final form has no next form');
+ assert.ok(!box.current.innerHTML.includes('role="progressbar"'),'Infinite growth has no 100% completion target');
+ box.current.innerHTML='';box.tier=26;box.next={name:'Next stage'};
+ vm.runInContext(game.slice(start,stop),box);
+ assert.ok(box.current.innerHTML.includes('evo-v2-next"'),'Earlier forms keep the next-stage card');
+ assert.ok(box.current.innerHTML.includes('role="progressbar"'));
+ console.log('PASS: final evolution is endless; intermediate evolution retains its next form');
+}
+
+// Full tester wipe deletes only test progress, backup, reward/music data and tester tweaks.
+{
+ const key='cosmic-evolution-tester-save-v1',tweaks='cosmic-evolution-tester-v1';
+ const saved=new Map([[key,'TEST-PROGRESS'],[key+'-backup','BACKUP'],[tweaks,'TEST-MODS'],
+  ['cosmic-evolution-save-v1','PRODUCTION'],['infiniti-space-language','ru']]);
+ let confirms=false,reloads=0;
+ const box={TEST_MODE:false,SAVE_KEY:key,TEST_KEY:tweaks,testerAbsoluteResetPending:false,
+  confirm(){return confirms;},location:{reload(){reloads++;}},toast(){},
+  localStorage:{removeItem(k){saved.delete(k);},getItem(k){return saved.get(k);},setItem(k,v){saved.set(k,v);}}};
+ const start=game.indexOf('function testerAbsoluteReset(){');
+ const end=game.indexOf('function testerInit(){',start);
+ assert.ok(start>0&&end>start);
+ vm.createContext(box);vm.runInContext(game.slice(start,end),box);
+ assert.equal(box.testerAbsoluteReset(),false,'Normal game cannot invoke tester wipe');
+ box.TEST_MODE=true;
+ assert.equal(box.testerAbsoluteReset(),false,'Cancel never deletes saves');
+ assert.equal(saved.get(key),'TEST-PROGRESS');
+ confirms=true;
+ assert.equal(box.testerAbsoluteReset(),true);
+ assert.equal(box.testerAbsoluteResetPending,true,'Unload autosave is blocked');
+ for(const k of [key,key+'-backup',tweaks])assert.equal(saved.has(k),false);
+ assert.equal(saved.get('cosmic-evolution-save-v1'),'PRODUCTION');
+ assert.equal(saved.get('infiniti-space-language'),'ru');
+ assert.equal(reloads,1);
+ assert.ok(game.includes('function save(){if(testerAbsoluteResetPending)return;'));
+ assert.ok(page.includes('id="tester-full-reset"'));
+ console.log('PASS: confirmed tester-only absolute wipe deletes all test data, never the real save');
+}
