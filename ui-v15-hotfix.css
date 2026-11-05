@@ -723,3 +723,10 @@ body.ui-v15 #hud .camera-buttons button:hover .zoom-glyph{
   width:27px!important;height:27px!important;min-width:27px!important;
  }
 }
+
+/* Preserve the compact mobile brand: only the centered emblem is shown. */
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ body.ui-v15 #hud .v15-hud .hud-left>div{
+  display:none!important;
+ }
+}
