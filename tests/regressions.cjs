@@ -506,6 +506,29 @@ for(const r of [6,300,1e100]){
  const caught={...p1,gravityBound:true};assert.equal(driftBox.driftBody(caught),caught);
  driftBox.g.time=0;
 }
+// Exercise the actual evolve() function at both sides of the timer threshold.
+{
+ const gate={
+  MIN_STAGE_SECONDS:600/27,
+  g:{tier:0,endless:false,complete:false,stageElapsed:20,matter:280,unlocks:0,stageCollects:12,stageRare:0,stagePulses:0,stageExplored:0},
+  TA:Array.from({length:28},(_,i)=>({required:280,name:'Form '+i,color:'#b8a5f8'})),
+  player:{x:0,y:0,r:10,targetR:10,shield:0},morph:null,screenFlash:0,shake:0,
+  shockwaves:[],energyArcs:[],spent:0,
+  spendRecipe(){this.spent++},currentRadius(){return 12},burst(){},popText(){},toast(){},sound(){},renderUI(){}
+ };
+ gate.spendRecipe=()=>{gate.spent++};
+ vm.createContext(gate);
+ const start=game.indexOf('function evolve(){'),end=game.indexOf('function flashAbilityButton(',start);
+ assert.ok(start>0&&end>start,'Evolution function must be directly testable');
+ vm.runInContext(game.slice(start,end),gate);
+ gate.evolve();assert.equal(gate.g.tier,0,'A stage may not complete before its minimum flight time');
+ assert.equal(gate.spent,0,'Recipes may not be spent while timer is locked');
+ gate.g.stageElapsed=600/27+.05;gate.evolve();
+ assert.equal(gate.g.tier,1,'Ready stage should advance as soon as its timer finishes');
+ assert.equal(gate.g.stageElapsed,0,'Every stage must start a new timer');
+ assert.equal(gate.spent,1,'Recipe should be spent once after the unlock');
+ assert.ok(27*gate.MIN_STAGE_SECONDS>=600,'27 transitions need >=600 seconds of active flight');
+}
 // Keep all 27 pre-black-hole transitions gated, for a strict 600s minimum.
 assert.ok(game.includes('const MIN_STAGE_SECONDS=600/(TA.length-1)'), 'Pre-black-hole stages must total at least 600 seconds');
 assert.ok(game.includes('g.stageElapsed<MIN_STAGE_SECONDS')||game.includes('(g.stageElapsed||0)<MIN_STAGE_SECONDS'), 'Evolution must respect stage time gates');
