@@ -483,3 +483,224 @@ body.ui-v15 #modal[data-screen="roulette"] .daily-spin:disabled{
   body.ui-v15 #screen-menu .menu-grid .daily-menu-link,
   body.ui-v15 #screen-menu .menu-grid .roulette-menu-link{transition:none}
 }
+
+
+/* v3.48.2 — main menu is an actual vertical document.
+   No absolutely positioned progress footer can cover the music button.
+   All menu items remain scrollable on short desktop and mobile screens. */
+body.ui-v15 #modal #screen-menu{
+  --menu-safe-left:clamp(20px,7.2vw,136px);
+  display:flex!important;
+  flex-direction:column;
+  align-items:stretch;
+  min-height:0;
+  height:100dvh;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#604295 transparent;
+}
+body.ui-v15 #screen-menu .menu-main{
+  box-sizing:border-box;
+  position:relative!important;
+  inset:auto!important;
+  top:auto!important;
+  left:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  transform:none!important;
+  flex:0 0 auto;
+  width:min(696px,calc(100% - var(--menu-safe-left) * 2))!important;
+  max-width:none!important;
+  margin:clamp(100px,14dvh,156px) 0 0 var(--menu-safe-left)!important;
+  padding:0 0 16px!important;
+}
+body.ui-v15 #screen-menu .menu-foot{
+  position:relative!important;
+  inset:auto!important;
+  top:auto!important;
+  left:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  flex:0 0 auto;
+  box-sizing:border-box;
+  display:flex!important;
+  flex-wrap:wrap;
+  width:calc(100% - var(--menu-safe-left) * 2)!important;
+  max-width:1300px;
+  min-height:0;
+  margin:auto 0 0 var(--menu-safe-left)!important;
+  padding:22px 0 max(22px,env(safe-area-inset-bottom))!important;
+  border:0;
+  gap:10px 14px;
+  background:transparent;
+}
+body.ui-v15 #screen-menu .menu-orbit-info{
+  pointer-events:none;
+}
+@media(max-height:840px){
+  body.ui-v15 #screen-menu .menu-main{
+    margin-top:clamp(76px,11dvh,108px)!important;
+  }
+  body.ui-v15 #screen-menu .hero-title{
+    font-size:clamp(60px,5.8vw,92px)!important;
+    margin:8px 0 10px!important;
+  }
+  body.ui-v15 #screen-menu .hero-desc{
+    margin:0 0 12px!important;
+    line-height:1.4;
+  }
+  body.ui-v15 #screen-menu .menu-divider{
+    margin:10px 0!important;
+  }
+  body.ui-v15 #screen-menu .menu-buttons>button{
+    height:50px!important;
+  }
+  body.ui-v15 #screen-menu .menu-grid{
+    row-gap:6px!important;
+  }
+  body.ui-v15 #screen-menu .menu-grid button:not(.daily-menu-link):not(.roulette-menu-link){
+    height:49px!important;
+  }
+  body.ui-v15 #screen-menu .menu-grid .daily-menu-link,
+  body.ui-v15 #screen-menu .menu-grid .roulette-menu-link{
+    height:65px!important;
+  }
+  body.ui-v15 #screen-menu .menu-orbit-info{
+    display:none!important;
+  }
+}
+@media(max-width:800px){
+  body.ui-v15 #modal #screen-menu{
+    --menu-safe-left:clamp(16px,5vw,45px);
+  }
+  body.ui-v15 #screen-menu .menu-main{
+    margin-top:clamp(74px,12dvh,106px)!important;
+  }
+  body.ui-v15 #screen-menu .menu-foot{
+    font-size:11px;
+  }
+}
+@media(max-width:540px){
+  body.ui-v15 #screen-menu .menu-main{
+    margin-top:clamp(65px,10dvh,90px)!important;
+  }
+  body.ui-v15 #screen-menu .menu-foot{
+    width:calc(100% - var(--menu-safe-left) * 2)!important;
+  }
+}
+@media(max-height:540px){
+  body.ui-v15 #screen-menu .menu-main{
+    margin-top:66px!important;
+    padding-bottom:8px!important;
+  }
+  body.ui-v15 #screen-menu .hero-desc{
+    margin-bottom:8px!important;
+  }
+  body.ui-v15 #screen-menu .menu-foot{
+    padding-top:14px!important;
+    padding-bottom:max(14px,env(safe-area-inset-bottom))!important;
+  }
+}
+
+/* v3.48.2 — bold, game-like reward panel edges instead of fragile 1px outlines.
+   Applied only to the two rewards screens. */
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .modal-card,
+body.ui-v15 #modal[data-screen="daily"] .modal-card:has(.daily-screen),
+body.ui-v15 #modal[data-screen="roulette"] .modal-card:has(.daily-screen){
+  border:3px solid #7e5abe!important;
+  border-bottom:6px solid #462874!important;
+  border-radius:17px;
+  box-shadow:0 26px 95px #000d,0 0 0 3px #1a102b,0 0 55px #7846c338;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs{
+  border:3px solid #3c2859!important;
+  background:#130d23;
+  border-radius:12px;
+  padding:4px;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs>button{
+  border:3px solid transparent!important;
+  border-radius:9px;
+  font-weight:900;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs>button.selected{
+  border-color:#b199f6!important;
+  border-bottom:5px solid #553098!important;
+  background:linear-gradient(130deg,#7246ce,#45257f);
+  box-shadow:0 4px 15px #2e13566a;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-back{
+  border:2px solid #8467ae!important;
+  border-bottom:5px solid #442966!important;
+  border-radius:9px;
+  background:linear-gradient(180deg,#3c2a5a,#29193f);
+  color:#fff4ff;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-streak{
+  border:3px solid #69488d!important;
+  background:linear-gradient(125deg,#452b5f,#2b1c42);
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day{
+  border:2px solid #645080!important;
+  border-bottom:4px solid #433058!important;
+  background:linear-gradient(135deg,#352545,#24192f);
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day-current{
+  border:3px solid #e2b66d!important;
+  border-bottom:5px solid #91613a!important;
+  background:linear-gradient(115deg,#62457e,#3a2853 85%);
+  box-shadow:0 6px 20px #0004,inset 0 1px 0 #fff2;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day-claimed{
+  border-color:#856da8!important;
+  border-bottom-color:#5c447c!important;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-claim,
+body.ui-v15 #modal[data-screen="roulette"] .daily-spin{
+  border:3px solid #c0a7ff!important;
+  border-bottom:6px solid #48208e!important;
+  border-radius:11px;
+  background:linear-gradient(125deg,#7446d9,#4d22c6);
+  box-shadow:0 10px 24px #2b0e694e,inset 0 1px 0 #ffffff35;
+  font-weight:950;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-claim:disabled,
+body.ui-v15 #modal[data-screen="roulette"] .daily-spin:disabled{
+  border-color:#67517f!important;
+  border-bottom-color:#3f2b57!important;
+  background:#302341;
+  box-shadow:none;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-intro{
+  border:3px solid #5e467d!important;
+  border-radius:10px;
+  background:linear-gradient(115deg,#37254d,#271a40);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+  border:2px solid #604977!important;
+  border-bottom:4px solid #413151!important;
+  border-radius:10px;
+  background:linear-gradient(155deg,#3a294b,#281c37);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:last-child{
+  border:3px solid #d0ad6e!important;
+  border-bottom:5px solid #836043!important;
+  background:linear-gradient(140deg,#54405a,#382a47);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item.daily-wheel-winner{
+  border:3px solid #f3d38c!important;
+  border-bottom:5px solid #997143!important;
+  background:#654369;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-result{
+  border:3px solid #785992!important;
+  border-radius:10px;
+  background:#34234b;
+  font-weight:800;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-result.daily-result-win{
+  border-color:#ebbe75!important;
+  background:#594064;
+}
