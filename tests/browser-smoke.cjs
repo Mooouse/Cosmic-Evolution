@@ -76,6 +76,37 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   await page.locator('#daily-back').click({timeout:12000});
   await page.locator('#screen-menu').waitFor({state:'visible',timeout:12000});
   log('PASS: Back from rewards opened in menu returns to menu');
+
+  // Try the same broken path on the user's likely high-resolution display,
+  // as well as a narrow/mobile viewport. Layout and scroll chains differ.
+  for(const size of [{width:2560,height:1440},{width:1920,height:1080},
+    {width:390,height:740}]){
+    await page.setViewportSize(size);
+    await page.locator('#screen-menu [data-reward-page="daily"]').click({timeout:10000});
+    await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='daily');
+    const cal=await page.locator('.daily-calendar').boundingBox();
+    assert.ok(cal,'Daily calendar visible at '+JSON.stringify(size));
+    for(let n=0;n<20;n++){
+      await page.mouse.move(Math.min(size.width-15,cal.x+cal.width*(.25+.5*(n%3)/2)),
+        Math.min(size.height-15,cal.y+cal.height*(.25+.5*(n%4)/3)),{steps:4});
+      await page.mouse.wheel(0,n%2?880:-890);
+    }
+    const tab=page.locator('#rewards-tab-roulette');
+    const hit=await page.evaluate(()=>{
+      const t=document.querySelector('#rewards-tab-roulette'),r=t.getBoundingClientRect();
+      const el=document.elementFromPoint(r.left+r.width*.5,r.top+r.height*.5);
+      return {id:el?.id,inside:el===t||t.contains(el),
+       modalScroll:document.querySelector('#modal')?.scrollTop,
+       contentScroll:document.querySelector('.rewards-page-content')?.scrollTop};
+    });
+    assert.ok(hit.inside,'Roulette tab blocked after wheel at '+JSON.stringify(size)+': '+JSON.stringify(hit));
+    await tab.click({timeout:10000});
+    await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette',{timeout:10000});
+    await page.locator('#daily-back').click({timeout:10000});
+    log('PASS: repeated calendar scrolling and roulette tab at',size.width+'x'+size.height);
+  }
+  await page.setViewportSize({width:1100,height:760});
+
   // Enter actual gameplay, open daily rewards using the in-game HUD, then
   // confirm Back really clears the DOM overlay instead of only resuming physics.
   await page.locator('#screen-menu .primary.big-play').click({timeout:10000});
@@ -84,6 +115,17 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   await page.waitForFunction(()=>document.getElementById('modal')?.classList.contains('off'),null,{timeout:15000});
   await page.locator('#hud .daily-hud-button').click({timeout:10000});
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='daily',null,{timeout:12000});
+  const gameCalendar=await page.locator('.daily-calendar').boundingBox();
+  for(let n=0;n<20;n++){
+   await page.mouse.move(gameCalendar.x+gameCalendar.width*.55,
+    gameCalendar.y+gameCalendar.height*.5,{steps:3});
+   await page.mouse.wheel(0,n%2?560:-650);
+  }
+  await page.locator('#rewards-tab-roulette').click({timeout:10000});
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='roulette',null,{timeout:12000});
+  await page.locator('#rewards-tab-daily').click({timeout:10000});
+  await page.waitForFunction(()=>document.querySelector('#modal')?.dataset.screen==='daily',null,{timeout:12000});
+  log('PASS: roulette tab remains clickable after wheel in gameplay HUD');
   await page.locator('#daily-back').click({timeout:10000});
   const hidden=await page.evaluate(()=>{
    const m=document.getElementById('modal');
@@ -101,6 +143,13 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   assert.equal(collision,true,'Tester must reproduce lethal rival-hole collision');
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='death',null,{timeout:15000});
   assert.equal(await page.locator('#revive-restart').isVisible(),true);
+  assert.equal(await page.locator('.revive-results-title').isVisible(),true,'Flight results must be visible');
+  assert.equal(await page.locator('.revive-stats span').count(),6,'All six stats must be visible');
+  assert.equal(await page.locator('#revive-ad').isVisible(),true,'Rewarded revival option is always visible');
+  assert.equal(await page.locator('#revive-ad').isEnabled(),true,'Unused rewarded revival is interactive');
+  await page.locator('#revive-ad').click({timeout:10000});
+  assert.match(await page.locator('#revive-feedback').textContent(),/CrazyGames/,
+    'Standalone site should explain why ads cannot play; never grant a free life');
   assert.equal(await page.locator('#revive-coins').count(),0,'No stardust revival');
   await page.locator('#revive-restart').click({timeout:15000});
   await page.waitForFunction(()=>document.getElementById('modal')?.classList.contains('off'),null,{timeout:18000});
