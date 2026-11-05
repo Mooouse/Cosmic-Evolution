@@ -2722,6 +2722,40 @@ function showDailyRewards(origin){
   toast(L('Daily gift: ','Ежедневная награда: ','Regalo diario: ')+'✦ '+fmt(result.amount));
  };
 }
+// The wheel is built from the REAL prize weights; the visible wedge size and
+// the pointer landing angle agree with the random selection logic.
+function rouletteWheelArtwork(prizes){
+ const cx=180,cy=180,r=156,colors=['#4d22c6','#6040bf','#8255d5','#9b6de1','#b58bdb','#d6aa86','#f6c67c','#ffefbd'];
+ let angle=0;
+ const arcs=prizes.map((prize,i)=>{
+  const start=angle;angle+=prize.weight*3.6;
+  const end=angle,polar=(deg,rad)=>({x:cx+Math.sin(deg*Math.PI/180)*rad,y:cy-Math.cos(deg*Math.PI/180)*rad});
+  const a=polar(start,r),b=polar(end,r);
+  const d='M '+cx+' '+cy+' L '+a.x.toFixed(3)+' '+a.y.toFixed(3)+' A '+r+' '+r+' 0 '+(end-start>180?1:0)+' 1 '+b.x.toFixed(3)+' '+b.y.toFixed(3)+' Z';
+  const label=prize.id==='track'?'♫':'×'+prize.mult;
+  const showLabel=prize.weight>=8;
+  const p=polar((start+end)/2,prize.weight<13?119:111);
+  return '<path d="'+d+'" fill="'+colors[i]+'" stroke="#211130" stroke-width="2.8"/>'+
+    (showLabel?'<text x="'+p.x.toFixed(2)+'" y="'+p.y.toFixed(2)+'" text-anchor="middle" dominant-baseline="middle" fill="'+
+     (i>=5?'#291d36':'#f9f4ff')+'" font-size="'+(prize.weight<13?23:25)+'" font-weight="950" paint-order="stroke" stroke="#170e29" stroke-width="1.5">'+label+'</text>':'');
+ }).join('');
+ const marks=Array.from({length:48},(_,i)=>{
+  const rad=i*Math.PI/24,x1=180+Math.sin(rad)*160,y1=180-Math.cos(rad)*160;
+  const x2=180+Math.sin(rad)*(i%6===0?170:165),y2=180-Math.cos(rad)*(i%6===0?170:165);
+  return '<path d="M '+x1.toFixed(2)+' '+y1.toFixed(2)+' L '+x2.toFixed(2)+' '+y2.toFixed(2)+'" stroke="'+(i%6===0?'#d5b7ff':'#78619f')+'" stroke-width="'+(i%6===0?3:1.5)+'"/>';
+ }).join('');
+ return '<svg viewBox="0 0 360 360" class="roulette-disc-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
+  '<defs><radialGradient id="roulette-shine" cx="38%" cy="27%" r="78%"><stop offset="0%" stop-color="#fff" stop-opacity=".22"/>'+
+  '<stop offset="55%" stop-color="#fff" stop-opacity="0"/><stop offset="100%" stop-color="#0b0618" stop-opacity=".55"/></radialGradient></defs>'+
+  '<circle cx="180" cy="180" r="177" fill="#23163c" stroke="#7450ab" stroke-width="4"/>'+
+  arcs+'<circle cx="180" cy="180" r="'+r+'" fill="url(#roulette-shine)"/>'+
+  '<circle cx="180" cy="180" r="158" fill="none" stroke="#d6bcfa" stroke-width="4"/>'+
+  marks+'<circle cx="180" cy="180" r="63" fill="#190e2e" stroke="#a785e7" stroke-width="6"/>'+
+  '<circle cx="180" cy="180" r="53" fill="#2d1850" stroke="#67439f" stroke-width="2"/>'+
+  '<text x="180" y="185" text-anchor="middle" fill="#fff3d0" font-family="system-ui" font-size="47" font-weight="850">✦</text>'+
+  '<text x="180" y="209" text-anchor="middle" fill="#c7b1ec" font-family="system-ui" font-size="11" font-weight="900" letter-spacing="3">SPACE</text>'+
+  '</svg>';
+}
 function showCosmicRoulette(origin){
  dailyOrigin=origin||($('modal').classList.contains('off')?'play':dailyOrigin);
  const meta=window.SpaceMeta;if(!meta)return;
@@ -2740,9 +2774,9 @@ function showCosmicRoulette(origin){
   L('Today’s spin is used. Come back tomorrow.','Сегодняшняя попытка использована. Возвращайся завтра.','Ya giraste hoy. Vuelve mañana.');
  const body='<div class="roulette-intro"><span>✦ '+L('1 FREE SPIN / DAY','1 БЕСПЛАТНАЯ ПОПЫТКА В ДЕНЬ','1 GIRO GRATIS / DÍA')+'</span>'+
   '<small>'+L('Spins played','Всего прокруток','Giros realizados')+': '+state.spins+'</small></div>'+
-  '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true">▼</div>'+
+  '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true"><span></span></div>'+
   '<div class="daily-wheel" id="daily-wheel" role="img" aria-label="'+L('Weighted prize roulette','Колесо с вероятностями призов','Ruleta de premios ponderados')+'">'+
-  '<div class="daily-wheel-center"><span>✦</span><small>IS</small></div></div></div>'+
+  rouletteWheelArtwork(meta.PRIZES)+'</div><div class="roulette-wheel-base" aria-hidden="true"></div></div>'+
   '<div class="roulette-prizes"><div class="roulette-prizes-title">'+L('PRIZES AND ODDS','ПРИЗЫ И ШАНСЫ','PREMIOS Y PROBABILIDADES')+
   '</div><div class="daily-wheel-legend">'+prizeRows+'</div></div></div>'+
   '<p class="daily-prize-note">♫ '+L('Track chance: 0.8%. If you own every paid track, receive the price of a random paid track instead.',
@@ -3443,23 +3477,20 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.primary.big-play').onclick=()=>g.tutorialDone?resumeGame():showTutorial();q(root,'.quiet-btn').onclick=restartCampaign;
   const dailyReady=window.SpaceMeta?.canClaim(g),rouletteReady=window.SpaceMeta?.canSpin(g);
   const menuGrid=q(root,'.menu-grid');
-  const dailyBtn=document.createElement('button');dailyBtn.type='button';dailyBtn.className='daily-menu-link';
-  dailyBtn.innerHTML='<span class="daily-link-icon">✦</span><span class="daily-link-copy"><strong>'+
-   L('DAILY GIFTS','НАГРАДЫ','REGALOS')+'</strong><small>'+
-   (dailyReady?L('Collect your gift','Забрать подарок','Recoger regalo'):
-    L('See next rewards','Будущие награды','Ver próximos regalos'))+
-   '</small></span><span class="daily-link-status">'+(dailyReady?'●':'↗')+'</span>';
+  // Match the original menu controls EXACTLY: same SVG family, three spans,
+  // grid metrics, typographic scale, arrow and hover state. No custom card UI.
+  const dailyBtn=document.createElement('button');dailyBtn.type='button';
+  dailyBtn.className='rewards-menu-entry';dailyBtn.dataset.rewardPage='daily';
+  dailyBtn.innerHTML='<span>'+icon('star')+'</span><span>'+
+   L('Daily rewards','Ежедневные награды','Recompensas diarias')+'</span><span>'+icon('arrow-right')+'</span>';
   dailyBtn.onclick=()=>showDailyRewards('menu');
-  dailyBtn.classList.toggle('daily-new',!!dailyReady);
-  const rouletteBtn=document.createElement('button');rouletteBtn.type='button';rouletteBtn.className='roulette-menu-link';
-  rouletteBtn.innerHTML='<span class="daily-link-icon">◉</span><span class="daily-link-copy"><strong>'+
-   L('ROULETTE','РУЛЕТКА','RULETA')+'</strong><small>'+
-   (rouletteReady?L('Free spin ready','Есть бесплатная попытка','Giro gratis disponible'):
-    dailyReady?L('Claim gift to unlock','Сначала забери подарок','Recoge tu regalo'):
-    L('See prizes and odds','Призы и шансы','Premios y probabilidades'))+
-   '</small></span><span class="daily-link-status">'+(rouletteReady?'●':'↗')+'</span>';
+  const rouletteBtn=document.createElement('button');rouletteBtn.type='button';
+  rouletteBtn.className='rewards-menu-entry';rouletteBtn.dataset.rewardPage='roulette';
+  rouletteBtn.innerHTML='<span>'+icon('orbit')+'</span><span>'+
+   L('Roulette','Рулетка','Ruleta')+'</span><span>'+icon('arrow-right')+'</span>';
   rouletteBtn.onclick=()=>showCosmicRoulette('menu');
-  rouletteBtn.classList.toggle('daily-new',!!rouletteReady);
+  if(dailyReady)dailyBtn.classList.add('reward-available');
+  if(rouletteReady)rouletteBtn.classList.add('reward-available');
   menuGrid.prepend(dailyBtn,rouletteBtn);
   // Use the exact same playlist glyph as the in-game music collection button.
   const collectionIcon=q(menuGrid,'[data-page="music"] > span:first-child');
