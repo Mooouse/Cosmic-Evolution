@@ -35,20 +35,39 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   // The original bug appeared only AFTER claiming, moving the cursor and
   // rotating the wheel: reproduce that sequence against real hit-testing.
   const tab=page.locator('#rewards-tab-roulette');
+  // Unlike the previous test, wheel in the calendar, around the lower claim
+  // button, OUTSIDE the dialog and near the tabs. Real pointer trajectories.
+  const calendarBox=await page.locator('.daily-calendar').boundingBox();
+  const contentBox=await page.locator('.rewards-page-content').boundingBox();
   const box=await tab.boundingBox();
-  assert.ok(box&&box.width>25&&box.height>20,'Roulette tab must have physical hitbox');
-  for(let i=0;i<14;i++){
-   await page.mouse.move(box.x+10+(i%4)*Math.min(22,box.width/8),
-    box.y+box.height/2+(i%3)*2);
-   await page.mouse.wheel(0,i%2?420:-420);
+  assert.ok(box&&calendarBox&&contentBox,'Reward panels need real clickable geometry');
+  const spots=[
+   [calendarBox.x+calendarBox.width*.5,calendarBox.y+calendarBox.height*.5],
+   [calendarBox.x+calendarBox.width*.3,calendarBox.y+calendarBox.height*.82],
+   [contentBox.x+contentBox.width*.7,contentBox.y+contentBox.height-18],
+   [box.x+box.width*.5,box.y+box.height*.5],
+   [contentBox.x+18,contentBox.y+18]
+  ];
+  for(let i=0;i<40;i++){
+   const [x,y]=spots[i%spots.length];
+   await page.mouse.move(x,y,{steps:8});
+   await page.mouse.wheel(0,i%2===0?980:-870);
   }
   const top=await page.evaluate(()=>{
    const el=document.querySelector('#rewards-tab-roulette');
    if(!el)return {missing:true};
    const b=el.getBoundingClientRect(),hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);
-   return {tag:hit?.tagName,id:hit?.id,inside:el===hit||el.contains(hit)};
+   const modal=document.getElementById('modal');
+   return {hitId:hit?.id,hitClass:hit?.className,inside:el===hit||el.contains(hit),
+    origin:modal.dataset.dailyOrigin,screen:modal.dataset.screen,
+    scroll:{windowY:window.scrollY,document:document.documentElement.scrollTop,
+      modal:modal.scrollTop,card:modal.querySelector('.modal-card')?.scrollTop,
+      content:modal.querySelector('.rewards-page-content')?.scrollTop,
+      menu:document.querySelector('#screen-menu')?.scrollTop},
+    hitRect:b,hitHTML:hit?.outerHTML?.slice(0,350)};
   });
-  assert.equal(top.inside,true,'Reward tabs must be physically clickable after wheel and mouse moves: '+JSON.stringify(top));
+  log('WHEEL-SCROLL-HITBOX:',JSON.stringify(top));
+  assert.equal(top.inside,true,'Roulette button must remain clickable after scrolling calendar and moving mouse');
   await tab.click({timeout:10000});
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='roulette',null,{timeout:12000});
   assert.equal(await page.locator('#daily-spin').isEnabled(),true,
