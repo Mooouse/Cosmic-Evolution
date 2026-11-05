@@ -3209,8 +3209,53 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const earned=Object.keys(g.achievements||{}).length;q(root,'.br-ach-big').innerHTML=`${earned}<span>/${ACHIEVEMENTS.length}</span>`;text(root,'.br-ach-summary p',L('Your discoveries and milestones','Твои открытия и достижения','Tus descubrimientos y logros'));
   qa(root,'.br-filter').forEach(b=>b.onclick=()=>{qa(root,'.br-filter').forEach(n=>n.classList.toggle('active',n===b));qa(list,'.br-ach-row').forEach(n=>n.hidden=b.dataset.achFilter!=='all'&&n.dataset.rarity!==b.dataset.achFilter);});
  };
- showBestiary=function(){enterScreen('bestiary');legacy.bestiary();const {root}=mount('bestiary');const buttons=qa(root,'[data-bestiary]');function select(i){const [id,t,title,desc]=FIELD_GUIDE[i];buttons.forEach((b,j)=>b.classList.toggle('selected',i===j));text(root,'#br-best-number',String(i+1).padStart(2,'0'));text(root,'#br-best-name',L(...title));text(root,'#br-best-desc',L(...desc));text(root,'#br-best-status',g.tier>=t?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR'));q(root,'#br-best-visual').className='br-best-planet '+({blackhole:'hole',planet:'rock',galaxy:'galaxy'}[id]||id);}
- buttons.forEach((b,i)=>{b.onclick=()=>select(i);b.children[1].textContent=`${String(i+1).padStart(2,'0')} / ${L(...FIELD_GUIDE[i][2])}`;b.querySelector('b').textContent=g.tier>=FIELD_GUIDE[i][1]?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR');});q(root,'.br-best-details>small')?.remove();select(0);
+ showBestiary=function(){
+  enterScreen('bestiary');legacy.bestiary();
+  const {root}=mount('bestiary'),list=q(root,'.br-best-list');
+  const header=q(root,'.br-head .br-serial');
+  if(header)header.textContent=L('FIELD GUIDE / ','ПОЛЕВОЙ СПРАВОЧНИК / ','GUÍA / ')+FIELD_GUIDE.length+' '+L('ENTRIES','ЗАПИСЕЙ','ENTRADAS');
+  const buttons=[];
+  FIELD_GUIDE.forEach(([id,t,title,desc,formTier],i)=>{
+   const b=document.createElement('button');
+   b.type='button';b.className='br-best-row';b.dataset.bestiary=String(i);
+   const category=Number.isInteger(formTier)?TA[formTier].type:id;
+   const orb=document.createElement('span');
+   orb.className='br-best-bubble '+({planet:'rock',blackhole:'hole',nebula:'galaxy',cluster:'galaxy',web:'galaxy'}[category]||category);
+   orb.style.setProperty('--orb-color',TA[Math.min(27,t)]?.color||'#aa89ff');
+   const label=document.createElement('span');label.textContent=String(i+1).padStart(2,'0')+' / '+L(...title);
+   const state=document.createElement('b');state.textContent=g.tier>=t?L('REACHED','ОТКРЫТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR');
+   b.append(orb,label,state);list.append(b);buttons.push(b);
+  });
+  const original=q(root,'#br-best-visual'),portrait=document.createElement('canvas');
+  portrait.id='br-best-visual';portrait.className='br-best-portrait';
+  portrait.dataset.size='144';portrait.setAttribute('role','img');
+  original.replaceWith(portrait);
+  const details=q(root,'.br-best-details');
+  q(root,'.br-best-details>small')?.remove();
+  const facts=document.createElement('div');facts.className='br-best-facts';details.append(facts);
+  const select=i=>{
+   const [id,t,title,desc,formTier]=FIELD_GUIDE[i],isForm=Number.isInteger(formTier);
+   buttons.forEach((b,j)=>{b.classList.toggle('selected',i===j);b.setAttribute('aria-pressed',String(i===j));});
+   text(root,'#br-best-number',String(i+1).padStart(2,'0'));
+   text(root,'#br-best-name',L(...title));text(root,'#br-best-desc',L(...desc));
+   text(root,'#br-best-status',g.tier>=t?L('REACHED','ДОСТИГНУТО','ALCANZADO'):L('AHEAD','ВПЕРЕДИ','POR DESCUBRIR'));
+   const previewTier=isForm?formTier:id==='rock'?4:id==='planet'?10:id==='ice'?8:id==='galaxy'?23:id==='blackhole'?27:t;
+   paintStagePortrait(portrait,Math.min(27,previewTier));
+   portrait.setAttribute('aria-label',L(...title));
+   facts.replaceChildren();
+   const texts=isForm?[
+    L('ERA','ЭПОХА','ERA')+': '+TA[t].epoch,
+    L('STAGE','СТАДИЯ','ETAPA')+': '+(t+1)+' / '+TA.length,
+    L('RECIPE','РЕЦЕПТ','RECETA')+': '+stageRecipe(t).map(r=>MATERIALS[r.type].label).join(' · ')
+   ]:[
+    L('FIRST ENCOUNTER','ПЕРВОЕ ЗНАКОМСТВО','PRIMER ENCUENTRO')+': '+(t+1)+' / '+TA.length,
+    L('COSMIC FIELD GUIDE','КОСМИЧЕСКИЙ СПРАВОЧНИК','GUÍA CÓSMICA')
+   ];
+   texts.forEach(str=>{const item=document.createElement('span');item.textContent=str;facts.append(item);});
+  };
+  buttons.forEach((b,i)=>b.onclick=()=>select(i));
+  const initial=7+g.tier;select(initial<FIELD_GUIDE.length?initial:0);
+  list.scrollTop=Math.max(0,buttons[initial]?.offsetTop-list.offsetTop-110||0);
  };
  showStatistics=function(){enterScreen('statistics');legacy.statistics();const {root,old}=mount('statistics');const grid=q(root,'.br-stat-grid');grid.replaceChildren(...qa(old,'.stat-list>div'));text(root,'.br-simple-intro>span',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(root,'.br-simple-intro p',L('Your current journey','Твоё текущее прохождение','Tu viaje actual'));};
  function showV15Evolution(){enterScreen('evolution');renderUI(true);show('');const {root}=mount('evolution'),tier=g.tier; text(root,'.overline',`${tier+1} / 28`);text(root,'.page-nav .muted-caps',TA[tier].epoch);const words=TA[tier].name.split(' ');q(root,'.display-heading').innerHTML=esc(words.shift())+'<br><em>'+esc(words.join(' ')||'·')+'</em>';text(root,'.lead',TA[tier].desc);text(root,'.large-progress-label strong',g.endless?L('INFINITE GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):`${TA[Math.min(27,tier+1)].name} · ${Math.round(stageFraction()*100)}%`);q(root,'.progress-bar span').style.width=stageFraction()*100+'%';
