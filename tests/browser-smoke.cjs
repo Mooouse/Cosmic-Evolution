@@ -70,8 +70,23 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   });
   log('WHEEL-SCROLL-HITBOX:',JSON.stringify(top));
   assert.equal(top.inside,true,'Roulette button must remain clickable after scrolling calendar and moving mouse');
-  await tab.click({timeout:10000});
+  // Recreate the real failure mode: an invisible element mistakenly owns
+  // the mouse hit box after wheel scrolling. Screen-coordinate dispatch must
+  // reach the correct tab even when elementFromPoint now returns the blocker.
+  await page.evaluate(()=>{
+   const blocker=document.createElement('div');blocker.id='test-hitbox-obstruction';
+   blocker.style.cssText='position:fixed;inset:0;z-index:999999;pointer-events:auto;background:transparent';
+   document.querySelector('#modal').append(blocker);
+  });
+  const trapped=await page.evaluate(()=>{
+   const r=document.querySelector('#rewards-tab-roulette').getBoundingClientRect();
+   return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.id;
+  });
+  assert.equal(trapped,'test-hitbox-obstruction','Test must really obstruct browser hit testing');
+  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='roulette',null,{timeout:12000});
+  assert.equal(await page.locator('#test-hitbox-obstruction').count(),0,'Navigation replaces intercepted blocker');
+  log('PASS: reward tab survives an invisible full-screen click-stealing layer');
   assert.equal(await page.locator('#daily-spin').isEnabled(),true,
    'One free roulette attempt is unlocked by claiming the daily reward');
   log('PASS: roulette tab works after daily claim + 40 alternating wheel gestures');
@@ -99,7 +114,16 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
     log('REOPEN MENU ROULETTE '+n+':',JSON.stringify(stateBefore));
     assert.equal(stateBefore.hitIsButton,true,
       'Main menu Roulette button is blocked after a spin: '+JSON.stringify(stateBefore));
-    await entry.click({timeout:12000});
+    if(n===1){
+      // A stale visual layer should not make the menu entry inert either.
+      await page.evaluate(()=>{
+       const b=document.createElement('div');b.id='test-menu-obstruction';
+       b.style.cssText='position:fixed;inset:0;z-index:999999;pointer-events:auto;background:transparent';
+       document.querySelector('#modal').append(b);
+      });
+      const rect=await entry.boundingBox();assert.ok(rect);
+      await page.mouse.click(rect.x+rect.width/2,rect.y+rect.height/2);
+    }else await entry.click({timeout:12000});
     await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='roulette',null,{timeout:12000});
     assert.equal(await page.locator('#daily-spin').isDisabled(),true,
       'Reopening should show exhausted free spin, not fail to open');
