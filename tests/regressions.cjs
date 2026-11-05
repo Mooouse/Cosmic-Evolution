@@ -412,7 +412,7 @@ console.log('PASS: death avoids rendering and defers its dialog until physics st
 
 // A death-screen restart must not wait for ad callbacks (SDK timeout: 120 s).
 {
- const start=game.indexOf(" $('revive-restart').onclick=");
+ const start=game.indexOf(" $('revive-restart').onclick=",game.indexOf('function showDeathOffer('));
  const end=game.indexOf("\n const revive=reviveFromDeath;",start);
  assert.ok(start>0&&end>start,'Death restart handler must exist');
  const handler=game.slice(start,end);
