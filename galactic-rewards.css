@@ -281,3 +281,179 @@ body.ui-v15 #modal[data-screen="roulette"] .roulette-disc-svg{
   padding:10px 9px;
  }
 }
+
+
+/* v3.53 · FULLY scroll-free rewards. Buttons stay in the visible panel.
+   A single fitted content layer handles short viewports without scroll offsets. */
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .modal-card,
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-screen{
+ overflow:hidden!important;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-page-content,
+body.ui-v15 #modal[data-screen="roulette"] .rewards-page-content{
+ display:block!important;
+ position:relative!important;
+ flex:1 1 0;
+ min-height:0;
+ max-height:100%;
+ overflow:hidden!important;
+ overscroll-behavior:contain;
+ scrollbar-width:none!important;
+ -ms-overflow-style:none;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-page-content::-webkit-scrollbar{
+ width:0!important;height:0!important;display:none!important;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-fit-body{
+ position:relative;
+ box-sizing:border-box;
+ display:flex;
+ flex-direction:column;
+ width:100%;
+ min-width:0;
+ height:max-content;
+ min-height:0;
+ margin:0;
+ transform-origin:top center;
+ will-change:transform;
+ isolation:isolate;
+ overflow:visible;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-fit-body>.daily-galaxy-stars{
+ position:absolute;
+ display:block;
+ top:0;left:0;
+ width:100%;height:100%;
+ z-index:0;
+ object-fit:cover;
+ opacity:.91;
+ pointer-events:none!important;
+ user-select:none;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-fit-body> :not(.daily-galaxy-stars){
+ position:relative;
+ z-index:1;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-fit-body button{
+ position:relative;
+ z-index:3;
+ pointer-events:auto;
+ touch-action:manipulation;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-fit-body button:disabled{
+ pointer-events:auto;
+}
+/* Place all seven days where they fit, rather than an extra screen below. */
+@media(max-width:640px){
+ body.ui-v15 #modal[data-screen="daily"] .daily-streak{
+  min-height:56px!important;
+  margin-bottom:9px!important;
+  padding:9px 11px!important;
+  gap:6px 10px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-streak>strong{
+  font-size:22px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .rewards-section-caption{
+  margin:3px 0 8px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-calendar{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:6px!important;
+  margin-bottom:9px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day{
+  min-height:76px!important;
+  padding:8px!important;
+  gap:3px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-current{
+  grid-column:span 3!important;
+  min-height:89px!important;
+  padding:12px 15px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day>strong{
+  font-size:13px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-head small{
+  font-size:10px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-head span{
+  width:19px;height:19px;font-size:11px;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-reward i{
+  font-size:19px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-reward b{
+  font-size:16px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-current .daily-day-reward b{
+  font-size:25px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-calendar-note{
+  margin-bottom:8px!important;
+  font-size:11px!important;
+  line-height:1.25!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-claim{
+  min-height:48px!important;
+  padding:9px!important;
+  font-size:14px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .rewards-next-hint{
+  margin-top:6px!important;
+  font-size:11px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{
+  min-height:199px!important;
+  padding:4px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{
+  width:186px!important;
+  height:186px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .roulette-prizes-title{
+  margin-bottom:6px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+  min-height:42px!important;
+  padding:6px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-prize-note{
+  font-size:10px!important;
+  margin:5px 0!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-result{
+  min-height:39px!important;
+  padding:7px!important;
+  margin-bottom:7px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-spin,
+ body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin{
+  min-height:46px!important;
+  padding:8px!important;
+ }
+}
+@media(max-height:690px){
+ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-screen{
+  padding-top:12px!important;
+  padding-bottom:12px!important;
+ }
+ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-header{
+  margin-bottom:8px!important;
+ }
+ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-header h2{
+  font-size:clamp(22px,3vw,30px)!important;
+  margin:3px 0!important;
+ }
+ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs{
+  min-height:44px!important;
+  margin-bottom:8px!important;
+ }
+ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs>button{
+  min-height:40px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .rewards-page-content{
+  padding:9px!important;
+ }
+}
