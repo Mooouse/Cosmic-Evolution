@@ -478,3 +478,30 @@ body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) :is(.daily
 body.ui-v15 #modal[data-screen="roulette"] .daily-result[hidden]{
  display:none!important;
 }
+
+
+/* A deliberate, unmistakable full wipe action. Never confused with "New Game"
+   (which deliberately preserves tracks, currency and achievements). */
+body.ui-v15 #tester-panel .tester-wipe-zone{
+ margin:13px 0 4px;padding:12px;
+ border:2px solid #9c4d62;border-radius:7px;
+ background:linear-gradient(135deg,#3d1b31,#221322);
+}
+body.ui-v15 #tester-panel .tester-absolute-reset{
+ display:block;width:100%;min-height:53px;
+ padding:12px 9px;border:2px solid #f19b9e!important;
+ border-bottom:5px solid #8e354e!important;border-radius:6px;
+ color:#fff3f4;font-size:14px;font-weight:950;letter-spacing:.025em;
+ background:linear-gradient(120deg,#a63852,#752137)!important;
+ box-shadow:0 5px 20px #4e111e80;
+ cursor:pointer;transition:filter .15s,transform .15s;
+}
+body.ui-v15 #tester-panel .tester-absolute-reset:hover{
+ filter:brightness(1.18);transform:translateY(-1px);
+}
+body.ui-v15 #tester-panel .tester-absolute-reset:focus-visible{
+ outline:3px solid #ffe4b1;outline-offset:3px;
+}
+body.ui-v15 #tester-panel #tester-full-reset-warning{
+ margin:9px 0 0;color:#efbcc4;font-size:11px;line-height:1.5;
+}
