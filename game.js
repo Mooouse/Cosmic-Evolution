@@ -2826,7 +2826,7 @@ function showCosmicRoulette(origin){
  }).join('');
  const hint=canClaim?
   L('Claim today’s gift to unlock your spin.','Сначала забери ежедневную награду, чтобы открыть попытку.','Recoge el regalo diario para desbloquear el giro.'):
-  canSpin?L('One free spin is ready. Good luck!','Доступна одна бесплатная попытка. Удачи!','Tienes un giro gratis. ¡Suerte!'):
+  canSpin?(state.spinDay===meta.dayIndex()?L('Bonus spin unlocked! Good luck!','Бонусная попытка открыта! Удачи!','¡Giro extra desbloqueado!'):L('One free spin is ready. Good luck!','Доступна одна бесплатная попытка. Удачи!','Tienes un giro gratis. ¡Suerte!')):
   L('Today’s spin is used. Come back tomorrow.','Сегодняшняя попытка использована. Возвращайся завтра.','Ya giraste hoy. Vuelve mañana.');
  const body='<div class="roulette-intro"><span>✦ '+L('1 FREE SPIN / DAY','1 БЕСПЛАТНАЯ ПОПЫТКА В ДЕНЬ','1 GIRO GRATIS / DÍA')+'</span>'+
   '<small>'+L('Spins played','Всего прокруток','Giros realizados')+': '+state.spins+'</small></div>'+
@@ -2842,11 +2842,44 @@ function showCosmicRoulette(origin){
   '<button type="button" id="daily-spin" class="daily-spin" '+(canSpin?'':'disabled')+'>'+
   (canSpin?L('✦ SPIN THE WHEEL','✦ КРУТИТЬ РУЛЕТКУ','✦ GIRAR LA RULETA'):
    canClaim?L('CLAIM DAILY REWARD FIRST','СНАЧАЛА ЗАБЕРИ НАГРАДУ','RECOGE TU REGALO PRIMERO'):
-   L('NEXT SPIN TOMORROW','СЛЕДУЮЩАЯ ПОПЫТКА ЗАВТРА','PRÓXIMO GIRO MAÑANA'))+'</button>';
+   L('NEXT SPIN TOMORROW','СЛЕДУЮЩАЯ ПОПЫТКА ЗАВТРА','PRÓXIMO GIRO MAÑANA'))+'</button>'+ 
+  '<button type="button" id="daily-ad-spin" class="roulette-ad-spin" '+(meta.canAdSpin(g)?'':'hidden ')+
+  (window.SpacePlatform?.adsAvailable?'':'disabled ')+
+  '>'+L('▶ WATCH AD · SPIN AGAIN','▶ РЕКЛАМА · ЕЩЁ ОДИН СПИН','▶ VER ANUNCIO · OTRO GIRO')+'</button>';
  rewardsShell('roulette',
   L('Cosmic roulette','Космическая рулетка','Ruleta cósmica'),
   L('Spin for stardust or a rare music track.','Крути колесо ради звёздной пыли или редкого музыкального трека.','Gira para ganar polvo estelar o una pista musical rara.'),
   body);
+ const bonus=$('daily-ad-spin');
+ bonus.title=window.SpacePlatform?.adsAvailable?
+  L('Complete a rewarded video for one extra spin today.','Досмотри рекламу и получи одну дополнительную попытку сегодня.','Mira el anuncio completo para conseguir un giro extra hoy.'):
+  L('Rewarded ads are only available inside CrazyGames.','Реклама доступна только при запуске на CrazyGames.','Los anuncios solo están disponibles en CrazyGames.');
+ bonus.onclick=async()=>{
+  if(awaitingAd||!meta.canAdSpin(g))return;
+  if(!window.SpacePlatform?.adsAvailable){
+   $('daily-result').textContent=L('Ad not available here. Try on CrazyGames.','Реклама здесь недоступна. Запусти игру на CrazyGames.','El anuncio no está disponible aquí. Prueba en CrazyGames.');
+   return;
+  }
+  awaitingAd=true;bonus.disabled=true;
+  $('rewards-tab-daily').disabled=true;$('rewards-tab-roulette').disabled=true;$('daily-back').disabled=true;
+  $('daily-result').textContent=L('Opening rewarded ad…','Открываем рекламу…','Abriendo anuncio…');
+  let completed=false;
+  try{completed=await window.SpacePlatform.requestAd('rewarded');}
+  catch(_){completed=false;}
+  finally{awaitingAd=false;}
+  if(!bonus.isConnected)return;
+  if(completed&&meta.grantAdSpin(g).ok){
+   save();checkProgression();
+   const from=dailyOrigin;
+   showCosmicRoulette(from);
+   // A confirmed ad grants and automatically starts exactly one bonus spin.
+   $('daily-spin')?.click();
+   return;
+  }
+  bonus.disabled=!window.SpacePlatform?.adsAvailable;
+  $('rewards-tab-daily').disabled=false;$('rewards-tab-roulette').disabled=false;$('daily-back').disabled=false;
+  $('daily-result').textContent=L('Ad not completed. Your extra spin is still available.','Реклама не завершена. Дополнительная попытка не потрачена.','Anuncio incompleto. Tu giro extra sigue disponible.');
+ };
  $('daily-spin').onclick=()=>{
   let rouletteRandom=Math.random;
   if(TEST_MODE&&testerPrizeOverride){
@@ -2876,13 +2909,19 @@ function showCosmicRoulette(origin){
    if(prize.id===sectorId){sectorCenter=cumulative+prize.weight/2;break;}
    cumulative+=prize.weight;
   }
-  wheel.style.setProperty('--wheel-turn',(1800+360-sectorCenter*3.6)+'deg');
+  // Four full turns, a gentle start, then a long deceleration into the prize.
+  wheel.style.setProperty('--wheel-turn',(1440+360-sectorCenter*3.6)+'deg');
   wheel.classList.add('spinning');
   const message=result.type==='track'?
    L('NEW TRACK','НОВЫЙ ТРЕК','PISTA NUEVA')+': '+result.track.title:
    '✦ '+fmt(result.amount)+(result.prize==='track-value'?
     ' · '+L('Complete collection: track price','Все треки куплены: стоимость трека','Colección completa: precio de la pista'):'');
   sound(590,'triangle',.20,.04);
+  // Anticipation builds as the wheel approaches the last revolution.
+  setTimeout(()=>{
+   if(!resultBox.isConnected||!wheel.isConnected)return;
+   resultBox.textContent=L('Slowing down…','Колесо замедляется…','La ruleta se está frenando…');
+  },5150);
   setTimeout(()=>{
    if(!wheel.isConnected||!resultBox.isConnected)return;
    wheel.classList.add('finished');
@@ -2890,9 +2929,13 @@ function showCosmicRoulette(origin){
    if(tile)tile.classList.add('daily-wheel-winner');
    resultBox.textContent=message;resultBox.classList.add('daily-result-win');
    spin.textContent=L('COME BACK TOMORROW','ВОЗВРАЩАЙСЯ ЗАВТРА','VUELVE MAÑANA');
+   if(meta.canAdSpin(g)){
+    bonus.hidden=false;
+    bonus.disabled=!window.SpacePlatform?.adsAvailable;
+   }
    $('rewards-tab-daily').disabled=false;$('rewards-tab-roulette').disabled=false;$('daily-back').disabled=false;
    sound(790,'sine',.16,.03);
-  },2820);
+  },7350);
  };
 }
 function showMainMenu(paused=false){
