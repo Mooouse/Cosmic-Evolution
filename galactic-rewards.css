@@ -505,3 +505,156 @@ body.ui-v15 #tester-panel .tester-absolute-reset:focus-visible{
 body.ui-v15 #tester-panel #tester-full-reset-warning{
  margin:9px 0 0;color:#efbcc4;font-size:11px;line-height:1.5;
 }
+
+
+/* v3.56: FIX THE HIT BOXES, NOT JUST THE SCROLLBAR.
+   The previous "rewards-fit-body" used zoom/transform on every interactive
+   descendant; that shifts Chrome pointer hit testing after wheel gestures.
+   All rewards now live in normal unscaled flex flow. */
+body.ui-v15 #modal[data-screen="daily"] .rewards-page-content,
+body.ui-v15 #modal[data-screen="roulette"] .rewards-page-content{
+ box-sizing:border-box;
+ display:flex!important;
+ flex-direction:column!important;
+ align-items:stretch;
+ justify-content:flex-start;
+ position:relative!important;
+ isolation:isolate;
+ flex:1 1 auto;
+ width:100%;
+ height:auto;
+ min-height:0!important;
+ min-width:0!important;
+ max-height:100%;
+ overflow:hidden!important;
+ overscroll-behavior:none!important;
+ scroll-behavior:auto!important;
+ touch-action:manipulation;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-page-content{
+ padding:14px!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .rewards-page-content{
+ padding:2px 4px 0 0!important;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-page-content > .daily-galaxy-stars{
+ position:absolute!important;
+ inset:0!important;
+ top:0!important;left:0!important;
+ width:100%!important;height:100%!important;
+ z-index:0!important;
+ object-fit:cover;
+ pointer-events:none!important;
+ user-select:none;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-page-content > :not(.daily-galaxy-stars){
+ position:relative;
+ z-index:1;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-page-content button{
+ position:relative;
+ z-index:2;
+ pointer-events:auto!important;
+ cursor:pointer;
+ touch-action:manipulation;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-page-content button:disabled{
+ cursor:not-allowed;
+}
+/* Keep the starfield visible behind cards, but never above a button. */
+body.ui-v15 #modal[data-screen="daily"] .daily-calendar{
+ flex:none;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-streak{
+ flex:none;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-claim{
+ flex:none;
+ margin-top:auto!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-intro,
+body.ui-v15 #modal[data-screen="roulette"] .daily-roulette-body,
+body.ui-v15 #modal[data-screen="roulette"] .daily-prize-note,
+body.ui-v15 #modal[data-screen="roulette"] .daily-result,
+body.ui-v15 #modal[data-screen="roulette"] .daily-spin,
+body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin{
+ flex:none;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-spin{
+ margin-top:auto!important;
+}
+/* The popup contains no element with scrollable content; trackpad/wheel
+   cannot displace buttons or turn them into unreachable hit areas. */
+body.ui-v15 #modal[data-screen="daily"] .modal-card,
+body.ui-v15 #modal[data-screen="roulette"] .modal-card,
+body.ui-v15 #modal[data-screen="daily"] .daily-screen,
+body.ui-v15 #modal[data-screen="roulette"] .daily-screen{
+ overflow:hidden!important;
+ overscroll-behavior:none!important;
+}
+@media(max-width:640px){
+ body.ui-v15 #modal[data-screen="daily"] .rewards-page-content{
+  padding:9px 8px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .rewards-page-content{
+  padding:0!important;
+ }
+}
+@media(max-height:700px) and (min-width:641px){
+ body.ui-v15 #modal[data-screen="daily"] .daily-day{
+  min-height:102px!important;padding:10px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-streak{
+  min-height:55px!important;margin-bottom:7px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-calendar{
+  gap:7px!important;margin-bottom:7px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-claim{
+  min-height:45px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{
+  min-height:222px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{
+  width:208px!important;height:208px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+  min-height:41px!important;padding:6px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .roulette-intro{
+  min-height:38px!important;margin-bottom:6px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-result{
+  min-height:36px!important;
+ }
+}
+@media(max-height:690px) and (max-width:640px){
+ body.ui-v15 #modal[data-screen="daily"] .daily-streak{
+  min-height:49px!important;padding:6px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day{
+  min-height:64px!important;padding:6px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-day-current{
+  min-height:76px!important;
+ }
+ body.ui-v15 #modal[data-screen="daily"] .daily-claim{
+  min-height:42px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{
+  min-height:150px!important;padding:1px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{
+  width:144px!important;height:144px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+  min-height:33px!important;padding:4px!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .daily-prize-note{
+  display:none!important;
+ }
+ body.ui-v15 #modal[data-screen="roulette"] .roulette-intro{
+  min-height:32px!important;padding:6px!important;
+ }
+}
