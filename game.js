@@ -124,7 +124,7 @@ function normaliseMapPins(value){
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
-window.SpaceMeta?.state(g);
+globalThis.SpaceMeta?.state(g);
 if(!g.drift||typeof g.drift!=='object')g.drift={route:[],seconds:0,totalDistance:0,visits:0,last:null};
 if(!Array.isArray(g.drift.route))g.drift.route=[];
 g.awaySince=Number.isFinite(g.awaySince)?Math.max(0,g.awaySince):0;
