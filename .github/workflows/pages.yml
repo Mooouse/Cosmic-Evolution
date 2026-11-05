@@ -23,6 +23,9 @@ jobs:
       - name: Check game syntax and required files
         run: |
           node --check game.js
+          node --check platform.js
+          node --check space-meta.js
+          node tests/meta.cjs
           node tests/regressions.cjs
           node tests/music.cjs
           node tests/joystick.cjs
