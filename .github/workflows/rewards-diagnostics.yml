@@ -1,0 +1,30 @@
+name: Diagnose physical roulette input
+on:
+  push:
+    branches: [diagnose/roulette-physical-input]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  physical:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser driver
+        shell: bash
+        run: npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/roulette-browser" playwright@1.56.1
+      - name: Use real Chrome mouse input
+        shell: bash
+        env:
+          NODE_PATH: ${{ runner.temp }}/roulette-browser/node_modules
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a node tests/rewards-physical.cjs
+          else
+            node tests/rewards-physical.cjs
+          fi
