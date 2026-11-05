@@ -100,9 +100,7 @@ async function run(width,height,label){
   cp.execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',webm,
    '-an','-c:v','libx264','-preset','medium','-crf','22','-pix_fmt','yuv420p',
    '-movflags','+faststart','-r','24',target],{stdio:'inherit'});
-  const ff=cp.execFileSync('ffprobe',['-v','error','-show_entries',
-   'format=duration,size','-of','json',target],{encoding:'utf8'});
-  console.log('VIDEO CREATED '+label,ff.trim());
+  console.log('VIDEO CREATED '+label,fs.statSync(target).size+' bytes');
   if(errors.length)throw Error('Page errors: '+errors.join('|').slice(0,1000));
  }finally{await browser.close()}
 }
