@@ -55,6 +55,26 @@
     <label class="tester-line"><span>Размер бублика <b data-test-value="ring">1×</b></span><input data-test="ring" aria-label="Размер бублика" type="range" min=".6" max="2.5" step=".05" value="1"></label>
     <label class="tester-line"><span>Плотность добычи <b data-test-value="density">16/32</b></span><input data-test="density" type="range" min="4" max="32" step="1" value="16"></label>
     <label class="tester-line"><span>Звёздная пыль (баланс)</span><input id="tester-credits" type="number" min="0" max="1000000000000" step="1000" value="0"></label>
+    <section class="tester-rewards" aria-label="Тестирование наград и рулетки">
+      <h3>✦ НАГРАДЫ И РУЛЕТКА</h3>
+      <div id="tester-daily-status" class="tester-rewards-status" role="status" aria-live="polite"></div>
+      <label class="tester-line"><span>Серия входов, дней</span><input id="tester-daily-streak" type="number" min="0" max="99999" step="1" value="0"></label>
+      <label class="tester-line"><span>Множитель ежедневной пыли <b data-reward-value="rewardMultiplier">1×</b></span><input data-reward-tune="rewardMultiplier" type="range" min=".1" max="20" step=".1" value="1"></label>
+      <label class="tester-line"><span>Шанс музыкального трека <b data-reward-value="trackChance">0.8%</b></span><input data-reward-tune="trackChance" type="range" min=".1" max="25" step=".1" value=".8"></label>
+      <label class="tester-line"><span>Принудительный приз (только тестовый спин)</span><select id="tester-force-prize"><option value="">Случайный результат</option><option value="dust-1">×1 — звёздная пыль</option><option value="dust-2">×2 — звёздная пыль</option><option value="dust-3">×3 — звёздная пыль</option><option value="dust-5">×5 — звёздная пыль</option><option value="dust-8">×8 — звёздная пыль</option><option value="dust-15">×15 — звёздная пыль</option><option value="dust-30">×30 — звёздная пыль</option><option value="track">♫ Музыкальный трек</option></select></label>
+      <div class="tester-reward-buttons">
+        <button id="tester-open-daily" type="button">Календарь наград</button>
+        <button id="tester-open-wheel" type="button">Открыть рулетку</button>
+        <button id="tester-unlock-daily" type="button">↻ Новый день (тест)</button>
+        <button id="tester-claim-daily" type="button">✦ Выдать награду</button>
+        <button id="tester-unlock-spin" type="button">↻ Разблокировать спин</button>
+        <button id="tester-force-spin" type="button">◉ Тестовый спин</button>
+        <button id="tester-odds-sim" type="button">1000 случайных призов</button>
+        <button id="tester-reset-daily" type="button" class="danger">Сбросить награды</button>
+      </div>
+      <div id="tester-odds-result" class="tester-odds-result" role="status" aria-live="polite"></div>
+      <p class="tester-reward-note">Все действия меняют только тестовое сохранение. Изменение шансов и множителя не влияет на обычную игру.</p>
+    </section>
     <div class="tester-actions">
       <button id="tester-missions" type="button">✓ Выполнить задачи</button>
       <button id="tester-next" type="button">↑ Следующая форма</button>
