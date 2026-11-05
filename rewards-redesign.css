@@ -1,0 +1,401 @@
+/* INFINITI SPACE · unified rewards/roulette UI 3.49
+   This skin replaces the previous boxed, over-rounded reward treatment.
+   Menu buttons intentionally use the SAME base selectors as native pages. */
+
+/* Remove remnants of bespoke promotional tiles: both entries are ordinary menu-grid buttons. */
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry {
+  order:-1;
+  grid-column:auto;
+  height:60px;
+  min-height:0;
+  margin:0;
+  padding:0 15px;
+  gap:11px;
+  border:1px solid #4c3b72!important;
+  border-bottom:3px solid #362357!important;
+  border-radius:6px;
+  background:linear-gradient(160deg,rgba(29,21,53,.95),rgba(12,13,26,.98))!important;
+  color:#eee7ff!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.04);
+  font-size:14px;
+  font-weight:900;
+  text-align:left;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry:hover {
+  border-color:#9d79f7!important;
+  background:linear-gradient(160deg,#322259,#1b1234)!important;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry > span:first-child {
+  display:grid;place-items:center;flex:0 0 39px;
+  width:39px;height:39px;
+  border:1px solid #6c4dc2!important;
+  border-radius:6px;
+  background:#28194e!important;
+  color:#c0a7ff!important;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry > span:first-child .ui-symbol{
+  width:25px;height:25px;color:#c0a7ff;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry > span:nth-child(2){
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:14px;line-height:1.2;font-weight:900;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry > span:last-child{
+  flex:0 0 22px;width:22px;height:22px;
+  display:grid;place-items:center;margin-left:auto!important;color:#bfa8ff;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry > span:last-child .ui-symbol{
+  width:21px;height:21px;
+}
+body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry.reward-available > span:first-child{
+  color:#ddc9ff!important;
+  box-shadow:0 0 13px #6736cf48;
+}
+@media(max-width:1400px) {
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry{
+    height:57px;font-size:13.5px;padding:0 13px;gap:10px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:first-child{
+    flex-basis:37px;width:37px;height:37px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:nth-child(2){font-size:13.5px}
+}
+@media(max-width:800px) {
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry{
+    height:54px;font-size:12px;padding:0 9px;gap:7px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:first-child{
+    flex-basis:32px;width:32px;height:32px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:first-child .ui-symbol{
+    width:21px;height:21px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:nth-child(2){font-size:12px}
+}
+@media(max-width:430px) {
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry{
+    height:51px;padding:0 7px;gap:5px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:first-child{
+    flex-basis:30px;width:30px;height:30px;
+  }
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry>span:nth-child(2){
+    font-size:11.5px;white-space:normal;overflow:visible;text-overflow:clip;
+  }
+}
+@media(max-height:840px) {
+  body.ui-v15 #screen-menu .menu-grid button.rewards-menu-entry{
+    height:49px!important;
+  }
+}
+
+/* Dialog frame: flatter game-native geometry; identical on both reward screens. */
+body.ui-v15 #modal[data-screen="daily"] .modal-card:has(.daily-screen),
+body.ui-v15 #modal[data-screen="roulette"] .modal-card:has(.daily-screen){
+  box-sizing:border-box;
+  width:min(952px,calc(100vw - 40px));
+  max-width:952px;
+  height:min(800px,calc(100dvh - 40px));
+  max-height:calc(100dvh - 40px);
+  display:flex;align-items:stretch;justify-content:flex-start;
+  flex-direction:column;overflow:hidden;
+  border:2px solid #574186!important;
+  border-bottom:4px solid #38235e!important;
+  border-radius:7px!important;
+  background:linear-gradient(145deg,#120c23,#0e0a1c 65%,#151024)!important;
+  box-shadow:0 24px 92px #000c,0 0 38px #4d22c62d!important;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .modal-card::before{
+  background:radial-gradient(circle,#53329a16,transparent 72%);
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-screen{
+  padding:30px 33px 28px;min-height:0;
+  color:#eee7ff;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-header{
+  align-items:center;gap:16px;
+  margin-bottom:18px;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-eyebrow{
+  color:#a38ac9;font-size:11px;letter-spacing:.09em;font-weight:850;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-header h2{
+  font-family:"Inter Display",Inter,system-ui,sans-serif;
+  font-size:clamp(28px,3.3vw,40px);
+  font-weight:950;line-height:1.1;
+  letter-spacing:-.045em;
+  margin:7px 0;
+  color:#f5f0ff;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-header p{
+  font-size:14px;color:#b0a0cb;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-back{
+  min-height:46px;
+  border:1px solid #7353a4!important;
+  border-bottom:4px solid #3b2366!important;
+  border-radius:5px!important;
+  background:linear-gradient(180deg,#2b1c49,#1b1232)!important;
+  color:#e8dfff;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs{
+  min-height:58px;margin:0 0 19px;padding:0;gap:9px;
+  border:0!important;border-radius:0;
+  background:transparent;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs>button{
+  min-height:56px;padding:9px 12px;
+  border:1px solid #4e3971!important;
+  border-bottom:4px solid #342151!important;
+  border-radius:5px!important;
+  background:linear-gradient(160deg,#231838,#151024)!important;
+  color:#a99bc1;font-size:15px;font-weight:900;
+  box-shadow:none!important;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs>button.selected{
+  color:#f9f5ff;background:linear-gradient(130deg,#4d22c6,#32177c)!important;
+  border-color:#9b76e7!important;
+  border-bottom-color:#44218e!important;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs>button:not(.selected):hover{
+  border-color:#8061bc!important;color:#eee8ff;
+}
+body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-page-content{
+  padding:2px 5px 1px 0;
+  scrollbar-color:#6c46af transparent;
+}
+
+/* Daily: large, neatly squared reward tiles. One featured reward. */
+body.ui-v15 #modal[data-screen="daily"] .daily-streak{
+  min-height:70px;padding:13px 18px;margin-bottom:17px;
+  border:1px solid #564077!important;
+  border-bottom:4px solid #352453!important;
+  border-radius:6px;
+  background:linear-gradient(100deg,#2b1b48,#1b132e)!important;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-streak>strong{
+  color:#ebd9ff;font-size:29px;
+}
+body.ui-v15 #modal[data-screen="daily"] .rewards-section-caption strong{
+  font-size:17px;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-calendar{
+  gap:9px;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day{
+  min-height:133px;padding:15px;
+  border:1px solid #4c3a6b!important;
+  border-bottom:4px solid #302047!important;
+  border-radius:6px!important;
+  background:linear-gradient(160deg,#291b40,#1a132b)!important;
+  box-shadow:none;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day-current{
+  border:2px solid #9e79ef!important;
+  border-bottom:5px solid #522fa5!important;
+  background:linear-gradient(120deg,#4a2b94,#271748)!important;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day-claimed{
+  border-color:#755d99!important;
+  border-bottom-color:#43305c!important;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day>strong{
+  font-size:16px;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day-reward b{
+  font-size:21px;color:#f1d8ff;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-day-current .daily-day-reward b{
+  font-size:31px;color:#fff5db;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-claim,
+body.ui-v15 #modal[data-screen="roulette"] .daily-spin{
+  min-height:58px;
+  border:2px solid #a285f5!important;
+  border-bottom:5px solid #3c1a8d!important;
+  border-radius:6px!important;
+  background:linear-gradient(180deg,#6740db,#4d22c6)!important;
+  box-shadow:0 7px 25px #31127355!important;
+  font-size:17px;font-weight:950;
+}
+body.ui-v15 #modal[data-screen="daily"] .daily-claim:disabled,
+body.ui-v15 #modal[data-screen="roulette"] .daily-spin:disabled{
+  background:#322244!important;
+  border-color:#5e477f!important;
+  border-bottom-color:#342149!important;
+  box-shadow:none!important;
+}
+
+/* Roulette: a functional weighted wheel rendered as high-resolution SVG,
+   no flat conic pie, with engraved labels, lights, hub and fixed arrow. */
+body.ui-v15 #modal[data-screen="roulette"] .roulette-intro{
+  min-height:46px;
+  margin-bottom:11px;padding:10px 15px;
+  background:#211634!important;
+  border:1px solid #4d376d!important;
+  border-bottom:3px solid #2d1f43!important;
+  border-radius:5px!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-intro span{
+  color:#d8c8ff;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-roulette-body{
+  grid-template-columns:minmax(0,345px) minmax(0,1fr);
+  gap:20px;align-items:center;
+  margin:0;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{
+  min-height:330px;padding:8px 0 8px;
+  position:relative;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage:before{
+  content:"";position:absolute;z-index:0;pointer-events:none;
+  top:50%;left:50%;width:min(92%,310px);aspect-ratio:1;transform:translate(-50%,-50%);
+  border-radius:50%;
+  box-shadow:0 0 48px #5d34b552;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{
+  width:317px;height:317px;max-width:100%;aspect-ratio:1;
+  box-sizing:border-box;display:block;position:relative;z-index:1;
+  border:0!important;border-radius:50%;
+  background:none!important;box-shadow:none!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel::before{
+  display:none!important;content:none!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-disc-svg{
+  display:block;width:100%;height:100%;
+  overflow:visible;filter:drop-shadow(0 6px 10px #0008);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-pointer{
+  position:absolute;z-index:5;
+  top:-5px;left:50%;transform:translateX(-50%);
+  display:grid;place-items:start center;
+  width:52px;height:52px;
+  filter:drop-shadow(0 3px 5px #080312);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-pointer span{
+  display:block;width:30px;height:42px;
+  background:linear-gradient(125deg,#ffedb8,#c8964c);
+  clip-path:polygon(0% 0%,100% 0%,50% 100%);
+  border-radius:3px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-wheel-base{
+  position:absolute;z-index:0;bottom:1px;
+  width:180px;height:32px;border-radius:50%;
+  background:radial-gradient(ellipse,#7346c74f,transparent 75%);
+  pointer-events:none;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel.spinning{
+  transition:transform 2.7s cubic-bezier(.12,.7,.15,1)!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-prizes-title{
+  font-size:15px;font-weight:950;color:#f4e9ff;
+  margin:0 0 10px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+  display:flex;align-items:center;gap:9px;
+  min-height:58px;
+  padding:10px;
+  border:1px solid #504064!important;
+  border-bottom:3px solid #322343!important;
+  border-radius:5px!important;
+  background:linear-gradient(160deg,#291c42,#1b142d)!important;
+  box-shadow:none!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item i{
+  width:6px;height:29px;border-radius:1px;flex:0 0 6px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(1) i{background:#4d22c6}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(2) i{background:#6040bf}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(3) i{background:#8255d5}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(4) i{background:#9b6de1}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(5) i{background:#b58bdb}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(6) i{background:#d6aa86}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(7) i{background:#f6c67c}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:nth-child(8) i{background:#ffefbd}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item b{
+  font-size:14px;line-height:1.2;
+  color:#f3edff;
+  overflow-wrap:anywhere;white-space:normal;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item strong{
+  color:#bcaada;font-size:12px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item:last-child{
+  border-color:#b49362!important;
+  border-bottom-color:#5a3f28!important;
+  background:linear-gradient(150deg,#372941,#231936)!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item.daily-wheel-winner{
+  border:2px solid #f5d49a!important;
+  background:#4b3064!important;box-shadow:0 0 17px #9165ec55!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-prize-note{
+  margin:9px 0 10px;
+  line-height:1.3;font-size:12px;color:#aa96bd;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-result{
+  min-height:43px;margin:0 0 10px;padding:10px 12px;
+  border:1px solid #543a72!important;
+  border-bottom:3px solid #34204a!important;
+  border-radius:5px!important;
+  background:#251638!important;
+  color:#e9dfff;
+  font-size:13px;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-result.daily-result-win{
+  border-color:#ac8add!important;
+  color:#fff5d9;background:#39245b!important;
+}
+@media(max-width:820px){
+  body.ui-v15 #modal[data-screen="roulette"] .daily-roulette-body{
+    grid-template-columns:minmax(0,265px) minmax(0,1fr);
+    gap:12px;
+  }
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{min-height:270px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{width:253px;height:253px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+    min-height:53px;padding:7px;
+  }
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item b{font-size:12px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item strong{font-size:10px}
+}
+@media(max-width:640px){
+  body.ui-v15 #modal[data-screen="daily"] .modal-card:has(.daily-screen),
+  body.ui-v15 #modal[data-screen="roulette"] .modal-card:has(.daily-screen){
+    width:calc(100vw - 14px);
+    height:calc(100dvh - 14px);
+    max-width:none;
+    max-height:calc(100dvh - 14px);
+  }
+  body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-screen{
+    padding:19px 15px 17px;
+  }
+  body.ui-v15 #modal[data-screen="roulette"] .daily-roulette-body{
+    grid-template-columns:minmax(0,1fr);gap:3px;
+  }
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{min-height:247px;padding:5px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{width:224px;height:224px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend{
+    gap:6px;
+  }
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{min-height:48px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item b{font-size:13px}
+  body.ui-v15 #modal[data-screen="roulette"] .roulette-intro span{font-size:12px}
+}
+@media(max-height:800px) and (min-width:641px){
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage{min-height:262px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{width:253px;height:253px}
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item{
+    min-height:50px;padding:7px;
+  }
+  body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-legend-item b{font-size:13px}
+  body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .daily-screen{padding:18px 24px}
+  body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-header{margin-bottom:12px}
+  body.ui-v15 #modal:is([data-screen="daily"],[data-screen="roulette"]) .rewards-tabs{margin-bottom:12px}
+}
