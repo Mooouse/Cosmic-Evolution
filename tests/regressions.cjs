@@ -1015,7 +1015,7 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
 }
 (async()=>{
  const calls=[];let release;const ready=new Promise(resolve=>release=resolve);
- const b={performance:{now:()=>1000},Event:class{},dispatchEvent(){},CrazyGames:{SDK:{init(){calls.push('init');return ready},game:{settings:{muteAudio:true},addSettingsChangeListener(f){this.listener=f},loadingStart(){calls.push('loadingStart')},loadingStop(){calls.push('loadingStop')},gameplayStart(){calls.push('start')},gameplayStop(){calls.push('stop')}}}}};b.window=b;
+ const b={performance:{now:()=>1000},Event:class{},dispatchEvent(){},CrazyGames:{SDK:{environment:'crazygames',init(){calls.push('init');return ready},game:{settings:{muteAudio:true},addSettingsChangeListener(f){this.listener=f},loadingStart(){calls.push('loadingStart')},loadingStop(){calls.push('loadingStop')},gameplayStart(){calls.push('start')},gameplayStop(){calls.push('stop')}}}}};b.window=b;
  vm.createContext(b);vm.runInContext(fs.readFileSync('platform.js','utf8'),b);b.SpacePlatform.loaded();b.SpacePlatform.playing(true);assert.deepEqual(calls,['init']);
  release();await ready;await new Promise(setImmediate);assert.deepEqual(calls,['init','loadingStart','loadingStop','start']);assert.equal(b.SpacePlatform.muted,true);
  b.SpacePlatform.playing(true);b.SpacePlatform.playing(false);b.SpacePlatform.playing(false);assert.equal(calls.filter(x=>x==='stop').length,1);

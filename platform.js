@@ -8,11 +8,11 @@
   get muted(){return platformMuted||adMuted;},
   get adBusy(){return adBusy;},
   get adsAvailable(){
-   const env=sdk?.environment;
-   const local=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||
-      new URLSearchParams(location.search).get('useLocalSdk')==='true';
-   const hosted=/(^|\.)crazygames\.com$/i.test(location.hostname);
-   return ready&&!adBusy&&!!sdk?.ad?.requestAd&&env!=='disabled'&&(local||hosted);
+   if(!ready||adBusy)return false;
+   // In disabled mode even reading SDK.ad can throw sdkDisabled.
+   // Check the environment BEFORE touching any advertising module.
+   try{return sdkEnabled()&&typeof sdk.ad?.requestAd==='function';}
+   catch(_){return false;}
   },
   status:'loading',
   playing(value){wantsPlay=!!value;sync();},
@@ -21,6 +21,10 @@
   requestAd
  };
  window.SpacePlatform=api;
+ function sdkEnabled(){
+  try{return sdk?.environment==='local'||sdk?.environment==='crazygames';}
+  catch(_){return false;}
+ }
  function call(name){
   try{sdk?.game?.[name]?.();}catch(_){/* SDK must not interrupt gameplay. */}
  }
@@ -59,11 +63,15 @@
   try{
    sdk=window.CrazyGames?.SDK;
    if(!sdk)throw Error('SDK unavailable');
-   await sdk.init();ready=true;api.status='ready';call('loadingStart');
+   await sdk.init();
+   // GitHub Pages completes init in "disabled" mode. It must remain a
+   // standalone game; reading SDK.game/settings in this mode also throws.
+   if(!sdkEnabled()){sdk=null;api.status='standalone';return;}
+   ready=true;api.status='ready';call('loadingStart');
    settings(sdk.game.settings);
    sdk.game.addSettingsChangeListener?.(settings);
    sync();
-  }catch(_){api.status='standalone';}
+  }catch(_){ready=false;sdk=null;api.status='standalone';}
  }
  if(window.CrazyGames?.SDK)initialize();
  else{

@@ -132,6 +132,36 @@ async function testSDK(){
  vm.createContext(disabled);vm.runInContext(original,disabled);
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(disabled.window.SpacePlatform.adsAvailable,false,'GitHub Pages fallback has no real advertisements');
+
+ // Real SDK disabled mode uses throwing module getters, not inert objects.
+ // Initialization can finish AFTER the user has already opened rewards.
+ let finishInit,gameReads=0,adReads=0;
+ const delayedSDK={
+  environment:'disabled',
+  init:()=>new Promise(resolve=>{finishInit=resolve;}),
+  get game(){gameReads++;throw {code:'sdkDisabled',message:'SDK is disabled'};},
+  get ad(){adReads++;throw {code:'sdkDisabled',message:'SDK is disabled'};}
+ };
+ const delayed={
+  window:{CrazyGames:{SDK:delayedSDK},dispatchEvent(){}},
+  location:{hostname:'mooouse.github.io',search:''},
+  performance:{now:()=>0},Event:ctx.Event,URLSearchParams,setTimeout,clearTimeout
+ };
+ vm.createContext(delayed);vm.runInContext(original,delayed);
+ const bridge=delayed.window.SpacePlatform;
+ assert.equal(bridge.adsAvailable,false,'Rewards are safe before SDK init completes');
+ bridge.loaded();bridge.playing(true);
+ finishInit();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(bridge.status,'standalone');
+ for(let i=0;i<20;i++)assert.equal(bridge.adsAvailable,false,'Rewards remain safe after disabled SDK init');
+ bridge.playing(false);bridge.happy();
+ assert.equal(await bridge.requestAd('rewarded'),false);
+ assert.equal(await bridge.requestAd('midgame'),false);
+ assert.equal(bridge.adBusy,false);
+ assert.equal(gameReads,0,'Never read SDK.game in disabled mode');
+ assert.equal(adReads,0,'Never read SDK.ad in disabled mode');
+ console.log('PASS: delayed disabled SDK cannot break rewards, navigation or ad availability');
+
  console.log('PASS: CrazyGames SDK v3 callback completion, ad error handling, audio mute and standalone mode');
 }
 testSDK().catch(e=>{console.error(e);process.exitCode=1;});

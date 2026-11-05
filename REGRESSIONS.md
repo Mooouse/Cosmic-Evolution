@@ -264,3 +264,10 @@
 - Покупки: заданное целое количество, ×1/×10/×100, MAX. Цена включает последовательное удорожание каждого уровня. Недоступная фиксированная покупка не списывает пыль; MAX ищется ограниченным двоичным поиском. Неограниченно длинные циклы покупки запрещены.
 - 164 уникальных составных названия чёрных дыр. Сохранены прежние RNG-вызовы, идентификаторы, размеры и координаты всего каталога.
 - Проверки: границы всех четырёх улучшений, пакет против суммы отдельных цен, нехватка средств, MAX, очень большие числа, рост эффектов после прежних максимумов, x10 базовой скорости; сравнение старого и нового каталогов, регрессионный набор и Canvas-проверка игровых стадий.
+
+ 
+## v3.59.3 — roulette stops opening after the SDK finishes loading on GitHub Pages
+- Reproduced on the published GitHub Pages build in headed Chrome on Windows and Linux with physical mouse clicks. The click reaches the correct button, but `SpacePlatform.adsAvailable` throws `{code:"sdkDisabled"}` before the roulette dialog is mounted.
+- CrazyGames SDK `init()` may resolve in `disabled` mode. Both `SDK.game` and `SDK.ad` are throwing getters in that mode. Optional chaining does not catch getter exceptions. The bridge previously set `ready=true` before reading game settings, then caught the error without clearing readiness. Its ad predicate accessed `SDK.ad` before checking the disabled environment.
+- Check the SDK environment before accessing any modules, keep disabled initialization in standalone mode, clear readiness after initialization errors, and make the availability getter return false on SDK exceptions. Cache-bust platform.js along with the game release.
+- Localhost smoke tests cannot cover the GitHub Pages SDK environment. The new unit and Chromium regressions use delayed initialization with real-shaped throwing module getters, then exercise wheel input, completed spins, and reentry from Daily and Menu. Validate published builds separately with tests/rewards-physical.cjs on the diagnostic branch.

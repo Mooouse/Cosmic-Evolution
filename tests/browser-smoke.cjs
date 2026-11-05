@@ -268,6 +268,58 @@ const log=(...a)=>process.stdout.write(a.join(' ')+'\n');
   await page.waitForFunction(()=>document.getElementById('modal')?.classList.contains('off'),null,{timeout:18000});
   log('PASS: lethal black-hole collision opens responsive ad-only death screen and restart');
   assert.equal(errors.length,0,'No unhandled JavaScript errors: '+errors.join('\n'));
+
+  // Match the real GitHub Pages failure: the external SDK resolves its init
+  // in disabled mode, and merely reading SDK.ad / SDK.game throws an object.
+  const standalone=await browser.newContext({viewport:{width:1100,height:760}});
+  const sp=await standalone.newPage();
+  const standaloneErrors=[];
+  sp.on('pageerror',e=>standaloneErrors.push(String(e)));
+  await sp.addInitScript(()=>{
+   localStorage.setItem('infiniti-space-language','ru');
+   window.__disabledModuleReads=[];
+   window.CrazyGames={SDK:{
+    environment:'disabled',
+    init:()=>new Promise(resolve=>{window.__finishDisabledSdk=resolve;}),
+    get game(){window.__disabledModuleReads.push('game');throw {code:'sdkDisabled',message:'SDK is disabled'};},
+    get ad(){window.__disabledModuleReads.push('ad');throw {code:'sdkDisabled',message:'SDK is disabled'};}
+   }};
+  });
+  await sp.goto(base+'/?tester=1',{waitUntil:'domcontentloaded'});
+  await sp.waitForFunction(()=>document.querySelector('#screen-menu [data-reward-page="roulette"]'));
+  async function physicalClick(selector,screen){
+   const rect=await sp.evaluate(sel=>{
+    const r=document.querySelector(sel).getBoundingClientRect();
+    return {x:r.x+r.width/2,y:r.y+r.height/2};
+   },selector);
+   await sp.mouse.click(rect.x,rect.y);
+   if(screen)await sp.waitForFunction(s=>document.querySelector('#modal')?.dataset.screen===s,screen,{timeout:5000});
+  }
+  await physicalClick('#screen-menu [data-reward-page="roulette"]','roulette');
+  await physicalClick('#rewards-tab-daily','daily');
+  await sp.evaluate(()=>window.__finishDisabledSdk());
+  await sp.waitForFunction(()=>window.SpacePlatform?.status==='standalone');
+  const calendar=await sp.locator('.daily-calendar').boundingBox();
+  for(let i=0;i<12;i++){
+   await sp.mouse.move(calendar.x+calendar.width*.5,calendar.y+calendar.height+12);
+   await sp.mouse.wheel(0,i%2?900:-900);
+  }
+  await physicalClick('#rewards-tab-roulette','roulette');
+  await physicalClick('#rewards-tab-daily','daily');
+  await physicalClick('#daily-claim');
+  await physicalClick('#rewards-tab-roulette','roulette');
+  await physicalClick('#daily-spin');
+  await sp.locator('.daily-wheel.finished').waitFor({timeout:15000});
+  await physicalClick('#rewards-tab-daily','daily');
+  await physicalClick('#rewards-tab-roulette','roulette');
+  await physicalClick('#daily-back','menu');
+  await physicalClick('#screen-menu [data-reward-page="roulette"]','roulette');
+  assert.equal(await sp.evaluate(()=>window.SpacePlatform.adsAvailable),false);
+  assert.deepEqual(await sp.evaluate(()=>window.__disabledModuleReads),[]);
+  assert.deepEqual(standaloneErrors,[]);
+  log('PASS: delayed disabled SDK, physical scrolling, completed spin and roulette reentry on standalone host');
+  await standalone.close();
+
   log('PASS: ALL REAL-CHROMIUM REWARD/ROULETTE/DEATH SMOKE TESTS');
   await context.close();
  }finally{await browser.close();}
