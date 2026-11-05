@@ -1005,6 +1005,31 @@ function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
 // physical bodies are drawn every frame. This avoids thousands of drawImage
 // operations per frame on giant black holes and high-DPI screens.
 let macroBackdrop=null,macroBackdropOld=null,macroFadeStart=0,macroBlend=null;
+// Purely visual accretion fragments. They have no entity, sector state or
+// reward: the 2.5x real capture rate already scales material/mass payouts down.
+function renderAccretionStreams(time){
+ if(!g.endless)return;
+ const center=project(player.x,player.y),core=blackHoleCoreWorldRadius()*camera.zoom;
+ if(!Number.isFinite(core)||core<2||core>Math.max(W,H)*2)return;
+ const palette=['#b997ff','#7bdcff','#f5e2ff','#e4a7ff','#ffe6bf'];
+ ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
+ for(let i=0;i<230;i++){
+  const seed=(i*.61803398875)%1,phase=(i*.754877666+time*(.14+seed*.16))%1;
+  const reach=1.13+phase*(2.7+seed*.9);
+  const angle=i*2.39996323+time*(.25+1.1/reach)+phase*2.1;
+  const radius=core*reach,x=center.x+Math.cos(angle)*radius,y=center.y+Math.sin(angle)*radius*.78;
+  if(x<-16||x>W+16||y<-16||y>H+16)continue;
+  const brightness=(1-phase*.65)*(i%13===0?1:.75);
+  ctx.globalAlpha=brightness;ctx.strokeStyle=palette[i%palette.length];
+  ctx.lineWidth=i%11===0?2.1:1.15;
+  const tail=3+Math.min(14,core*.11)+((i%7)*.4);
+  ctx.beginPath();
+  ctx.moveTo(x-Math.cos(angle+1.25)*tail,y-Math.sin(angle+1.25)*tail*.78);
+  ctx.lineTo(x,y);ctx.stroke();
+  if(i%19===0){ctx.fillStyle='#ffffff';ctx.fillRect(x-1,y-1,2,2);}
+ }
+ ctx.restore();
+}
 function renderMacroField(time){
  macroVisibleCount=0;
  // Reuse cached sprites, but project live positions every frame. A cached
@@ -2279,7 +2304,7 @@ function render(time){
   try{renderBlackHoleLensing();}
   catch(_){blackHoleLensRetryAt=time+2;}
  }
- renderGatherFlow(time);renderPlayer(time);renderParticles();
+ renderGatherFlow(time);renderAccretionStreams(time);renderPlayer(time);renderParticles();
  ctx.restore();
  if(screenFlash>0&&!g.endless){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
  // Compositing invariant: the event horizon is drawn after every distortion,
