@@ -477,3 +477,41 @@
 /* v3.42.2: remove duplicate mobile zoom popup button; pinch is direct. */
 .ui-v15 #hud .v15-camera-toggle{display:none!important}
 .ui-v15 #hud .camera-buttons{pointer-events:auto}
+
+/* v3.42.3 — center the upgrades trigger along the left screen edge.
+   Both the trigger and drawer use the same viewport midpoint on all devices. */
+.ui-v15 #hud .v15-hud .upgrade-pull{
+ position:absolute!important;
+ top:50%!important;
+ bottom:auto!important;
+ left:clamp(10px,1.5vw,22px)!important;
+ right:auto!important;
+ transform:translateY(-50%)!important;
+ z-index:27!important;
+}
+.ui-v15 #hud .v15-hud .quick-upgrades{
+ position:absolute!important;
+ top:50%!important;
+ bottom:auto!important;
+ left:clamp(183px,15vw,230px)!important;
+ transform:translateY(-50%)!important;
+ max-height:calc(100dvh - 44px)!important;
+ z-index:28!important;
+}
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px),(max-height:500px) and (max-width:1000px){
+ .ui-v15 #hud .v15-hud .upgrade-pull{
+  top:50%!important;
+  bottom:auto!important;
+  left:max(10px,env(safe-area-inset-left))!important;
+  transform:translateY(-50%)!important;
+ }
+ .ui-v15 #hud .v15-hud .quick-upgrades{
+  top:50%!important;
+  bottom:auto!important;
+  left:calc(max(10px,env(safe-area-inset-left)) + 51px)!important;
+  transform:translateY(-50%)!important;
+  width:min(235px,calc(100vw - 74px))!important;
+  max-width:calc(100vw - 74px)!important;
+  max-height:calc(100dvh - 24px)!important;
+ }
+}
