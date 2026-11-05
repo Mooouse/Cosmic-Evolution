@@ -2721,15 +2721,34 @@ function drawAtlas(){
   c.strokeStyle=isBlackHole?'rgba(255,215,170,.75)':'rgba(198,174,255,.72)';
   c.lineWidth=1.3;c.beginPath();c.arc(playerPoint.x,playerPoint.y,bodyRadius,0,TAU);c.stroke();
  }
- // Draw the ACTUAL evolution shape (asteroid, planet, star, galaxy or black hole).
- // Keep a legible icon even when the map zoom makes its physical radius subpixel.
- const avatarRadius=clamp(bodyRadius,10,26);
- if(isBlackHole){
-  paintAbyss(c,playerPoint.x,playerPoint.y,avatarRadius,w,h);
- }else{
-  const previousCtx=ctx;ctx=c;
-  try{paintPlayerForm(playerPoint.x,playerPoint.y,avatarRadius,0,g.tier);}
-  finally{ctx=previousCtx;}
+ // Render the current form in TRUE world units. Do not cap the radius to a
+ // 10–26 px avatar: zooming the map must change the physical silhouette.
+ // Keep only a separate locator when the form is genuinely subpixel.
+ if(Number.isFinite(bodyRadius)&&bodyRadius>=.5){
+  if(isBlackHole){
+   paintAbyss(c,playerPoint.x,playerPoint.y,bodyRadius,w,h);
+  }else if(bodyRadius<Math.max(w,h)*32){
+   const previousCtx=ctx;ctx=c;
+   try{paintPlayerForm(playerPoint.x,playerPoint.y,bodyRadius,0,g.tier);}
+   finally{ctx=previousCtx;}
+  }else{
+   // A planet/galaxy larger than the entire atlas becomes a local surface.
+   // Draw the true disk intersection without astronomical-radius paths.
+   const diagonal=Math.hypot(w,h),dx=w*.5-playerPoint.x,dy=h*.5-playerPoint.y,d=Math.hypot(dx,dy);
+   c.save();c.fillStyle=TA[g.tier].color;
+   if(d+diagonal<bodyRadius){c.fillRect(0,0,w,h);}
+   else if(d-diagonal<bodyRadius){
+    const nx=dx/(d||1),ny=dy/(d||1),edgeX=playerPoint.x+nx*bodyRadius,edgeY=playerPoint.y+ny*bodyRadius;
+    c.translate(edgeX,edgeY);c.rotate(Math.atan2(ny,nx));
+    c.fillRect(-diagonal*3,-diagonal*3,diagonal*3,diagonal*6);
+   }
+   c.restore();
+  }
+ }else if(Number.isFinite(bodyRadius)){
+  // This crosshair identifies position only; it is NOT an enlarged body.
+  c.save();c.strokeStyle='rgba(222,195,255,.82)';c.lineWidth=1;
+  c.beginPath();c.moveTo(playerPoint.x-4,playerPoint.y);c.lineTo(playerPoint.x+4,playerPoint.y);
+  c.moveTo(playerPoint.x,playerPoint.y-4);c.lineTo(playerPoint.x,playerPoint.y+4);c.stroke();c.restore();
  }
  // The rectangular frame is the actual camera footprint, not a fixed inset.
  const viewCenter=projectMap(camera.x,camera.y),viewW=W/camera.zoom*scale,viewH=H/camera.zoom*scale;
@@ -2742,7 +2761,7 @@ function drawAtlas(){
  if(playerPoint.x>=0&&playerPoint.y>=0&&playerPoint.x<=w&&playerPoint.y<=h){
   c.font='800 11px Inter,sans-serif';c.fillStyle='#fff3d6';
   const markerLabel=L('YOU','ТЫ','TÚ')+' · '+TA[g.tier].name;
-  const tx=clamp(playerPoint.x+Math.min(34,avatarRadius+10),8,Math.max(8,w-130));
+  const tx=clamp(playerPoint.x+Math.min(34,Math.max(0,bodyRadius)+10),8,Math.max(8,w-130));
   c.fillText(markerLabel,tx,clamp(playerPoint.y-avatarRadius-5,14,h-15),130);
  }
  const origin=projectMap(0,0);
@@ -2967,7 +2986,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.42.2';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.42.4';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
@@ -2975,7 +2994,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.42.2`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.42.4`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -3042,7 +3061,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.42.2');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.42.4');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{
@@ -3086,6 +3105,8 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   const left=q(root,'.map-corner.left');q(left,'.map-stats').replaceWith(q(old,'.atlas-stats'));
   const add=q(old,'#atlas-pin-add');add.className='map-accent-action';add.innerHTML=icon('pin')+' '+L('Place a marker','Поставить метку','Colocar marca');q(left,'#pin-add').replaceWith(add);q(left,'#pin-status').replaceWith(q(old,'#atlas-pin-hint'));
   const details=document.createElement('details');details.className='v15-map-details';const summary=document.createElement('summary');summary.textContent=L('Scale & saved markers','Масштаб и сохранённые метки','Escala y marcas guardadas');details.append(summary,q(old,'.atlas-measures'),q(old,'.atlas-pins'));left.append(details);
+  // This select is moved from the legacy modal after mount(). Style it here.
+  visual?.enhanceSelects(details);
   [['#zoom-in','#atlas-zoom-in'],['#zoom-out','#atlas-zoom-out'],['#map-center','#atlas-center']].forEach(([to,from])=>q(root,to).replaceWith(q(old,from)));
   q(root,'.map-threat').replaceChildren(q(old,'#atlas-threat'),q(old,'#atlas-abyss'));
   q(root,'.map-footer .legend').replaceWith(q(old,'.atlas-legend'));atlasFitPlayer();atlas.dirty=true;translate(root);
