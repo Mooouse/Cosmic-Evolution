@@ -181,7 +181,13 @@ g.headingAngle=Number.isFinite(g.headingAngle)?Math.atan2(Math.sin(g.headingAngl
 g.mobileSensitivity=clamp(Number(g.mobileSensitivity)||1,.5,2);
 if(!['hold','follow','keys','direction'].includes(g.controlMode))g.controlMode='follow';
 if(!['direct','smooth'].includes(g.flightFeel))g.flightFeel='smooth';
-function clearFlightInput(){mobileControls?.reset();pointer.active=false;pointer.down=false;pointer.id=null;stick.active=false;stick.id=null;stick.x=stick.y=0;stick.originX=stick.originY=null;const thumb=$('stick-thumb'),pad=$('flight-stick'),marker=$('flight-marker');if(thumb)thumb.style.transform='translate(-50%, -50%)';if(pad)pad.classList.remove('engaged');if(marker)marker.classList.remove('visible');}
+function clearFlightInput(){
+ // A captured gameplay pointer must be returned to the browser when any
+ // overlay opens. Otherwise subsequent mouse clicks can be sent to canvas.
+ if(pointer.id!==null&&pointer.id!==undefined){
+  try{if(canvas.hasPointerCapture(pointer.id))canvas.releasePointerCapture(pointer.id);}catch(_){}
+ }
+ mobileControls?.reset();pointer.active=false;pointer.down=false;pointer.id=null;stick.active=false;stick.id=null;stick.x=stick.y=0;stick.originX=stick.originY=null;const thumb=$('stick-thumb'),pad=$('flight-stick'),marker=$('flight-marker');if(thumb)thumb.style.transform='translate(-50%, -50%)';if(pad)pad.classList.remove('engaged');if(marker)marker.classList.remove('visible');}
 function updateFlightMarker(){const mark=$('flight-marker');if(!mark)return;mark.style.left=pointer.x+'px';mark.style.top=pointer.y+'px';mark.classList.toggle('visible',running&&pointer.type==='mouse'&&!['keys','direction'].includes(g.controlMode)&&(pointer.down||g.controlMode==='follow')&&!atlasVisible);}
 function updateStickPosition(e){
  const pad=$('flight-stick'),rect=pad.getBoundingClientRect(),maxDist=Math.min(rect.width,rect.height)*.36;
@@ -2687,51 +2693,30 @@ function dailyReturn(){
  else showMainMenu(g.time>0);
 }
 // Fit every reward control into the visible panel: no inner scrollbars.
+// Rewards are a normal CSS flex layout. Never zoom or transform an
+// interactive subtree: scaled controls can lose accurate mouse hit testing.
 function fitRewardsContent(){
  const modal=$('modal');
- if(!['daily','roulette'].includes(modal.dataset.screen))return;
- const area=modal.querySelector('.rewards-page-content'),fit=area?.querySelector('.rewards-fit-body');
- if(!area||!fit)return;
- // CSS transform on the entire interactive subtree caused wrong hitboxes
- // in some browsers after a wheel gesture. Use layout-aware CSS zoom.
- fit.style.zoom='1';
- fit.style.transform='none';
- fit.style.width='100%';
- fit.style.marginLeft='0';
- const height=area.clientHeight,width=area.clientWidth;
- if(height<60||width<100)return;
- const required=fit.scrollHeight;
- const scale=Math.min(1,height/Math.max(height,required));
- if(scale<.999){
-  // A wider layout balances the visible width after zoom, while buttons
-  // retain their native browser click targets (unlike transform:scale).
-  fit.style.width=(100/scale).toFixed(3)+'%';
-  fit.style.zoom=scale.toFixed(5);
- }
- fit.dataset.fitScale=scale.toFixed(3);
+ if(modal.dataset.screen!=='daily'&&modal.dataset.screen!=='roulette')return;
+ const area=modal.querySelector('.rewards-page-content');
+ if(area)area.scrollTop=0;
 }
-// Protect reward buttons from scroll-chain and browser wheel hit testing.
-// This captures the gesture BEFORE any nested scroll container can react;
-// unlike a visually hidden scrollbar, the wheel is actually cancelled.
+// Wheel events are not a request to change the layout/scroll position.
+// Catch them at the document capture phase as well as on the overlay, since
+// trackpad gestures may start outside the card while the mouse is moving.
 let rewardsWheelGuardInstalled=false;
 function installRewardsWheelGuard(){
  if(rewardsWheelGuardInstalled)return;
  const modal=$('modal');
- modal.addEventListener('wheel',event=>{
-  if(modal.dataset.screen!=='daily'&&modal.dataset.screen!=='roulette')return;
+ const stopWheel=event=>{
+  if((modal.dataset.screen!=='daily'&&modal.dataset.screen!=='roulette')||modal.classList.contains('off'))return;
   if(event.cancelable)event.preventDefault();
   event.stopPropagation();
- },{capture:true,passive:false});
+ };
+ modal.addEventListener('wheel',stopWheel,{capture:true,passive:false});
+ if(typeof document!=='undefined')document.addEventListener('wheel',stopWheel,{capture:true,passive:false});
  rewardsWheelGuardInstalled=true;
 }
-window.addEventListener?.('resize',()=>{
- const screen=$('modal').dataset.screen;
- if(screen!=='daily'&&screen!=='roulette')return;
- requestAnimationFrame(()=>{
-  fitRewardsContent();
-  if(screen==='daily')paintDailyGalaxySky();
- });
-});
 function rewardsShell(screen,title,subtitle,body){
  installRewardsWheelGuard();
  const tabs='<nav class="rewards-tabs" aria-label="'+L('Reward screens','Страницы наград','Pantallas de premios')+'">'+
@@ -2741,7 +2726,7 @@ function rewardsShell(screen,title,subtitle,body){
   '<header class="rewards-header"><div><div class="daily-eyebrow">INFINITI SPACE / '+L('REWARDS','НАГРАДЫ','RECOMPENSAS')+'</div>'+
   '<h2>'+title+'</h2><p>'+subtitle+'</p></div>'+
   '<button type="button" id="daily-back" class="daily-back">'+L('← BACK','← НАЗАД','← VOLVER')+'</button></header>'+
-  tabs+'<main class="rewards-page-content"><div class="rewards-fit-body">'+body+'</div></main></div>');
+  tabs+'<main class="rewards-page-content">'+body+'</main></div>');
  $('modal').dataset.screen=screen;
  $('modal').dataset.dailyOrigin=dailyOrigin;
  // Main-menu shortcuts keep the animated black hole and comets, not the live game.
@@ -2752,7 +2737,6 @@ function rewardsShell(screen,title,subtitle,body){
  $('rewards-tab-daily').onclick=()=>{if(screen!=='daily')showDailyRewards(dailyOrigin);};
  $('rewards-tab-roulette').onclick=()=>{if(screen!=='roulette')showCosmicRoulette(dailyOrigin);};
  fitRewardsContent();
- requestAnimationFrame(fitRewardsContent);
 }
 // Same sky recipe as gameplay: dense, pixel-aligned stars organized into
 // curved, multicolored stellar associations and soft nebula knots.
