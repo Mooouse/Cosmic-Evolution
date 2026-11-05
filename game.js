@@ -2674,6 +2674,7 @@ function showDailyRewards(origin){
   '<div class="daily-wheel-stage"><div class="daily-wheel-pointer">▼</div>'+
   '<div class="daily-wheel" id="daily-wheel"><div class="daily-wheel-center">✦</div>'+
   '<div class="daily-wheel-prizes">'+prizes+'</div></div></div>'+
+  '<div class="daily-wheel-legend">'+meta.PRIZES.map((p,i)=>'<span class="daily-wheel-legend-item" data-prize="'+p.id+'"><i></i><b>'+(p.id==='track'?'♫ '+L('MUSIC','МУЗЫКА','MÚSICA'):p.mult+'×')+'</b><small>'+p.weight+'%</small></span>').join('')+'</div>'+
   '<div class="daily-prize-note">'+L('Rare jackpot: random music track · 0.8%','Редкий джекпот: случайный трек · 0,8%','Premio raro: pista musical · 0,8%')+'</div>'+
   '<div id="daily-result" class="daily-result" role="status" aria-live="polite">'+
   (canClaim?L('Collect the daily gift to unlock the wheel.','Забери ежедневную награду, чтобы открыть рулетку.','Recoge el regalo para desbloquear la ruleta.'):
@@ -2696,9 +2697,14 @@ function showDailyRewards(origin){
   const spin=$('daily-spin');spin.disabled=true;spin.textContent=L('SPINNING…','ВРАЩЕНИЕ…','GIRANDO…');
   const claim=$('daily-claim');claim.disabled=true;
   const wheel=$('daily-wheel');
-  const sector=Math.max(0,window.SpaceMeta.PRIZES.findIndex(p=>p.id===result.prize||
-   (result.prize==='track-value'&&p.id==='track')));
-  wheel.style.setProperty('--wheel-turn',(1800+360-sector*45-22.5)+'deg');
+  const sectorId=result.prize==='track-value'?'track':result.prize;
+  let cumulative=0,sectorCenter=0;
+  for(const prize of meta.PRIZES){
+   if(prize.id===sectorId){sectorCenter=cumulative+prize.weight/2;break;}
+   cumulative+=prize.weight;
+  }
+  // The dial has variable-width sectors. Point at the actual weighted slice.
+  wheel.style.setProperty('--wheel-turn',(1800+360-sectorCenter*3.6)+'deg');
   wheel.classList.add('spinning');
   const label=result.type==='track'?
    L('NEW TRACK','НОВЫЙ ТРЕК','PISTA NUEVA')+': '+result.track.title:
@@ -2710,7 +2716,7 @@ function showDailyRewards(origin){
  };
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.44.0 / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>v3.45.0 / INFINITI SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
  const dailyMenuBtn=document.createElement('button');dailyMenuBtn.id='menu-daily';
@@ -3352,7 +3358,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.44.0';});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · v3.45.0';});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
@@ -3368,7 +3374,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'.quiet-btn').removeAttribute('aria-label');
   label(root,'.quiet-btn',L('NEW UNIVERSE','НОВАЯ ВСЕЛЕННАЯ','NUEVO UNIVERSO'));
   label(root,'.primary.big-play',paused||g.time>0?L('CONTINUE','ПРОДОЛЖИТЬ','CONTINUAR'):L('BEGIN EVOLUTION','НАЧАТЬ ЭВОЛЮЦИЮ','COMENZAR EVOLUCIÓN'));
-  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.44.0`);
+  text(root,'.menu-foot .caption-tag',L('YOUR JOURNEY','ТВОЙ ПУТЬ','TU VIAJE'));text(root,'.menu-foot>span:nth-child(2)',TA[g.tier].epoch);q(root,'.menuprog>div').style.width=stageFraction()*100+'%';text(root,'.menu-foot .mint',Math.round(stageFraction()*100)+'%');text(root,'.menu-foot>span:last-child',`${timeFmt(g.time)} · v3.45.0`);
   const lang=q(root,'#language-control'),popup=q(lang,'#language-popup'),toggle=q(lang,'#lang-toggle');
   const selected=q(lang,`[data-lang="${window.SpaceI18n?.language||'en'}"]`);q(lang,'#current-language-flag').innerHTML=q(selected,'.flag-window').innerHTML;text(lang,'#current-language-code',selected.dataset.lang.toUpperCase());
   toggle.onclick=()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));};
@@ -3435,7 +3441,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · v3.44.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITI SPACE · v3.45.0');text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{
