@@ -2914,7 +2914,9 @@ function showCosmicRoulette(origin){
   '<small>'+L('Spins played','Всего прокруток','Giros realizados')+': '+state.spins+'</small></div>'+
   '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true"><span></span></div>'+
   '<div class="daily-wheel" id="daily-wheel" role="img" aria-label="'+L('Weighted prize roulette','Колесо с вероятностями призов','Ruleta de premios ponderados')+'">'+
-  rouletteWheelArtwork(meta.PRIZES)+'</div><div class="roulette-wheel-base" aria-hidden="true"></div></div>'+
+  '<img class="roulette-disc-svg" alt="" loading="eager" decoding="async" src="data:image/svg+xml;charset=utf-8,'+
+  encodeURIComponent(rouletteWheelArtwork(meta.PRIZES)).replace(/'/g,'%27')+'"></div>'+
+  '<div class="roulette-wheel-base" aria-hidden="true"></div></div>'+
   '<div class="roulette-prizes"><div class="roulette-prizes-title">'+L('PRIZES AND ODDS','ПРИЗЫ И ШАНСЫ','PREMIOS Y PROBABILIDADES')+
   '</div><div class="daily-wheel-legend">'+prizeRows+'</div></div></div>'+
   '<p class="daily-prize-note">♫ '+L('Track chance: 0.8%. If you own every paid track, receive the price of a random paid track instead.',
