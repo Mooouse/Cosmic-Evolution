@@ -507,6 +507,13 @@ for(const r of [6,300,1e100]){
  driftBox.g.time=0;
 }
 const mapCode=game.slice(game.indexOf('function drawAtlas(){'),game.indexOf('function showMap(){'));
+assert.ok(!mapCode.includes('clamp(bodyRadius,10,26)'), 'Atlas must not clamp the physical player radius to a fixed-size avatar');
+assert.ok(mapCode.includes('paintAbyss(c,playerPoint.x,playerPoint.y,bodyRadius,w,h)'), 'Black-hole map core must use original physical radius');
+assert.ok(mapCode.includes('paintPlayerForm(playerPoint.x,playerPoint.y,bodyRadius,0,g.tier)'), 'Non-black-hole forms must use original physical map radius');
+const selectBehavior=fs.readFileSync('ui-v15-behaviors.js','utf8');
+assert.ok(game.includes('visual?.enhanceSelects(details)'), 'Marker picker must use the game-themed dropdown');
+assert.ok(selectBehavior.includes("childList:true,subtree:true,characterData:true"), 'Marker dropdown options must refresh after adding and renaming pins');
+
 assert.ok(!mapCode.includes('g.tier>=13'),'Galaxies must be on the map from the first form');
 console.log('PASS: moving bodies agree across map/physics/reload; captured bodies leave orbital paths');
 
