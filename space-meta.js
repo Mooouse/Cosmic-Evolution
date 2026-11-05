@@ -33,6 +33,8 @@
   d.claims=clamp(Math.floor(Number(d.claims)||0),0,99999);
   d.spins=clamp(Math.floor(Number(d.spins)||0),0,99999);
   d.musicWins=clamp(Math.floor(Number(d.musicWins)||0),0,99999);
+  d.adSpinDay=finite(d.adSpinDay)?d.adSpinDay:-1;
+  d.adSpinUsedDay=finite(d.adSpinUsedDay)?d.adSpinUsedDay:-1;
   return d;
  }
  function baseReward(g,streak){
@@ -42,7 +44,17 @@
  function canClaim(g,now=Date.now()){return state(g).lastDay<dayIndex(now);}
  function canSpin(g,now=Date.now()){
   const d=state(g),day=dayIndex(now);
-  return d.lastDay===day&&d.spinDay!==day;
+  return d.lastDay===day&&(d.spinDay!==day||(d.adSpinDay===day&&d.adSpinUsedDay!==day));
+ }
+ // One additional attempt per day, credited only by a finished rewarded ad.
+ function canAdSpin(g,now=Date.now()){
+  const d=state(g),day=dayIndex(now);
+  return d.lastDay===day&&d.spinDay===day&&d.adSpinDay!==day;
+ }
+ function grantAdSpin(g,now=Date.now()){
+  if(!canAdSpin(g,now))return {ok:false,reason:'unavailable'};
+  const d=state(g);d.adSpinDay=dayIndex(now);
+  return {ok:true};
  }
  function claim(g,now=Date.now()){
   const d=state(g),today=dayIndex(now);
@@ -65,9 +77,11 @@
  ];
  function roll(g,tracks,now=Date.now(),random=Math.random){
   const d=state(g),today=dayIndex(now);
-  if(d.lastDay!==today||d.spinDay===today)return {ok:false,reason:'unavailable'};
-  // Persist the spin before any animation, navigation or reload can repeat it.
-  d.spinDay=today;d.spins++;
+  const normal=d.spinDay!==today,bonus=d.adSpinDay===today&&d.adSpinUsedDay!==today;
+  if(d.lastDay!==today||(!normal&&!bonus))return {ok:false,reason:'unavailable'};
+  // Consume the appropriate entitlement before any animation/reload.
+  if(normal)d.spinDay=today;else d.adSpinUsedDay=today;
+  d.spins++;
   let n=clamp(Number(random())||0,0,.999999999)*100,prize=PRIZES[PRIZES.length-1];
   for(const p of PRIZES){n-=p.weight;if(n<0){prize=p;break;}}
   const amountBase=baseReward(g,d.streak);
@@ -165,6 +179,6 @@
   // Around 90 minutes unattended can complete a form; never exceed 100%.
   return Math.max(0,Math.min(r-m,r*(seconds/5400)));
  }
- root.SpaceMeta={dayIndex,state,canClaim,canSpin,claim,roll,PRIZES,baseReward,setTesterTuning,
+ root.SpaceMeta={dayIndex,state,canClaim,canSpin,canAdSpin,grantAdSpin,claim,roll,PRIZES,baseReward,setTesterTuning,
   segmentHit,safeStep,planDrift,addRoute,driftReward};
 })(typeof window!=='undefined'?window:globalThis);
