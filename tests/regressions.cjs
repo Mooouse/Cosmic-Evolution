@@ -19,7 +19,7 @@ has('Math.max(1e-155,camera.zoom)', 'Camera must support extremely small zoom');
 has('140/physicsZoom()', 'Movement must scale with physical size, never manual camera zoom');
 has('const cellX=Math.round(gx/stride)', 'Very large cosmic coordinates must not be hashed directly');
 has('const extent=Math.min(32,', 'Cosmic horizon sector sweep regressed');
-has('let budget=Math.min(60,', 'Cosmic digestion budget regressed');
+has('let budget=Math.min(125,', 'Cosmic feast throughput regressed');
 has('function blackHoleTouchDistance(', 'Rendered horizon-contact physics missing');
 lacks('e.r>radius*.92', 'Oversized galaxy collision filter must remain removed');
 const version=page.match(/game\.js\?v=(\d+)\.(\d+)\.(\d+)/);
