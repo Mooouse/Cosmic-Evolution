@@ -2657,9 +2657,14 @@ function showMusicShop(){
 let dailyOrigin='menu';
 let testerPrizeOverride=null;
 function dailyReturn(){
- const from=dailyOrigin;
+ // Source of truth is the screen's opening context, not stale global state.
+ const modal=$('modal');
+ if(!['daily','roulette'].includes(modal.dataset.screen))return;
+ const from=modal.dataset.dailyOrigin==='play'?'play':'menu';
  dailyOrigin='menu';
- if(from==='play'){resumeGame();renderUI(true);}else showMainMenu(true);
+ delete modal.dataset.dailyOrigin;
+ if(from==='play'){resumeGame();renderUI(true);}
+ else showMainMenu(g.time>0);
 }
 function rewardsShell(screen,title,subtitle,body){
  const tabs='<nav class="rewards-tabs" aria-label="'+L('Reward screens','Страницы наград','Pantallas de premios')+'">'+
@@ -2730,7 +2735,10 @@ const ROULETTE_GALAXY_COLORS=['#ee4e6d','#ffa439','#f7d44a','#41d184','#31bddb',
 // Uses the same layered star-association design as makeSkyDepthTexture:
 // thousands of pinpoints across the game, with colorful clustered galaxies
 // and deep black gaps. Each weighted prize slice is its own clipped starfield.
+let rouletteArtworkCacheKey='',rouletteArtworkCacheHtml='';
 function rouletteWheelArtwork(prizes){
+ const key=prizes.map(p=>p.id+':'+p.weight.toFixed(6)).join('|');
+ if(key===rouletteArtworkCacheKey)return rouletteArtworkCacheHtml;
  const cx=180,cy=180,r=156,TAU2=Math.PI*2;
  let seed=0x72b4a31;
  const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -2800,7 +2808,7 @@ function rouletteWheelArtwork(prizes){
   const x=180+Math.cos(rad)*dist,y=180+Math.sin(rad)*dist;
   return (i===0?'M':'L')+num(x)+' '+num(y);
  }).join(' ')+' Z';
- return '<svg viewBox="0 0 360 360" class="roulette-disc-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
+ const art='<svg viewBox="0 0 360 360" class="roulette-disc-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
   '<defs>'+defs.join('')+
   '<radialGradient id="wheel-hub"><stop offset="0%" stop-color="#4c3296"/>'+
   '<stop offset="75%" stop-color="#21143e"/><stop offset="100%" stop-color="#0e0c22"/></radialGradient>'+
@@ -2811,6 +2819,9 @@ function rouletteWheelArtwork(prizes){
   '<circle cx="180" cy="180" r="53" fill="url(#wheel-hub)" stroke="#7150a7" stroke-width="2"/>'+
   '<path d="'+starPath+'" fill="#fff1bf" stroke="#f9d897" stroke-width="1.4"/>'+
   '</svg>';
+ rouletteArtworkCacheKey=key;
+ rouletteArtworkCacheHtml=art;
+ return art;
 }
 function showCosmicRoulette(origin){
  dailyOrigin=origin||($('modal').classList.contains('off')?'play':dailyOrigin);
@@ -2861,23 +2872,27 @@ function showCosmicRoulette(origin){
    return;
   }
   awaitingAd=true;bonus.disabled=true;
-  $('rewards-tab-daily').disabled=true;$('rewards-tab-roulette').disabled=true;$('daily-back').disabled=true;
   $('daily-result').textContent=L('Opening rewarded ad…','Открываем рекламу…','Abriendo anuncio…');
   let completed=false;
   try{completed=await window.SpacePlatform.requestAd('rewarded');}
   catch(_){completed=false;}
   finally{awaitingAd=false;}
-  if(!bonus.isConnected)return;
-  if(completed&&meta.grantAdSpin(g).ok){
-   save();checkProgression();
-   const from=dailyOrigin;
+  // Credit the bonus even if the player switched pages while the ad ran.
+  // Losing a rewarded-ad grant because its button detached is not acceptable.
+  const granted=completed&&meta.grantAdSpin(g).ok;
+  if(granted){save();checkProgression();}
+  if(!bonus.isConnected){
+   if(granted)toast(L('Extra spin is ready in roulette.','Дополнительный спин доступен в рулетке.','Tienes un giro extra disponible.'));
+   return;
+  }
+  if(granted){
+   const from=$('modal').dataset.dailyOrigin==='play'?'play':'menu';
    showCosmicRoulette(from);
    // A confirmed ad grants and automatically starts exactly one bonus spin.
    $('daily-spin')?.click();
    return;
   }
   bonus.disabled=!window.SpacePlatform?.adsAvailable;
-  $('rewards-tab-daily').disabled=false;$('rewards-tab-roulette').disabled=false;$('daily-back').disabled=false;
   $('daily-result').textContent=L('Ad not completed. Your extra spin is still available.','Реклама не завершена. Дополнительная попытка не потрачена.','Anuncio incompleto. Tu giro extra sigue disponible.');
  };
  $('daily-spin').onclick=()=>{
@@ -2898,8 +2913,8 @@ function showCosmicRoulette(origin){
   save();checkProgression();
   const spin=$('daily-spin');spin.disabled=true;
   spin.textContent=L('SPINNING…','ВРАЩАЕТСЯ…','GIRANDO…');
-  // Disable page switching until the result is revealed.
-  $('rewards-tab-daily').disabled=true;$('rewards-tab-roulette').disabled=true;$('daily-back').disabled=true;
+  // Do not block Back/tabs during a seven-second animation. The prize
+  // is granted and saved atomically; detached wheel callbacks are harmless.
   const wheel=$('daily-wheel'),resultBox=$('daily-result');
   resultBox.textContent=L('The wheel is spinning…','Колесо вращается…','La ruleta está girando…');
   resultBox.classList.remove('daily-result-win');
@@ -2933,7 +2948,6 @@ function showCosmicRoulette(origin){
     bonus.hidden=false;
     bonus.disabled=!window.SpacePlatform?.adsAvailable;
    }
-   $('rewards-tab-daily').disabled=false;$('rewards-tab-roulette').disabled=false;$('daily-back').disabled=false;
    sound(790,'sine',.16,.03);
   },7350);
  };
