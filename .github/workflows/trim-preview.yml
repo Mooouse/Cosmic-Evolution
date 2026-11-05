@@ -1,0 +1,42 @@
+name: Finalize CrazyGames gameplay video lengths
+on:
+  push:
+    branches: [crazygames-video-preview]
+    paths:
+      - scripts/trim_crazygames_previews.py
+      - .github/workflows/trim-preview.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get FFmpeg static binary
+        run: |
+          python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
+          FFMPEG_BIN="$(python3 -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')"
+          sudo cp "$FFMPEG_BIN" /usr/local/bin/ffmpeg
+          sudo chmod +x /usr/local/bin/ffmpeg
+      - name: Cut genuine gameplay without changing playback speed
+        run: python3 scripts/trim_crazygames_previews.py
+      - name: Check final videos
+        run: |
+          for suffix in 1920x1080 1080x1620; do
+            file="video-export/Infiniti_Space_Gameplay_\${suffix}.mp4"
+            test -s "$file"
+            test "$(stat -c%s "$file")" -lt 50000000
+            ffmpeg -hide_banner -i "$file" 2>&1 | tee "$RUNNER_TEMP/video-\${suffix}.txt" || true
+            grep -q 'Duration: 00:00:1' "$RUNNER_TEMP/video-\${suffix}.txt"
+            grep -q 'Video: h264' "$RUNNER_TEMP/video-\${suffix}.txt"
+            if grep -q 'Audio:' "$RUNNER_TEMP/video-\${suffix}.txt"; then exit 1; fi
+          done
+      - name: Publish finalized preview files to isolated branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f video-export/*.mp4
+          git commit -m "Finalize real-game previews at approved duration [skip ci]"
+          git push origin HEAD:crazygames-video-preview
