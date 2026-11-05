@@ -91,7 +91,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,awaySince:0,drift:{route:[],seconds:0,totalDistance:0,visits:0,last:null},daily:{lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0},awaitingReturnEvolution:false,reviveUsed:false,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -124,6 +124,11 @@ function normaliseMapPins(value){
 }
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
+window.SpaceMeta?.state(g);
+if(!g.drift||typeof g.drift!=='object')g.drift={route:[],seconds:0,totalDistance:0,visits:0,last:null};
+if(!Array.isArray(g.drift.route))g.drift.route=[];
+g.awaySince=Number.isFinite(g.awaySince)?Math.max(0,g.awaySince):0;
+g.awaitingReturnEvolution=!!g.awaitingReturnEvolution;g.reviveUsed=!!g.reviveUsed;
 
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
@@ -227,7 +232,14 @@ headingDial.addEventListener('keydown',e=>{
  save();
 });
 window.addEventListener('resize',syncHeadingControl);
-let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
+let pulseCd=0,boostCd=0,boostTime=0,shake=0,renderTicks=0;const BOOST_DURATION=2.5;
+function boostMultiplier(time=boostTime){
+ if(time<=0)return 1;
+ const elapsed=BOOST_DURATION-time;
+ // Smoothstep ramp up 0.45s and ramp down 0.65s to avoid a sudden speed jerk.
+ const ease=t=>{const u=clamp(t,0,1);return u*u*(3-2*u);};
+ return 1+1.5*ease(elapsed/.45)*ease(time/.65);
+}let atlasVisible=false,atlas={x:0,y:0,zoom:1,drag:false,lastX:0,lastY:0,dirty:true};
 let externalMusic=null,musicPreview=null,musicPreviewTimer=null;let soundCtx=null;let musicMaster=null,musicFX=null,musicLoop=null,musicNext=0,musicBeat=0;
 let pickupSoundAt=-1e9,pickupCount=0,pickupValue=0,pickupDisplayAt=-1e9;
 let absorptionTokens=0;
@@ -1434,7 +1446,7 @@ function collideWithGiant(e,dx,dy,dist){
 }
 function impact(e){if(g.tier===TA.length-1){e.kind='matter';e.material='plasma';e.value=Math.max(15,e.value||0);absorb(e);return;}if(player.shield>0){respawn(e);return;}const reduction=(1-Math.min(g.upgrade.shield,45)*.018)/(1+Math.max(0,upgradePower('shield')-45)*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
 function evolve(){
- if(g.complete)return;
+ if(g.complete||g.awaitingReturnEvolution)return;
  if(g.tier===TA.length-1){g.complete=true;g.endless=true;save();return;}
  const before=g.tier;
  spendRecipe();g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
@@ -1471,7 +1483,7 @@ function activatePulse(){
  }
  shake=5;toast('◉ ГРАВИТАЦИОННЫЙ ИМПУЛЬС');sound(245,'sine',.55,.055);renderUI();
 }
-function activateBoost(){if(!running||boostCd>0)return;boostCd=6;flashAbilityButton('dash');boostTime=2.5;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
+function activateBoost(){if(!running||boostCd>0)return;boostCd=6;flashAbilityButton('dash');boostTime=BOOST_DURATION;player.shield=Math.max(player.shield,.7);burst(player.x,player.y,20,'#bd9bff');sound(440,'triangle',.23);}
 // A finite field changes momentum; it does not attach a body to the player.
 // driftBody/freeFlightAt already advanced the inertial position to this time.
 function deflectResource(e,dt,range){
@@ -1515,7 +1527,7 @@ function update(dt){
  }
  player.targetR=currentRadius();
  player.r+=(player.targetR-player.r)*(1-Math.exp(-dt*4.5));
- const speed=flightSpeed()*(boostTime>0?2.5:1);
+ const speed=flightSpeed()*boostMultiplier();
  // Direct flight stops almost immediately; "smooth" gives optional controlled inertia.
  const response=g.flightFeel==='smooth'?(ax||ay?7:11):(ax||ay?23:34),lerp=1-Math.exp(-dt*response);
  player.vx+=(ax*speed-player.vx)*lerp;player.vy+=(ay*speed-player.vy)*lerp;
@@ -1582,7 +1594,7 @@ function update(dt){
  const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-155),1e-10,1e10);
  camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
  camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
- uiTimer+=dt;if(uiTimer>.3){uiTimer=0;if(!g.endless&&g.matter>=TA[g.tier].required&&missionsDone())evolve();renderUI();checkProgression();}
+ uiTimer+=dt;if(uiTimer>.3){uiTimer=0;if(!g.endless&&!g.awaitingReturnEvolution&&g.matter>=TA[g.tier].required&&missionsDone())evolve();renderUI();checkProgression();}
  if(saveTimer>12){saveTimer=0;save();}
 }
 function project(x,y){return {x:(x-camera.x)*camera.zoom+W/2,y:(y-camera.y)*camera.zoom+H/2};}
