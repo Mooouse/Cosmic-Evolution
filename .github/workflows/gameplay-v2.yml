@@ -44,7 +44,7 @@ jobs:
           for suffix in 1920x1080 1080x1620; do
             file="video-export/Infiniti_Space_Gameplay_$suffix.mp4"
             test -s "$file"
-            test -s "video-export/Infiniti_Space_Gameplay_$suffix-frame.jpg"
+            test -s "video-export/Infiniti_Space_Gameplay_$suffix-frame10.jpg"
             ffmpeg -hide_banner -i "$file" 2>&1 | tee "$RUNNER_TEMP/verify-$suffix.txt" || true
             grep -q 'Video: h264' "$RUNNER_TEMP/verify-$suffix.txt"
             grep -q 'Duration: 00:00:1' "$RUNNER_TEMP/verify-$suffix.txt"
@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f video-export/*mp4 video-export/*frame.jpg
+          git add -f video-export/*mp4 video-export/*frame*.jpg
           if ! git diff --cached --quiet; then
             git commit -m "Render smooth full-UI CrazyGames gameplay previews [skip ci]"
             git push origin HEAD:crazygames-video-v2
