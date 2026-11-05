@@ -2836,7 +2836,7 @@ function showMap(){
  <div class="atlas-danger-bar"><span id="atlas-threat"></span><button id="atlas-abyss" class="secondary-button">ОБЗОР ГИГАНТОВ ↗</button></div>
  <div class="atlas-pins"><button id="atlas-pin-add" class="secondary-button" aria-pressed="false">＋ МЕТКА</button><select id="atlas-pin-list" aria-label="Метки на карте"></select><input data-no-translate id="atlas-pin-name" aria-label="Название метки" maxlength="32" placeholder="Название метки"><button id="atlas-pin-edit" class="secondary-button">${L('EDIT','ИЗМЕНИТЬ','EDITAR')}</button><button id="atlas-pin-go" class="secondary-button">К МЕТКЕ</button><button id="atlas-pin-delete" class="secondary-button" aria-label="Удалить выбранную метку">УДАЛИТЬ</button></div><div id="atlas-pin-hint" class="atlas-pin-hint" aria-live="polite"></div>
  <div class="atlas-stats"><span id="atlas-count"></span><span id="atlas-coords"></span></div>
- <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту">${uiIcon('plus')}</button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту">${uiIcon('minus')}</button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">${uiIcon('center')}</button></div></div>
+ <div class="atlas-wrap"><canvas id="atlas-canvas" aria-label="Карта Вселенной: реальный масштаб, горизонт событий и видимая область"></canvas><div class="atlas-controls"><button id="atlas-zoom-in" class="atlas-control" title="Приблизить" aria-label="Приблизить карту"><span class="zoom-glyph zoom-glyph-plus" aria-hidden="true"></span></button><button id="atlas-zoom-out" class="atlas-control" title="Отдалить" aria-label="Отдалить карту"><span class="zoom-glyph zoom-glyph-minus" aria-hidden="true"></span></button><button id="atlas-center" class="atlas-control center" title="Мой масштаб" aria-label="Мой масштаб">${uiIcon('center')}</button></div></div>
  <div class="atlas-legend"><span><i class="atlas-mark you"></i>ГОРИЗОНТ / ТВОЙ РАЗМЕР</span><span class="gravity-key">◌ ПРИТЯЖЕНИЕ</span><span>▭ ИГРОВОЙ ЭКРАН</span><span><i class="atlas-mark known"></i>ИЗУЧЕНО</span><span>✦ ГАЛАКТИКИ</span><span class="abyss-key">◉ МЕНЬШЕ ТЕБЯ — ДОБЫЧА · БОЛЬШЕ — ОПАСНОСТЬ</span></div>
  <div class="atlas-footer"><small>Перетаскивай карту · ПКМ — метка · Колёсико / + / − — масштаб · ⌖ — вернуться к своему размеру. Расстояния и диаметры — в световых годах. Площадь — в квадратных световых годах.</small>${continueButton('ВЕРНУТЬСЯ В КОСМОС')}</div>`);
  setNavigationState('map');$('modal').dataset.screen='map';$('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
@@ -3180,6 +3180,9 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  $('btn-evolution').onclick=openEvolution;$('btn-stage-details').onclick=openEvolution;
  function buildHud(){const holder=document.createElement('template');holder.innerHTML=tpl.play;const hud=holder.content.firstElementChild;hud.classList.add('active','v15-hud');$('hud').append(hud);decorate(hud);
  const drawer=q(hud,'#upgrade-drawer'),upgradeToggle=q(hud,'#upgrades-open'),upgradeClose=q(drawer,'#upgrades-close');
+ upgradeClose.innerHTML=uiIcon('close');
+ upgradeClose.setAttribute('aria-label',L('Close upgrades','Закрыть улучшения','Cerrar mejoras'));
+ upgradeClose.setAttribute('title',upgradeClose.getAttribute('aria-label'));
  q(drawer,'.drawer-more').remove();
  drawer.classList.add('quick-upgrades');drawer.classList.remove('open');
  upgradeToggle.setAttribute('aria-expanded','false');
