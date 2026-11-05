@@ -45,7 +45,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add single-file/index.html single-file/Infiniti-Space-CrazyGames.zip
+          git add single-file/index.html
+          git add -f single-file/Infiniti-Space-CrazyGames.zip
           if ! git diff --cached --quiet; then
             git commit -m "Export verified one-file CrazyGames index.html [skip ci]"
             git push origin HEAD:crazygames-single-file
