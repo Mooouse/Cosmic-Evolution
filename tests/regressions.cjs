@@ -875,7 +875,7 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
 {
  const nodes=new Map();
  const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{setAttribute(){},dataset:{},innerHTML:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}});}return nodes.get(id);};
- const ui={window:{},closePinEditor(){},$:el,running:true,atlasVisible:true,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
+ const ui={window:{},closePinEditor(){},$:el,running:true,atlasVisible:true,pendingDeath:null,last:0,performance:{now:()=>123},clears:0,music:0,saves:0};
  ui.clearFlightInput=()=>ui.clears++;ui.startMusic=()=>ui.music++;ui.save=()=>ui.saves++;
  vm.createContext(ui);vm.runInContext(game.slice(game.indexOf('function uiIcon(name){'),game.indexOf('function populateUpgrades(){')),ui);vm.runInContext(game.slice(game.indexOf('function setNavigationState(screen){'),game.indexOf('function openEvolution(){')),ui);
  ui.show('<p>Settings</p>');assert.equal(ui.running,false);assert.equal(ui.atlasVisible,false);assert.equal(el('modal').dataset.screen,'panel');assert.ok(el('evolution-panel').classList.contains('hidden'));
