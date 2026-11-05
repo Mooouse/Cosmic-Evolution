@@ -119,7 +119,7 @@ function traceFrame(lensFails=false){
  });
  const screenCtx=mockCtx("front"),frameCtx=mockCtx("back");
  const universe={
-  ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},menuVisible:false,
+  ctx:screenCtx,screenCtx,frameCtx,frameCanvas:{},menuVisible:false,pendingDeath:null,
   dpr:1,W:1920,H:1080,g:{tier:27},TA:Array(28),
   sky(){calls.push("sky")},renderBackgroundComets(){calls.push("comet")},renderDistantBodies(){calls.push("distant")},
   renderMacroField(){calls.push("macro")},renderEntity(){calls.push("entity")},
@@ -139,6 +139,14 @@ function traceFrame(lensFails=false){
  assert.ok(calls.indexOf("front:present")>calls.indexOf("particles"),"Screen must not present before particle pass");
  assert.equal(screenCtx.globalCompositeOperation,"source-over","Front context state must be restored");
  return calls;
+}
+// While inside a massive hole, the death overlay must not continue lensing.
+{
+ const freeze={pendingDeath:{hole:{id:'giant'}},running:false,menuVisible:false,
+  $:()=>({dataset:{screen:'death'}}),ctx:{setTransform(){throw Error('GPU work after death');}}};
+ vm.createContext(freeze);
+ vm.runInContext(renderCode,freeze);
+ assert.equal(vm.runInContext('render(1)',freeze),undefined);
 }
 const restoredFrame=traceFrame(false);
 assert.ok(restoredFrame.indexOf('distant')<restoredFrame.indexOf('lens'));
@@ -373,6 +381,9 @@ assert.equal(savedDeath.tier,27,'Do not destroy the run before the user chooses 
 assert.ok(savedDeath.pendingDeath&&savedDeath.pendingDeath.hole.name==='ЭРЕБ');
 assert.equal(savedDeath.losses,1);
 assert.ok(deathScreen.includes('ПОГЛОЩЁН БЕЗДНОЙ'));
+assert.equal(resetBox.running,false,'Rival collision freezes simulation immediately');
+assert.equal(resetBox.player.vx,0,'Collision stops velocity before death dialog');
+assert.equal(resetBox.player.vy,0,'Collision stops vertical velocity');
 resetBox.resetCampaignState(false);
 assert.equal(savedDeath.tier,0);assert.equal(savedDeath.matter,0);assert.equal(savedDeath.credits,999999);
 assert.equal(savedDeath.upgrade.gravity,0);assert.equal(savedDeath.materials.exotic,0);
@@ -384,10 +395,13 @@ assert.equal(resetBox.tester.ring,1.5);
 assert.equal(savedDeath.pendingDeath,null);
 assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
 assert.deepEqual(savedDeath.achievements,{first:123});assert.deepEqual(savedDeath.bestiary,{planet:true});
-assert.equal(savedDeath.daily.claims,5);assert.equal(savedDeath.drift.route.length,2);
+assert.equal(savedDeath.daily.claims,5);
+assert.equal(savedDeath.drift.route.length,0,'A NEW run must start with an empty drift route');
+assert.equal(savedDeath.drift.visits,0,'New run must reset offline drift counters');
+assert.equal(savedDeath.awaySince,0,'New run must not inherit idle timer');
 resetBox.resetCampaignState(true);assert.equal(savedDeath.credits,999999,'new universe also retains stardust');
 assert.deepEqual(savedDeath.ownedTracks,[2,5]);assert.equal(savedDeath.activeTrack,5);
-console.log('PASS: death offers revival before resetting; restarting preserves stardust, music, daily rewards, route and achievements');
+console.log('PASS: death freezes black-hole rendering and new journeys clear drift history while retaining stardust, music and daily rewards');
 
 // A rival consumes matter without awarding it to the player or reviving it.
 const rivalStart=game.indexOf('function pullBodyIntoAbyss('),rivalStop=game.indexOf('function paintAbyss(',rivalStart);
@@ -1110,7 +1124,11 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
 {
  const els=new Map(),timeouts=[];
  let modalOff=true,resumed=0,menus=0,reads=0;
+ let rewardWheelListener=null;
  const modal={
+  addEventListener(type,listener,opts){
+   if(type==='wheel'){rewardWheelListener=listener;assert.equal(opts.passive,false);assert.equal(opts.capture,true);}
+  },
   dataset:{screen:'menu'},classList:{
    contains(key){return key==='off'?modalOff:false},
    add(key){if(key==='off')modalOff=true;},
@@ -1161,6 +1179,11 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  assert.ok(start>0&&stop>start,'Reward navigation source extract');
  vm.runInContext(game.slice(start,stop),context);
  context.showDailyRewards('play');
+ assert.equal(typeof rewardWheelListener,'function','Wheel handler is attached to modal');
+ let prevented=0,stopped=0;
+ rewardWheelListener({cancelable:true,preventDefault(){prevented++;},stopPropagation(){stopped++;}});
+ assert.equal(prevented,1,'Mouse wheel cannot scroll reward overlays');
+ assert.equal(stopped,1,'Mouse wheel cannot leak to world zoom');
  assert.equal(modal.dataset.screen,'daily');
  assert.equal(modal.dataset.dailyOrigin,'play');
  assert.ok(modal.innerHTML.includes('daily-galaxy-stars'),'Daily page has colorful sky canvas');
@@ -1171,6 +1194,8 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  assert.equal(modal.dataset.screen,'roulette');
  assert.equal(modal.dataset.dailyOrigin,'menu');
  assert.ok(modal.innerHTML.includes('data:image/svg+xml'),'Wheel is one cached image');
+ assert.ok(!modal.innerHTML.includes('Today’s spin is used. Come back tomorrow.'),
+  'Redundant tomorrow status should not appear above the disabled button');
  get('daily-back').onclick();
  assert.equal(menus,1,'Menu Back must return to menu');
  context.showDailyRewards('play');
@@ -1191,5 +1216,38 @@ console.log('PASS: all 27 campaign forms have size-weighted rewards without a fl
  for(const timer of timeouts)timer.fn(); // detached animation must not mutate the next screen.
  assert.equal(modal.dataset.screen,'play');
  assert.ok(reads>=2);
- console.log('PASS: daily/roulette open repeatedly, full HUD/menu Back history, switch during spin, cached SVG and sky');
+ console.log('PASS: scroll-free clickable rewards, wheel cancellation, safe Back history, repeated roulette and mid-spin tabs');
+}
+
+// Offline drift is earned only after leaving ACTIVE GAMEPLAY for 5+ minutes.
+// Merely sitting in the main menu cannot create a route or offline currency.
+{
+ let now=1_000_000,saves=0;
+ const d={
+  g:{time:300,awaySince:0},running:false,awaitingAd:false,pendingDeath:null,
+  window:{SpacePlatform:{adBusy:false},SpaceMeta:null},
+  Date:{now(){return now}},
+  save(){saves++}
+ };
+ vm.createContext(d);
+ const driftStart=game.indexOf('const AWAY_DRIFT_MIN_MS=');
+ const driftEnd=game.indexOf('function resumeFromAway(){',driftStart);
+ assert.ok(driftStart>0&&driftEnd>driftStart,'Locate offline timer implementation');
+ vm.runInContext(game.slice(driftStart,driftEnd),d);
+ d.beginAway();
+ assert.equal(d.g.awaySince,0,'Menu idle cannot start offline drift');
+ now+=10*60*1000;
+ d.beginAway();
+ assert.equal(d.g.awaySince,0,'Ten minutes in the menu still do not count');
+ d.running=true;
+ d.beginAway();
+ assert.equal(d.g.awaySince,now,'Active flight leaving app starts the timer');
+ now+=4*60*1000;
+ assert.equal(d.completeAway(),null,'Four minutes is not enough to earn drift');
+ assert.equal(d.g.awaySince,0,'Short absence clears its pending timer');
+ d.beginAway();now+=5*60*1000;
+ assert.equal(d.completeAway(),null,'No SpaceMeta module means no offline path');
+ assert.equal(d.g.awaySince,0,'Qualified absence is consumed only once');
+ assert.ok(saves>=3);
+ console.log('PASS: offline drift requires an active flight and 5+ real minutes; menu idle cannot generate a route');
 }
