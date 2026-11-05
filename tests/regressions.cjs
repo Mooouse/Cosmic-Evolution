@@ -212,7 +212,7 @@ const upgradePrelude=game.slice(game.indexOf('const upgrades ='),game.indexOf('c
 const gravityCode=upgradePrelude+game.slice(game.indexOf('function blackHoleGravityRadius(){'),game.indexOf('\nfunction harvestCosmicLOD'));
 let firstMotion;
 for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
- const e={x:400/zoom,y:0,r:80/zoom,cosmic:true,index:0,level:2,gx:0,gy:0};
+ const e={x:1000/zoom,y:0,r:30/zoom,cosmic:true,index:0,level:2,gx:0,gy:0};
  const sim={e,physicsZoom:()=>zoom,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
   BLACK_HOLE_CORE_FRACTION:.245,g:{time:0,freeFlights:{},upgrade:{gravity:0}},tester:{gravity:1},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'fixture',
@@ -220,7 +220,7 @@ for(const zoom of [1,.08,1e-15,1e-60,1e-110]){
  vm.createContext(sim);sim.physicsZoom??=()=>sim.camera.zoom;vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
  const radius=vm.runInContext('blackHoleGravityRadius()',sim);
  vm.runInContext('for(let i=0;i<6;i++){g.time+=1/60;applyBlackHoleGravity(e,1/60)}',sim);
- const movement=400-e.x*zoom;
+ const movement=1000-e.x*zoom;
  assert.ok(movement>.5,'Galaxies outside contact must move toward the black hole');
  if(firstMotion===undefined)firstMotion=movement;else assert.ok(Math.abs(movement-firstMotion)<1e-7,'Gravity speed must not vanish as zoom shrinks');
  sim.g.upgrade.gravity=40;
@@ -621,23 +621,29 @@ const entityPainter=game.slice(game.indexOf('function renderEntity('),game.index
 assert.ok(!entityPainter.includes('stroke'),'No motion lines attached to small resources');
 console.log('PASS: fast free flight, grazing deflection, inertial escape, save/reload and 30/120 Hz agreement');
 
+// The stronger field captures near passes, while truly distant flybys retain
+// their unmodified velocity. Both must stay stable at astronomical zoom.
 for(const zoom of [1,1e-60]){
  const sim={physicsZoom:()=>zoom,camera:{zoom},player:{x:0,y:0,r:450/zoom,vx:0,vy:0},W:1920,H:1080,
   BLACK_HOLE_CORE_FRACTION:.245,g:{time:0,freeFlights:{},upgrade:{gravity:0}},tester:{gravity:1},
   clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),absorbingMacroKeys:new Set(),absorptionKey:()=> 'grazing',
-  startAbsorption(){throw Error('Grazing body must not be auto-captured')}};
- vm.createContext(sim);sim.physicsZoom??=()=>sim.camera.zoom;vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
- const grazingY=(sim.blackHoleGravityRadius()+sim.blackHoleTouchDistance({r:6/zoom,cosmic:true})-sim.blackHoleCoreWorldRadius())*zoom*.985;
- const e={x:-500/zoom,y:grazingY/zoom,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
- sim.g.freeFlights.grazing={...e};let exitSpeed;
- for(let i=0;i<480;i++){
-  sim.g.time=(i+1)/60;sim.applyBlackHoleGravity(e,1/60);
-  if(i===419)exitSpeed=[e.motionVX,e.motionVY];
- }
- assert.ok(e.x*zoom>900&&e.y*zoom<grazingY&&!e.gravityBound);
- assert.deepEqual([e.motionVX,e.motionVY],exitSpeed,'Black-hole pull must end outside its field');
+  captures:0,startAbsorption(){sim.captures++;}};
+ vm.createContext(sim);sim.physicsZoom??=()=>sim.camera.zoom;
+ vm.runInContext(snippet+'\n'+game.slice(game.indexOf('const RESOURCE_STREAMS='),game.indexOf('const BIOME_NAMES='))+'\n'+gravityCode,sim);
+ const range=sim.blackHoleGravityRadius();
+ const outside={x:-500/zoom,y:range*1.1,r:6/zoom,cosmic:true,index:0,level:2,gx:0,gy:0,
+  vx:250/zoom,vy:0,motionVX:250/zoom,motionVY:0,freeFlight:true,flightTime:0};
+ sim.g.freeFlights.grazing={...outside};
+ for(let i=0;i<120;i++){sim.g.time=(i+1)/60;sim.applyBlackHoleGravity(outside,1/60);}
+ assert.ok(!outside.gravityBound,'A genuinely distant body must remain outside the stronger field');
+ assert.equal(outside.motionVX,250/zoom,'Outside the field there must be no acceleration');
+ const near={x:-250/zoom,y:range*.9,r:6/zoom,cosmic:true,index:1,level:2,gx:0,gy:0,
+  vx:0,vy:0,motionVX:0,motionVY:0,freeFlight:false,flightTime:0};
+ const initialDist=Math.hypot(near.x,near.y);
+ for(let i=0;i<30;i++){sim.g.time=(i+1)/60;sim.applyBlackHoleGravity(near,1/60);if(sim.captures)break;}
+ assert.ok(Math.hypot(near.x,near.y)<initialDist,'7x field must pull near passes inward');
 }
-console.log('PASS: fast grazing bodies escape black-hole fields at ordinary and astronomical scales');
+console.log('PASS: 7x black-hole gravity attracts near passes; remote flybys preserve velocity');
 
 // Physical scale, appearance and useful food evolve together without tier gates.
 const scaleBox={TA:reqBox.forms,player:{r:13},tester:{zoom:1},g:{tier:0,matter:0},
