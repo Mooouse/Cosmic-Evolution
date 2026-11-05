@@ -896,7 +896,7 @@ console.log('PASS: independent sky depth, bounded scrolling and seamless viewpor
 }
 {
  let saves=0;const notices=[];
- const b={window:{SpaceI18n:{language:'en',t:s=>s}},g:{tier:0,time:0,collects:1,achievements:{},abyssConsumed:{},materials:{ice:0},matter:100},clamp:scaleBox.clamp,TA:[{required:100}],stageRecipe:()=>[{type:'ice',amount:3}],MATERIALS:{ice:{label:'Ice'}},missionReq:()=>({explore:0,collect:0}),exploredCount:()=>0,solarMass:()=>1e100,fmt:String,save(){saves++},toast(t){notices.push(t)}};
+ const b={window:{SpaceI18n:{language:'en',t:s=>s}},MIN_STAGE_SECONDS:600/27,g:{tier:0,time:0,stageElapsed:25,collects:1,achievements:{},abyssConsumed:{},materials:{ice:0},matter:100},clamp:scaleBox.clamp,TA:[{required:100}],stageRecipe:()=>[{type:'ice',amount:3}],MATERIALS:{ice:{label:'Ice'}},missionReq:()=>({explore:0,collect:0}),exploredCount:()=>0,solarMass:()=>1e100,fmt:String,save(){saves++},toast(t){notices.push(t)}};
  b.g.stageExplored=0;b.g.stageCollects=100;
  vm.createContext(b);vm.runInContext(game.slice(game.indexOf('const L='),game.indexOf('function celebrateAchievement('))+'\nglobalThis.catalogue=ACHIEVEMENTS;globalThis.rarity=RARITIES;',b);
  let celebrations=0;b.celebrateAchievement=()=>celebrations++;
