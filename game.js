@@ -2824,7 +2824,7 @@ function showCosmicRoulette(origin){
    spin.textContent=L('COME BACK TOMORROW','ВОЗВРАЩАЙСЯ ЗАВТРА','VUELVE MAÑANA');
    $('rewards-tab-daily').disabled=false;$('rewards-tab-roulette').disabled=false;$('daily-back').disabled=false;
    sound(790,'sine',.16,.03);
-  },2450);
+  },2820);
  };
 }
 function showMainMenu(paused=false){
