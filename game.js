@@ -2413,7 +2413,11 @@ function render(time){
  ctx.restore();
  // A temporary Canvas readback failure must not abort this frame before
  // drawing the opaque horizon. Keep the lens optional, not the black hole.
- if(time>=blackHoleLensRetryAt){
+ // Near a lethal event horizon, avoid back-to-back full-canvas GPU
+ // readbacks. A stall here would happen BEFORE the death dialog can open.
+ const lethalHorizonNear=abyssPhysical.some(h=>!g.abyssConsumed[h.id]&&!canEatAbyss(h)&&
+  Math.hypot(h.x-player.x,h.y-player.y)<=h.r*1.20);
+ if(!lethalHorizonNear&&time>=blackHoleLensRetryAt){
   if(time>=rivalLensRetryAt){try{renderRivalLensing();}catch(_){rivalLensMaps.clear();rivalLensRetryAt=time+2;}}
   try{renderBlackHoleLensing();}
   catch(_){blackHoleLensRetryAt=time+2;}
@@ -3589,6 +3593,9 @@ function showDeathOffer(){
   '<small>'+L('One revival per run. Reviving preserves your progress. Starting over preserves stardust and owned music.','Одно возрождение за прохождение. При возрождении прогресс сохраняется. При новой игре остаются звёздная пыль и музыка.','Una reanimación por partida. Revivir conserva el progreso; empezar de nuevo conserva polvo y música.')+'</small>'+
   '<div class="revive-feedback" id="revive-feedback" aria-live="polite"></div></div>');
  $('modal').dataset.screen='death';$('panel-close').onclick=()=>{$('revive-restart').click();};
+ // Display the actionable death dialog before persisting potentially large
+ // explored-sector data. The save still contains the pending-death offer.
+ setTimeout(()=>{if(pendingDeath)save();},40);
  $('revive-restart').onclick=async()=>{
   if(awaitingAd)return;
   awaitingAd=true;
