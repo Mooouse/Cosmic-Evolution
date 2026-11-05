@@ -140,3 +140,55 @@ body.ui-v15 .tester-reward-note{
 @media(prefers-reduced-motion:reduce){
  body.ui-v15 .tester-reward-buttons button{transition:none}
 }
+
+
+/* v3.51 — same clustered star map as the game's sky, rather than painted wedges. */
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel.spinning{
+ transition:transform 7.2s cubic-bezier(.48,0,.12,1)!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel{
+ background:#080c1b!important;
+ will-change:transform;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-disc-svg{
+ filter:drop-shadow(0 0 14px #6052c696)
+        drop-shadow(0 0 22px #178fdf46)
+        drop-shadow(0 7px 13px #040211c0);
+}
+body.ui-v15 #modal[data-screen="roulette"] .daily-wheel-stage:before{
+ width:min(100%,345px);
+ box-shadow:0 0 74px #4939ce80,0 0 118px #198de44d,0 0 165px #e447a530;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin{
+ box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+ width:100%;min-height:52px;margin:10px 0 0;padding:12px 16px;
+ border:2px solid #85ace1!important;border-bottom:5px solid #365b9a!important;
+ border-radius:6px!important;
+ background:linear-gradient(110deg,#205c99,#253a79)!important;
+ color:#edfaff;font-size:15px;font-weight:950;line-height:1.25;
+ box-shadow:0 7px 22px #04133b66;
+ cursor:pointer;
+ transition:filter .15s ease,transform .15s ease;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin:not(:disabled):hover{
+ filter:brightness(1.12);transform:translateY(-1px);
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin:disabled{
+ opacity:.64;cursor:not-allowed;
+ background:#253044!important;color:#b3c3d8;
+ border-color:#53667f!important;border-bottom-color:#334050!important;
+ box-shadow:none;
+}
+body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin[hidden]{
+ display:none!important;
+}
+@media(max-width:640px){
+ body.ui-v15 #modal[data-screen="roulette"] .roulette-ad-spin{
+  min-height:50px;font-size:13px;padding:10px 12px;
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ body.ui-v15 #modal[data-screen="roulette"] .daily-wheel.spinning{
+  transition-duration:.01ms!important;
+ }
+}
