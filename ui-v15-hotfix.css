@@ -1398,3 +1398,42 @@ body.ui-v15 .drift-route-button:disabled{opacity:.47}
  body.ui-v15 #modal .revive-actions{grid-template-columns:1fr}
  body.ui-v15 #modal .revive-actions .revive-ad{grid-column:auto}
 }
+
+/* Roulette prizes match the eight weighted wheel slices. */
+body.ui-v15 #modal .daily-wheel-legend{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;
+ margin:0 0 4px;
+}
+body.ui-v15 #modal .daily-wheel-legend-item{
+ display:flex;align-items:center;justify-content:space-between;gap:4px;
+ padding:7px 6px;min-width:0;
+ border:1px solid #71519e;border-radius:5px;
+ background:#241636;color:#eee1ff;
+}
+body.ui-v15 #modal .daily-wheel-legend-item i{
+ width:7px;height:13px;flex:0 0 7px;
+ background:#7a50b5;border-radius:2px;
+}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(1) i{background:#5330a3}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(2) i{background:#7850b5}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(3) i{background:#9065c9}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(4) i{background:#a475d6}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(5) i{background:#ce9bda}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(6) i{background:#d9b378}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(7) i{background:#ffdc8a}
+body.ui-v15 #modal .daily-wheel-legend-item:nth-child(8) i{background:#fbefb5}
+body.ui-v15 #modal .daily-wheel-legend-item b{
+ flex:1;min-width:0;font-size:10px;font-weight:900;
+ text-overflow:ellipsis;overflow:hidden;white-space:nowrap;
+}
+body.ui-v15 #modal .daily-wheel-legend-item small{
+ flex:none;font-size:9px;color:#cdbce6;font-weight:800;
+}
+body.ui-v15 #modal .daily-wheel-legend-item:last-child{
+ border-color:#dcb66e;box-shadow:0 0 12px #d4ad5d45;
+}
+@media(max-width:510px){
+ body.ui-v15 #modal .daily-wheel-legend{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+}
