@@ -4,6 +4,20 @@
  'use strict';
  const DAY_MS=86400000;
  const TAU=Math.PI*2;
+ const IS_TESTER=typeof root.location?.search==='string'&&new URLSearchParams(root.location.search).get('tester')==='1';
+ let testerRewardMultiplier=1;
+ const BASE_PRIZE_WEIGHTS=[29,25,20,13,8,3,1.2,.8];
+ function setTesterTuning({rewardMultiplier=1,trackChance=.8}={}){
+  if(!IS_TESTER)return false;
+  testerRewardMultiplier=clamp(Number(rewardMultiplier)||1,.1,20);
+  const chance=clamp(Number(trackChance),.1,25);
+  const normalized=finite(chance)?chance:.8;
+  PRIZES.forEach((prize,i)=>{
+   prize.weight=i===7?normalized:BASE_PRIZE_WEIGHTS[i]*(100-normalized)/99.2;
+  });
+  return true;
+ }
+
  const finite=x=>Number.isFinite(x);
  const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
  function dayIndex(now=Date.now()){
@@ -23,7 +37,7 @@
  }
  function baseReward(g,streak){
   // Grows with progression, but does not grant free evolution matter.
-  return Math.round((240+Math.min(streak,30)*85)*Math.pow(1+Math.max(0,g.tier||0),2.2));
+  return Math.round((240+Math.min(streak,30)*85)*Math.pow(1+Math.max(0,g.tier||0),2.2)*testerRewardMultiplier);
  }
  function canClaim(g,now=Date.now()){return state(g).lastDay<dayIndex(now);}
  function canSpin(g,now=Date.now()){
@@ -151,6 +165,6 @@
   // Around 90 minutes unattended can complete a form; never exceed 100%.
   return Math.max(0,Math.min(r-m,r*(seconds/5400)));
  }
- root.SpaceMeta={dayIndex,state,canClaim,canSpin,claim,roll,PRIZES,baseReward,
+ root.SpaceMeta={dayIndex,state,canClaim,canSpin,claim,roll,PRIZES,baseReward,setTesterTuning,
   segmentHit,safeStep,planDrift,addRoute,driftReward};
 })(typeof window!=='undefined'?window:globalThis);
