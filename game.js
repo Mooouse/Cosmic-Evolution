@@ -3702,15 +3702,12 @@ function showDeathOffer(){
  // Display the actionable death dialog before persisting potentially large
  // explored-sector data. The save still contains the pending-death offer.
  setTimeout(()=>{if(pendingDeath)save();},40);
- $('revive-restart').onclick=async()=>{
+ $('revive-restart').onclick=()=>{
   if(awaitingAd)return;
-  awaitingAd=true;
-  const actions=[...document.querySelectorAll('.revive-actions button')];
-  actions.forEach(b=>b.disabled=true);
-  // A midgame ad fits the run-ending break; never while actively flying.
-  if(!d.triedAd&&window.SpacePlatform?.adsAvailable)await window.SpacePlatform.requestAd('midgame');
+  // Do not wait for CrazyGames midgame ads here: the SDK bridge can hold the
+  // response for 120 seconds. Restart is always immediate and independent.
   resetCampaignState(false);
-  awaitingAd=false;resumeGame();
+  resumeGame();
   toast(L('New journey started · soundtrack and stardust saved','Новое путешествие · музыка и пыль сохранены','Nuevo viaje · música y polvo conservados'));
  };
  const revive=reviveFromDeath;
