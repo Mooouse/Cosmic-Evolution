@@ -61,8 +61,6 @@ const TA = [
  ['Космическая паутина','Сверхмасштаб','Нити гравитации соединяют всё сущее.','web','#bf9bff'],
  ['БЕСКОНЕЧНАЯ ЧЁРНАЯ ДЫРА','Бесконечность','Поглощай всё вокруг: горизонт событий продолжает расти.','blackhole','#ffb269']
 ].map((a,i)=>({name:a[0],epoch:a[1],desc:a[2],type:a[3],color:a[4],required:Math.round(180+100*Math.pow(i+1,1.47))}));
-// Twenty-seven transitions require at least ten minutes of active flight.
-const MIN_STAGE_SECONDS=600/(TA.length-1);
 // More simultaneous catches, with proportional rewards per consumed object.
 const BH_FEAST=2.5,BH_REWARD_SCALE=1/BH_FEAST;
 const upgrades = [
@@ -93,7 +91,7 @@ try {
 }catch(_){}
 function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
 
-const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,stageElapsed:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
+const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
 try {const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
  if(s&&s.version===1&&Number.isFinite(s.tier)&&s.tier>=0&&s.tier<TA.length){
@@ -127,7 +125,6 @@ function normaliseMapPins(value){
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
 
-g.stageElapsed=Number.isFinite(g.stageElapsed)?clamp(g.stageElapsed,0,1e9):0;
 g.mapPins=normaliseMapPins(g.mapPins);
 g.nextPinId=Math.max(1,...g.mapPins.map(p=>p.id+1));
 if(!g.mapPins.some(p=>p.id===g.activePin))g.activePin=null;
@@ -865,7 +862,7 @@ function cosmicVisibleLOD(referenceWidth=W,referenceHeight=H){
 }
 function blackHoleGravityRadius(){
  const zoom=physicsZoom(),core=blackHoleCoreWorldRadius();
- return core+Math.max(216,core*zoom*2.64)*(1+upgradePower('gravity')*.012)*tester.gravity/zoom;
+ return core+Math.max(216,core*zoom*2.64)*(1+upgradePower('gravity')*.012)*tester.gravity*7/zoom;
 }
 function applyBlackHoleGravity(e,dt){
  if(e.freeFlight&&g.freeFlights[flightKey(e)])Object.assign(e,freeFlightAt(g.freeFlights[flightKey(e)]));
@@ -873,7 +870,7 @@ function applyBlackHoleGravity(e,dt){
  const core=blackHoleCoreWorldRadius(),touch=blackHoleTouchDistance(e,core)*zoom;
  const range=blackHoleGravityRadius()*zoom+touch-core*zoom;
  if(d>range){e.gravityBound=false;return !!e.freeFlight;}
- const strength=clamp(1-d/Math.max(1,range),0,1),acceleration=(308*strength+1400*strength*strength)*4*2.4;
+ const strength=clamp(1-d/Math.max(1,range),0,1),acceleration=(308*strength+1400*strength*strength)*4*2.4*7;
  const ax=dx/Math.max(d,.001)*acceleration/zoom,ay=dy/Math.max(d,.001)*acceleration/zoom;
  e.vx=(e.motionVX||0)+ax*dt;e.vy=(e.motionVY||0)+ay*dt;
  e.x+=ax*dt*dt*.5;e.y+=ay*dt*dt*.5;e.motionVX=e.vx;e.motionVY=e.vy;
@@ -1005,31 +1002,6 @@ function renderMacroBackground(time,referenceWidth=W,referenceHeight=H){
 // physical bodies are drawn every frame. This avoids thousands of drawImage
 // operations per frame on giant black holes and high-DPI screens.
 let macroBackdrop=null,macroBackdropOld=null,macroFadeStart=0,macroBlend=null;
-// Purely visual accretion fragments. They have no entity, sector state or
-// reward: the 2.5x real capture rate already scales material/mass payouts down.
-function renderAccretionStreams(time){
- if(!g.endless)return;
- const center=project(player.x,player.y),core=blackHoleCoreWorldRadius()*camera.zoom;
- if(!Number.isFinite(core)||core<2||core>Math.max(W,H)*2)return;
- const palette=['#b997ff','#7bdcff','#f5e2ff','#e4a7ff','#ffe6bf'];
- ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
- for(let i=0;i<230;i++){
-  const seed=(i*.61803398875)%1,phase=(i*.754877666+time*(.14+seed*.16))%1;
-  const reach=1.13+phase*(2.7+seed*.9);
-  const angle=i*2.39996323+time*(.25+1.1/reach)+phase*2.1;
-  const radius=core*reach,x=center.x+Math.cos(angle)*radius,y=center.y+Math.sin(angle)*radius*.78;
-  if(x<-16||x>W+16||y<-16||y>H+16)continue;
-  const brightness=(1-phase*.65)*(i%13===0?1:.75);
-  ctx.globalAlpha=brightness;ctx.strokeStyle=palette[i%palette.length];
-  ctx.lineWidth=i%11===0?2.1:1.15;
-  const tail=3+Math.min(14,core*.11)+((i%7)*.4);
-  ctx.beginPath();
-  ctx.moveTo(x-Math.cos(angle+1.25)*tail,y-Math.sin(angle+1.25)*tail*.78);
-  ctx.lineTo(x,y);ctx.stroke();
-  if(i%19===0){ctx.fillStyle='#ffffff';ctx.fillRect(x-1,y-1,2,2);}
- }
- ctx.restore();
-}
 function renderMacroField(time){
  macroVisibleCount=0;
  // Reuse cached sprites, but project live positions every frame. A cached
@@ -1419,7 +1391,11 @@ function burst(x,y,n,color='#7ed9ff',scale=1){const cap=g.particles?Math.min(30,
 function popText(x,y,text,color='#c7ebff'){texts.push({x,y,text,color,life:1.1});if(texts.length>35)texts.shift();}
 // Per-form calibration: comparable-sized bodies matter; dust never grants a flat
 // percentage of a planet/galaxy. No elapsed-time gate or passive mass income.
-const CAMPAIGN_YIELD=[.05,.065,.12,.19,.25,.31,.30,.4,.65,.20,.14,.14,.14,.17,.15,.16,.20,.13,.14,.13,.15,.12,.13,.13,.12,.14,.12];
+// Lower real rewards per body: progression is earned by collecting resources,
+// recipes and discoveries — never by waiting out a timer. Calibration targets
+// 10+ minutes to the final form under normal play, rather than a guaranteed cap.
+// Early dust stays approachable; middle/late eras need many more real captures.
+const CAMPAIGN_YIELD=[.036,.044,.052,.059,.061,.066,.070,.075,.080,.077,.066,.064,.062,.060,.058,.061,.066,.061,.060,.058,.057,.055,.054,.053,.052,.052,.050];
 function campaignBodyValue(e){
  const ratio=clamp(e.r/Math.max(1,player.r),0,.95);
  return TA[g.tier].required*CAMPAIGN_YIELD[g.tier]*ratio*ratio;
@@ -1459,10 +1435,9 @@ function collideWithGiant(e,dx,dy,dist){
 function impact(e){if(g.tier===TA.length-1){e.kind='matter';e.material='plasma';e.value=Math.max(15,e.value||0);absorb(e);return;}if(player.shield>0){respawn(e);return;}const reduction=(1-Math.min(g.upgrade.shield,45)*.018)/(1+Math.max(0,upgradePower('shield')-45)*.018),lost=Math.ceil(Math.min(g.matter*.09,TA[g.tier].required*.028)*reduction);g.matter=Math.max(0,g.matter-lost);g.losses++;player.shield=1.3;shake=14;burst(player.x,player.y,30,'#ff777a');popText(player.x,player.y,`−${lost} МАТЕРИИ`,'#ff9f9b');sound(112,'sawtooth',.3,.065);respawn(e);}
 function evolve(){
  if(g.complete)return;
- if(g.tier<TA.length-1&&(g.stageElapsed||0)<MIN_STAGE_SECONDS)return;
  if(g.tier===TA.length-1){g.complete=true;g.endless=true;save();return;}
  const before=g.tier;
- spendRecipe();g.tier++;g.unlocks++;g.stageElapsed=0;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ spendRecipe();g.tier++;g.unlocks++;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  if(g.tier===TA.length-1){g.complete=true;g.endless=true;}
  // Never alter world coordinates, velocity, camera center or nearby sectors on evolution.
  morph={from:before,time:0,duration:2.1};screenFlash=.9;
@@ -1524,7 +1499,7 @@ function gatherBody(e,dt){
 }
 function update(dt){
  harvestChainTime=Math.max(0,harvestChainTime-dt);if(harvestChainTime===0)harvestChain=0;
- g.time+=dt;if(!g.endless)g.stageElapsed=(g.stageElapsed||0)+dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
+ g.time+=dt;saveTimer+=dt;eventTimer+=dt;streamTimer+=dt;screenFlash=Math.max(0,screenFlash-dt*.8);if(morph){morph.time+=dt;if(morph.time>=morph.duration)morph=null;}pulseCd=Math.max(0,pulseCd-dt);boostCd=Math.max(0,boostCd-dt);boostTime=Math.max(0,boostTime-dt);player.shield=Math.max(0,player.shield-dt);shake=Math.max(0,shake-dt*30);
  let ax=0,ay=0;
  if(keys.has('w')||keys.has('arrowup'))ay-=1;if(keys.has('s')||keys.has('arrowdown'))ay+=1;
  if(keys.has('a')||keys.has('arrowleft'))ax-=1;if(keys.has('d')||keys.has('arrowright'))ax+=1;
@@ -1607,7 +1582,7 @@ function update(dt){
  const ratioZ=clamp(zTarget/Math.max(camera.zoom,1e-155),1e-10,1e10);
  camera.zoom*=Math.exp(Math.log(ratioZ)*(1-Math.exp(-dt*zoomResponse)));
  camera.x+=(player.x-camera.x)*(1-Math.exp(-dt*5));camera.y+=(player.y-camera.y)*(1-Math.exp(-dt*5));
- uiTimer+=dt;if(uiTimer>.3){uiTimer=0;if(!g.endless&&g.matter>=TA[g.tier].required&&missionsDone()&&g.stageElapsed>=MIN_STAGE_SECONDS)evolve();renderUI();checkProgression();}
+ uiTimer+=dt;if(uiTimer>.3){uiTimer=0;if(!g.endless&&g.matter>=TA[g.tier].required&&missionsDone())evolve();renderUI();checkProgression();}
  if(saveTimer>12){saveTimer=0;save();}
 }
 function project(x,y){return {x:(x-camera.x)*camera.zoom+W/2,y:(y-camera.y)*camera.zoom+H/2};}
@@ -2311,7 +2286,7 @@ function render(time){
   try{renderBlackHoleLensing();}
   catch(_){blackHoleLensRetryAt=time+2;}
  }
- renderGatherFlow(time);renderAccretionStreams(time);renderPlayer(time);renderParticles();
+ renderGatherFlow(time);renderPlayer(time);renderParticles();
  ctx.restore();
  if(screenFlash>0&&!g.endless){ctx.fillStyle=`rgba(188,215,255,${screenFlash*.14})`;ctx.fillRect(0,0,W,H);}
  // Compositing invariant: the event horizon is drawn after every distortion,
@@ -2430,7 +2405,6 @@ function checkProgression(){
  for(const a of ACHIEVEMENTS)if(!g.achievements[a[0]]&&achievementProgress(a)>=100){g.achievements[a[0]]=true;achievementQueue.push(a);save();}
  if(achievementQueue.length&&g.time-achievementToastAt>4.5){achievementToastAt=g.time;celebrateAchievement(achievementQueue.shift());}
  if(g.endless||g.matter<TA[g.tier].required){requirementNotice='';return;}
- if(g.stageElapsed<MIN_STAGE_SECONDS){requirementNotice='';return;}
  const missing=stageRecipe().filter(r=>(g.materials[r.type]||0)<r.amount);
  const explore=Math.max(0,missionReq().explore-g.stageExplored),collect=Math.max(0,missionReq().collect-g.stageCollects);
  const key=g.tier+':'+missing.map(r=>r.type).join(',')+':'+(explore>0)+':'+(collect>0);
@@ -3000,7 +2974,7 @@ function testerToggle(force){
 function testerSetTier(tier){
  const next=clamp(Math.round(tier),0,TA.length-1),from=g.tier;
  if(next===from)return;
- g.tier=next;g.stageElapsed=0;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
+ g.tier=next;g.complete=next===TA.length-1;g.endless=next===TA.length-1;g.matter=0;g.stageCollects=0;g.stageRare=0;g.stagePulses=0;g.stageExplored=0;
  morph={from,time:0,duration:1.5};player.targetR=currentRadius();
  player.r=player.targetR;screenFlash=.5;
  // Test jumps must not finish a previous form's in-flight digestion with the
