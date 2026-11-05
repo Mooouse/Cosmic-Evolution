@@ -2476,7 +2476,19 @@ function toggleOverlay(screen,open){
   else resumeGame();
  }else open();
 }
-function resumeGame(){closePinEditor();clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=true;window.SpacePlatform?.playing(true);startMusic();$('modal').classList.add('off');last=performance.now();}
+function resumeGame(){
+ closePinEditor();clearFlightInput();menuVisible=false;setNavigationState('');
+ atlasVisible=false;running=true;window.SpacePlatform?.playing(true);startMusic();
+ const modal=$('modal');
+ const wasRewards=modal.dataset.screen==='daily'||modal.dataset.screen==='roulette';
+ // CLOSED really means closed: clear the old screen identity as well as its
+ // CSS class. Otherwise [data-screen=daily] styles can keep the dialog
+ // visible above the gameplay and steal all subsequent pointer input.
+ modal.classList.add('off');modal.dataset.screen='play';
+ delete modal.dataset.dailyOrigin;
+ if(wasRewards)modal.replaceChildren();
+ last=performance.now();
+}
 function show(html){
  clearFlightInput();menuVisible=false;setNavigationState('');atlasVisible=false;running=false;window.SpacePlatform?.playing(false);
  $('evolution-panel').classList.add('hidden');
@@ -2683,14 +2695,18 @@ function showMusicShop(){
 let dailyOrigin='menu';
 let testerPrizeOverride=null;
 function dailyReturn(){
- // Source of truth is the screen's opening context, not stale global state.
  const modal=$('modal');
- if(!['daily','roulette'].includes(modal.dataset.screen))return;
+ // A detached or already closed reward dialog must never trigger a second
+ // navigation (which previously sent the player into the main menu).
+ if(modal.classList.contains('off')||!['daily','roulette'].includes(modal.dataset.screen))return;
  const from=modal.dataset.dailyOrigin==='play'?'play':'menu';
  dailyOrigin='menu';
- delete modal.dataset.dailyOrigin;
- if(from==='play'){resumeGame();renderUI(true);}
- else showMainMenu(g.time>0);
+ if(from==='play'){
+  resumeGame();renderUI(true);
+ }else{
+  delete modal.dataset.dailyOrigin;
+  showMainMenu(g.time>0);
+ }
 }
 // Fit every reward control into the visible panel: no inner scrollbars.
 // Rewards are a normal CSS flex layout. Never zoom or transform an
@@ -2701,20 +2717,16 @@ function fitRewardsContent(){
  const area=modal.querySelector('.rewards-page-content');
  if(area)area.scrollTop=0;
 }
-// Wheel events are not a request to change the layout/scroll position.
-// Catch them at the document capture phase as well as on the overlay, since
-// trackpad gestures may start outside the card while the mouse is moving.
+// Prevent only the default scroll inside reward dialogs. Do NOT intercept
+// wheel gestures at document capture: other UI controls share that input path.
 let rewardsWheelGuardInstalled=false;
 function installRewardsWheelGuard(){
  if(rewardsWheelGuardInstalled)return;
  const modal=$('modal');
- const stopWheel=event=>{
-  if((modal.dataset.screen!=='daily'&&modal.dataset.screen!=='roulette')||modal.classList.contains('off'))return;
+ modal.addEventListener('wheel',event=>{
+  if(modal.classList.contains('off')||!['daily','roulette'].includes(modal.dataset.screen))return;
   if(event.cancelable)event.preventDefault();
-  event.stopPropagation();
- };
- modal.addEventListener('wheel',stopWheel,{capture:true,passive:false});
- if(typeof document!=='undefined')document.addEventListener('wheel',stopWheel,{capture:true,passive:false});
+ },{passive:false});
  rewardsWheelGuardInstalled=true;
 }
 function rewardsShell(screen,title,subtitle,body){
