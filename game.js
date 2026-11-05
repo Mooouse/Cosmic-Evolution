@@ -2654,36 +2654,81 @@ function showMusicShop(){
 // Daily login gift plus one wheel spin per calendar day. Roulette prizes are
 // granted atomically before the visual spin and remain owned after any death.
 let dailyOrigin='menu';
-function dailyReturn(){const from=dailyOrigin;dailyOrigin='menu';if(from==='play')resumeGame();else showMainMenu(true);}
+function dailyReturn(){
+ const from=dailyOrigin;
+ dailyOrigin='menu';
+ if(from==='play')resumeGame();else showMainMenu(true);
+}
 function showDailyRewards(origin){
  dailyOrigin=origin||($('modal').classList.contains('off')?'play':'menu');
  const meta=window.SpaceMeta;if(!meta)return;
- const state=meta.state(g),canClaim=meta.canClaim(g),canSpin=meta.canSpin(g);
- const prizes=meta.PRIZES.map(p=>'<div class="daily-wheel-prize">'+
-  (p.id==='track'?'♫':p.mult+'×')+'</div>').join('');
+ const state=meta.state(g),today=meta.dayIndex(),canClaim=meta.canClaim(g),canSpin=meta.canSpin(g);
+ const claimedToday=state.lastDay===today;
+ const todayStreak=claimedToday?state.streak:(state.lastDay===today-1?state.streak+1:1);
+ const todayReward=meta.baseReward(g,todayStreak);
+ const futureDays=Array.from({length:7},(_,i)=>{
+  const active=i===0,amount=meta.baseReward(g,todayStreak+i);
+  const timing=active?L('TODAY','СЕГОДНЯ','HOY'):i===1?
+   L('TOMORROW','ЗАВТРА','MAÑANA'):L('IN ','ЧЕРЕЗ ','EN ')+i+L(' DAYS',' ДН.',' DÍAS');
+  const stateText=active?(claimedToday?L('CLAIMED','ПОЛУЧЕНО','RECOGIDO'):
+   L('AVAILABLE','ДОСТУПНО','DISPONIBLE')):L('UPCOMING','ВПЕРЕДИ','PRÓXIMO');
+  return '<div class="daily-day'+(active?' daily-day-current':'')+(active&&claimedToday?' daily-day-claimed':'')+'">'+
+   '<div class="daily-day-head"><small>'+timing+'</small><span>'+(active&&claimedToday?'✓':active?'●':'○')+'</span></div>'+
+   '<strong>'+L('DAY ','ДЕНЬ ','DÍA ')+(todayStreak+i)+'</strong>'+
+   '<div class="daily-day-reward"><i>✦</i><b>'+fmt(amount)+'</b></div>'+
+   '<div class="daily-day-state">'+stateText+'</div></div>';
+ }).join('');
+ const prizeRows=meta.PRIZES.map(p=>{
+  const track=p.id==='track';
+  const label=track?L('RANDOM TRACK','СЛУЧАЙНЫЙ ТРЕК','PISTA ALEATORIA'):'✦ '+fmt(todayReward*p.mult);
+  const detail=track?
+   L('Or its price if owned','Или его цена при полной коллекции','O su precio si la colección está completa'):
+   '×'+p.mult+' '+L('daily gift','ежедневного подарка','regalo diario');
+  return '<div class="daily-wheel-legend-item" data-prize="'+p.id+'">'+
+   '<i aria-hidden="true"></i><span><b>'+label+'</b><small>'+detail+'</small></span>'+
+   '<strong>'+String(p.weight).replace('.',',')+'%</strong></div>';
+ }).join('');
  show('<div class="daily-screen">'+
-  '<div class="daily-eyebrow">'+L('DAILY COSMIC REWARDS','ЕЖЕДНЕВНЫЕ НАГРАДЫ','RECOMPENSAS DIARIAS')+'</div>'+
-  '<h2>'+L('Stardust & luck','Звёздная пыль и удача','Polvo estelar y suerte')+'</h2>'+
-  '<p>'+L('Claim a gift every day, then spin the wheel once. The rarest prize is a random paid music track.','Получай награду каждый день и один раз крути рулетку. Самый редкий приз — случайный платный музыкальный трек.','Recoge un regalo cada día y gira la ruleta una vez. El premio más raro es una pista de música aleatoria.')+'</p>'+
-  '<div class="daily-streak"><span>'+L('STREAK','СЕРИЯ','RACHA')+'</span><strong>'+
-  state.streak+' '+L('days','дней','días')+'</strong><span>'+
-  L('Claims: ','Получено: ','Reclamos: ')+state.claims+'</span></div>'+
-  '<button class="daily-claim" id="daily-claim" '+(canClaim?'':'disabled')+'>'+
-  (canClaim?L('CLAIM DAILY STARDUST','ЗАБРАТЬ ЕЖЕДНЕВНУЮ НАГРАДУ','RECOGER REGALO DIARIO'):
-   L('GIFT CLAIMED TODAY','ПОДАРОК СЕГОДНЯ ПОЛУЧЕН','REGALO RECOGIDO HOY'))+'</button>'+
-  '<div class="daily-wheel-stage"><div class="daily-wheel-pointer">▼</div>'+
-  '<div class="daily-wheel" id="daily-wheel"><div class="daily-wheel-center">✦</div>'+
-  '<div class="daily-wheel-prizes">'+prizes+'</div></div></div>'+
-  '<div class="daily-wheel-legend">'+meta.PRIZES.map((p,i)=>'<span class="daily-wheel-legend-item" data-prize="'+p.id+'"><i></i><b>'+(p.id==='track'?'♫ '+L('MUSIC','МУЗЫКА','MÚSICA'):p.mult+'×')+'</b><small>'+p.weight+'%</small></span>').join('')+'</div>'+
-  '<div class="daily-prize-note">'+L('Rare jackpot: random music track · 0.8%','Редкий джекпот: случайный трек · 0,8%','Premio raro: pista musical · 0,8%')+'</div>'+
+  '<header class="daily-header"><div><div class="daily-eyebrow">'+
+  L('DAILY COSMIC REWARDS','КОСМИЧЕСКИЕ НАГРАДЫ','RECOMPENSAS CÓSMICAS')+'</div>'+
+  '<h2>'+L('A gift every day','Подарок каждый день','Un regalo cada día')+'</h2>'+
+  '<p>'+L('Log in daily to grow your streak. Claim a gift to unlock one roulette spin per day.','Заходи каждый день, увеличивай серию, получай подарок и открывай одну попытку в рулетке.','Entra a diario, aumenta tu racha, recibe un regalo y desbloquea un giro al día.')+'</p></div>'+
+  '<button type="button" id="daily-back" class="daily-back">'+L('← BACK','← НАЗАД','← VOLVER')+'</button></header>'+
+  '<div class="daily-streak"><span>'+L('LOGIN STREAK','СЕРИЯ ВХОДОВ','RACHA DIARIA')+'</span><strong>✦ '+state.streak+' '+
+  L('days','дн.','días')+'</strong><span>'+L('Gifts claimed','Подарков получено','Regalos recogidos')+': '+state.claims+'</span>'+
+  '<span>'+L('Spins played','Прокруток','Giros')+': '+state.spins+'</span></div>'+
+  '<div class="daily-layout"><section class="daily-week-panel"><div class="daily-section-title"><div>'+
+  '<small>01 / '+L('LOGIN CALENDAR','КАЛЕНДАРЬ','CALENDARIO')+'</small><h3>'+
+  L('Your next 7 rewards','Следующие 7 наград','Tus próximos 7 regalos')+'</h3></div></div>'+
+  '<div class="daily-calendar">'+futureDays+'</div>'+
+  '<p class="daily-calendar-note">'+L('Preview assumes consecutive logins at your current evolution stage. Missing a day resets the streak.','Суммы рассчитаны для текущего этапа эволюции при ежедневном входе. Пропуск дня сбрасывает серию.','Los importes suponen ingresos consecutivos en tu etapa actual. Un día perdido reinicia la racha.')+'</p>'+
+  '<button type="button" id="daily-claim" class="daily-claim" '+(canClaim?'':'disabled')+'>'+
+  (canClaim?L('✦ CLAIM TODAY · ','✦ ЗАБРАТЬ СЕГОДНЯ · ','✦ RECOGER HOY · ')+'✦ '+fmt(todayReward):
+   L('✓ TODAY’S GIFT CLAIMED','✓ СЕГОДНЯШНЯЯ НАГРАДА ПОЛУЧЕНА','✓ REGALO DE HOY RECOGIDO'))+'</button></section>'+
+  '<section class="daily-roulette-panel"><div class="daily-section-title"><div>'+
+  '<small>02 / '+L('LUCKY SPIN','РУЛЕТКА','RULETA')+'</small><h3>'+
+  L('Cosmic roulette','Космическая рулетка','Ruleta cósmica')+'</h3></div>'+
+  '<span class="daily-spin-frequency">'+L('1 SPIN / DAY','1 РАЗ В ДЕНЬ','1 GIRO / DÍA')+'</span></div>'+
+  '<div class="daily-wheel-summary">'+L('The wheel follows the real odds. The list shows exactly what each prize gives.','Сектора соответствуют реальным шансам. Справа указаны точные награды и вероятность.','Los sectores representan las probabilidades reales. A la derecha están los premios y sus opciones.')+'</div>'+
+  '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true">▼</div>'+
+  '<div class="daily-wheel" id="daily-wheel" role="img" aria-label="'+L('Weighted prize roulette','Рулетка с вероятностями наград','Ruleta de premios ponderados')+'">'+
+  '<div class="daily-wheel-center"><span>✦</span><small>IS</small></div></div>'+
+  '<div class="daily-wheel-caption">'+L('8 PRIZES','8 НАГРАД','8 PREMIOS')+'</div></div>'+
+  '<div class="daily-wheel-legend">'+prizeRows+'</div></div>'+
+  '<div class="daily-prize-note">♫ '+L('Ultra-rare: random unowned track (0.8%); if all are owned, receive a track’s price.','Сверхредкий приз: случайный непроданный трек (0,8%); если все куплены — его стоимость.','Ultra raro: pista sin comprar (0,8%); si tienes todas, recibes su precio.')+'</div>'+
   '<div id="daily-result" class="daily-result" role="status" aria-live="polite">'+
-  (canClaim?L('Collect the daily gift to unlock the wheel.','Забери ежедневную награду, чтобы открыть рулетку.','Recoge el regalo para desbloquear la ruleta.'):
-   canSpin?L('The wheel is ready!','Рулетка готова!','¡La ruleta está lista!'):
-   L('Come back tomorrow for the next spin.','Возвращайся завтра за следующей попыткой.','Regresa mañana para otro giro.'))+'</div>'+
-  '<div class="daily-actions"><button id="daily-spin" class="daily-spin" '+(canSpin?'':'disabled')+'>'+
-  L('SPIN THE WHEEL','КРУТИТЬ РУЛЕТКУ','GIRAR LA RULETA')+'</button>'+
-  '<button id="daily-back" class="daily-back">'+L('BACK','НАЗАД','VOLVER')+'</button></div></div>');
- $('modal').dataset.screen='daily';$('panel-close').onclick=dailyReturn;
+  (canClaim?L('First claim your gift on the left.','Сначала забери подарок слева.','Primero recoge tu regalo a la izquierda.'):
+   canSpin?L('Everything is ready. Spin to win one prize!','Всё готово! Крути и получай один приз.','¡Todo listo! Gira para ganar un premio.'):
+   L('Your spin is used. Come back tomorrow!','Попытка использована. Возвращайся завтра!','Ya has girado. ¡Vuelve mañana!'))+'</div>'+
+  '<button type="button" id="daily-spin" class="daily-spin" '+(canSpin?'':'disabled')+'>'+
+  (canSpin?L('✦ SPIN FOR A PRIZE','✦ КРУТИТЬ РУЛЕТКУ','✦ GIRAR PARA GANAR'):
+   L('NEXT SPIN TOMORROW','СЛЕДУЮЩАЯ ПОПЫТКА ЗАВТРА','PRÓXIMO GIRO MAÑANA'))+'</button></section></div></div>');
+ $('modal').dataset.screen='daily';
+ $('modal').dataset.dailyOrigin=dailyOrigin;
+ // Keep the main-menu black hole and comets behind the overlay when opened from menu.
+ menuVisible=dailyOrigin==='menu';
+ if(menuVisible)setNavigationState('menu');
+ $('panel-close').onclick=dailyReturn;
  $('daily-back').onclick=dailyReturn;
  $('daily-claim').onclick=()=>{
   const result=meta.claim(g);if(!result.ok)return;
@@ -2694,25 +2739,35 @@ function showDailyRewards(origin){
   const result=meta.roll(g,MUSIC_TRACKS);
   if(!result.ok)return;
   save();checkProgression();
-  const spin=$('daily-spin');spin.disabled=true;spin.textContent=L('SPINNING…','ВРАЩЕНИЕ…','GIRANDO…');
-  const claim=$('daily-claim');claim.disabled=true;
-  const wheel=$('daily-wheel');
+  const spin=$('daily-spin');spin.disabled=true;
+  spin.textContent=L('SPINNING…','ВРАЩАЕТСЯ…','GIRANDO…');
+  $('daily-claim').disabled=true;
+  const wheel=$('daily-wheel'),resultBox=$('daily-result');
+  resultBox.textContent=L('The wheel is spinning…','Рулетка вращается…','La ruleta está girando…');
+  resultBox.classList.remove('daily-result-win');
   const sectorId=result.prize==='track-value'?'track':result.prize;
   let cumulative=0,sectorCenter=0;
   for(const prize of meta.PRIZES){
    if(prize.id===sectorId){sectorCenter=cumulative+prize.weight/2;break;}
    cumulative+=prize.weight;
   }
-  // The dial has variable-width sectors. Point at the actual weighted slice.
+  // The weighted dial starts at 12 o'clock, matching the actual roll probabilities.
   wheel.style.setProperty('--wheel-turn',(1800+360-sectorCenter*3.6)+'deg');
   wheel.classList.add('spinning');
-  const label=result.type==='track'?
+  const message=result.type==='track'?
    L('NEW TRACK','НОВЫЙ ТРЕК','PISTA NUEVA')+': '+result.track.title:
    '✦ '+fmt(result.amount)+(result.prize==='track-value'?
-    ' · '+L('Collection complete: track value','Коллекция полная: стоимость трека','Colección completa: valor de la pista'):'');
-  $('daily-result').textContent=label;
+    ' · '+L('Complete collection: track price','Все треки куплены: стоимость трека','Colección completa: precio de la pista'):'');
   sound(590,'triangle',.20,.04);
-  setTimeout(()=>{if(wheel.isConnected)wheel.classList.add('finished');},2300);
+  setTimeout(()=>{
+   if(!wheel.isConnected||!resultBox.isConnected)return;
+   wheel.classList.add('finished');
+   const tile=$('modal').querySelector('.daily-wheel-legend-item[data-prize="'+sectorId+'"]');
+   if(tile)tile.classList.add('daily-wheel-winner');
+   resultBox.textContent=message;resultBox.classList.add('daily-result-win');
+   spin.textContent=L('COME BACK TOMORROW','ВОЗВРАЩАЙСЯ ЗАВТРА','VUELVE MAÑANA');
+   sound(790,'sine',.16,.03);
+  },2450);
  };
 }
 function showMainMenu(paused=false){
@@ -3364,9 +3419,16 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
   q(root,'.primary.big-play').onclick=()=>g.tutorialDone?resumeGame():showTutorial();q(root,'.quiet-btn').onclick=restartCampaign;
   const dailyBtn=document.createElement('button');dailyBtn.type='button';dailyBtn.className='daily-menu-link';
-  dailyBtn.innerHTML='<span class="daily-link-icon">✦</span><span>'+L('Daily rewards & roulette','Ежедневные награды и рулетка','Recompensas y ruleta')+'</span><span>↗</span>';
+  const dailyReady=window.SpaceMeta?.canClaim(g),rouletteReady=window.SpaceMeta?.canSpin(g);
+  dailyBtn.innerHTML='<span class="daily-link-icon">✦</span><span class="daily-link-copy"><strong>'+
+   L('DAILY REWARDS & ROULETTE','ЕЖЕДНЕВНЫЕ НАГРАДЫ И РУЛЕТКА','REGALOS Y RULETA')+'</strong><small>'+
+   (dailyReady?L('Your gift is ready · 1 free spin','Подарок доступен · 1 бесплатная попытка','Regalo disponible · 1 giro gratis'):
+    rouletteReady?L('Your roulette spin is ready','Рулетка готова к запуску','Tu giro está disponible'):
+    L('Come back tomorrow for a new gift','Завтра будет новый подарок','Vuelve mañana por otro regalo'))+
+   '</small></span><span class="daily-link-status">'+
+   (dailyReady||rouletteReady?L('READY','ГОТОВО','LISTO'):'↗')+'</span>';
   dailyBtn.onclick=()=>showDailyRewards('menu');
-  const menuGrid=q(root,'.menu-grid');menuGrid.append(dailyBtn);
+  const menuGrid=q(root,'.menu-grid');menuGrid.prepend(dailyBtn);
   // Use the exact same playlist glyph as the in-game music collection button.
   const collectionIcon=q(menuGrid,'[data-page="music"] > span:first-child');
   if(collectionIcon){collectionIcon.removeAttribute('data-icon');collectionIcon.innerHTML=uiIcon('playlist');}
