@@ -2672,6 +2672,9 @@ function fitRewardsContent(){
  if(!['daily','roulette'].includes(modal.dataset.screen))return;
  const area=modal.querySelector('.rewards-page-content'),fit=area?.querySelector('.rewards-fit-body');
  if(!area||!fit)return;
+ // CSS transform on the entire interactive subtree caused wrong hitboxes
+ // in some browsers after a wheel gesture. Use layout-aware CSS zoom.
+ fit.style.zoom='1';
  fit.style.transform='none';
  fit.style.width='100%';
  fit.style.marginLeft='0';
@@ -2680,11 +2683,26 @@ function fitRewardsContent(){
  const required=fit.scrollHeight;
  const scale=Math.min(1,height/Math.max(height,required));
  if(scale<.999){
+  // A wider layout balances the visible width after zoom, while buttons
+  // retain their native browser click targets (unlike transform:scale).
   fit.style.width=(100/scale).toFixed(3)+'%';
-  fit.style.marginLeft=((100-100/scale)/2).toFixed(3)+'%';
-  fit.style.transform='scale('+scale.toFixed(5)+')';
+  fit.style.zoom=scale.toFixed(5);
  }
  fit.dataset.fitScale=scale.toFixed(3);
+}
+// Protect reward buttons from scroll-chain and browser wheel hit testing.
+// This captures the gesture BEFORE any nested scroll container can react;
+// unlike a visually hidden scrollbar, the wheel is actually cancelled.
+let rewardsWheelGuardInstalled=false;
+function installRewardsWheelGuard(){
+ if(rewardsWheelGuardInstalled)return;
+ const modal=$('modal');
+ modal.addEventListener('wheel',event=>{
+  if(modal.dataset.screen!=='daily'&&modal.dataset.screen!=='roulette')return;
+  if(event.cancelable)event.preventDefault();
+  event.stopPropagation();
+ },{capture:true,passive:false});
+ rewardsWheelGuardInstalled=true;
 }
 window.addEventListener?.('resize',()=>{
  const screen=$('modal').dataset.screen;
@@ -2695,6 +2713,7 @@ window.addEventListener?.('resize',()=>{
  });
 });
 function rewardsShell(screen,title,subtitle,body){
+ installRewardsWheelGuard();
  const tabs='<nav class="rewards-tabs" aria-label="'+L('Reward screens','Страницы наград','Pantallas de premios')+'">'+
   '<button type="button" id="rewards-tab-daily" class="'+(screen==='daily'?'selected':'')+'" aria-current="'+(screen==='daily'?'page':'false')+'">✦ '+L('Daily gifts','Ежедневные награды','Regalos diarios')+'</button>'+
   '<button type="button" id="rewards-tab-roulette" class="'+(screen==='roulette'?'selected':'')+'" aria-current="'+(screen==='roulette'?'page':'false')+'">◉ '+L('Roulette','Рулетка','Ruleta')+'</button></nav>';
@@ -2939,7 +2958,7 @@ function showCosmicRoulette(origin){
  const hint=canClaim?
   L('Claim today’s gift to unlock your spin.','Сначала забери ежедневную награду, чтобы открыть попытку.','Recoge el regalo diario para desbloquear el giro.'):
   canSpin?(state.spinDay===meta.dayIndex()?L('Bonus spin unlocked! Good luck!','Бонусная попытка открыта! Удачи!','¡Giro extra desbloqueado!'):L('One free spin is ready. Good luck!','Доступна одна бесплатная попытка. Удачи!','Tienes un giro gratis. ¡Suerte!')):
-  L('Today’s spin is used. Come back tomorrow.','Сегодняшняя попытка использована. Возвращайся завтра.','Ya giraste hoy. Vuelve mañana.');
+  ''; // The disabled SPIN button already explains that it resets tomorrow.
  const body='<div class="roulette-intro"><span>✦ '+L('1 FREE SPIN / DAY','1 БЕСПЛАТНАЯ ПОПЫТКА В ДЕНЬ','1 GIRO GRATIS / DÍA')+'</span>'+
   '<small>'+L('Spins played','Всего прокруток','Giros realizados')+': '+state.spins+'</small></div>'+
   '<div class="daily-roulette-body"><div class="daily-wheel-stage"><div class="daily-wheel-pointer" aria-hidden="true"><span></span></div>'+
@@ -2952,7 +2971,7 @@ function showCosmicRoulette(origin){
   '<p class="daily-prize-note">♫ '+L('Track chance: 0.8%. If you own every paid track, receive the price of a random paid track instead.',
     'Шанс трека — 0,8%. Если все платные треки куплены, выдаётся стоимость случайного трека.',
     'Probabilidad de pista: 0,8%. Si tienes todas las pistas, recibes el precio de una al azar.')+'</p>'+
-  '<div id="daily-result" class="daily-result" role="status" aria-live="polite">'+hint+'</div>'+
+  '<div id="daily-result" class="daily-result" role="status" aria-live="polite"'+(hint?'':' hidden')+'>'+hint+'</div>'+
   '<button type="button" id="daily-spin" class="daily-spin" '+(canSpin?'':'disabled')+'>'+
   (canSpin?L('✦ SPIN THE WHEEL','✦ КРУТИТЬ РУЛЕТКУ','✦ GIRAR LA RULETA'):
    canClaim?L('CLAIM DAILY REWARD FIRST','СНАЧАЛА ЗАБЕРИ НАГРАДУ','RECOGE TU REGALO PRIMERO'):
@@ -2971,10 +2990,12 @@ function showCosmicRoulette(origin){
  bonus.onclick=async()=>{
   if(awaitingAd||!meta.canAdSpin(g))return;
   if(!window.SpacePlatform?.adsAvailable){
+   $('daily-result').hidden=false;
    $('daily-result').textContent=L('Ad not available here. Try on CrazyGames.','Реклама здесь недоступна. Запусти игру на CrazyGames.','El anuncio no está disponible aquí. Prueba en CrazyGames.');
    return;
   }
   awaitingAd=true;bonus.disabled=true;
+  $('daily-result').hidden=false;
   $('daily-result').textContent=L('Opening rewarded ad…','Открываем рекламу…','Abriendo anuncio…');
   let completed=false;
   try{completed=await window.SpacePlatform.requestAd('rewarded');}
@@ -2996,6 +3017,7 @@ function showCosmicRoulette(origin){
    return;
   }
   bonus.disabled=!window.SpacePlatform?.adsAvailable;
+  $('daily-result').hidden=false;
   $('daily-result').textContent=L('Ad not completed. Your extra spin is still available.','Реклама не завершена. Дополнительная попытка не потрачена.','Anuncio incompleto. Tu giro extra sigue disponible.');
  };
  $('daily-spin').onclick=()=>{
@@ -3019,6 +3041,7 @@ function showCosmicRoulette(origin){
   // Do not block Back/tabs during a seven-second animation. The prize
   // is granted and saved atomically; detached wheel callbacks are harmless.
   const wheel=$('daily-wheel'),resultBox=$('daily-result');
+  resultBox.hidden=false;
   resultBox.textContent=L('The wheel is spinning…','Колесо вращается…','La ruleta está girando…');
   resultBox.classList.remove('daily-result-win');
   const sectorId=result.prize==='track-value'?'track':result.prize;
