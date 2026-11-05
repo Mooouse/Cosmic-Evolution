@@ -2501,20 +2501,20 @@ FIELD_GUIDE.push(
 // sphere; stage preview drawings never change game state or current tier.
 function paintStagePortrait(canvas,tier){
  if(!canvas)return;
- const w=92,h=92,scale=1.5;
+ const size=clamp(Number(canvas.dataset.size)||92,64,180),w=size,h=size,center=size/2,scale=1.5;
  canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
  const c=canvas.getContext('2d');if(!c)return;
  c.setTransform(scale,0,0,scale,0,0);
- const bg=c.createRadialGradient(46,43,7,46,46,64);
+ const bg=c.createRadialGradient(center,center-3,7,center,center,size*.7);
  bg.addColorStop(0,'#342454');bg.addColorStop(.67,'#1a1131');bg.addColorStop(1,'#100b22');
  c.fillStyle=bg;c.fillRect(0,0,w,h);
- for(let i=0;i<13;i++){const x=(i*47+17)%92,y=(i*31+13)%92;
+ for(let i=0;i<19;i++){const x=(i*47+17)%size,y=(i*31+13)%size;
   c.fillStyle=i%4===0?'#a9d9ff':'#7962a8';c.fillRect(x,y,1.1,1.1);
  }
  const old=ctx;ctx=c;
  try{
-  if(tier===TA.length-1)paintAbyss(c,46,46,24,w,h);
-  else paintPlayerForm(46,46,tier>=23?22:tier>=19?21:23,2.4,tier);
+  if(tier===TA.length-1)paintAbyss(c,center,center,size*.265,w,h);
+  else paintPlayerForm(center,center,size*(tier>=23?.23:tier>=19?.22:.255),2.4,tier);
  }finally{ctx=old;}
 }
 function showBestiary(){
@@ -3259,10 +3259,42 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  };
  showStatistics=function(){enterScreen('statistics');legacy.statistics();const {root,old}=mount('statistics');const grid=q(root,'.br-stat-grid');grid.replaceChildren(...qa(old,'.stat-list>div'));text(root,'.br-simple-intro>span',`${g.tier+1} / 28 · ${TA[g.tier].name}`);text(root,'.br-simple-intro p',L('Your current journey','Твоё текущее прохождение','Tu viaje actual'));};
  function showV15Evolution(){enterScreen('evolution');renderUI(true);show('');const {root}=mount('evolution'),tier=g.tier; text(root,'.overline',`${tier+1} / 28`);text(root,'.page-nav .muted-caps',TA[tier].epoch);const words=TA[tier].name.split(' ');q(root,'.display-heading').innerHTML=esc(words.shift())+'<br><em>'+esc(words.join(' ')||'·')+'</em>';text(root,'.lead',TA[tier].desc);text(root,'.large-progress-label strong',g.endless?L('INFINITE GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):`${TA[Math.min(27,tier+1)].name} · ${Math.round(stageFraction()*100)}%`);q(root,'.progress-bar span').style.width=stageFraction()*100+'%';
-  const stages=q(root,'.stage-controls');stages.replaceChildren();for(let i=Math.max(0,tier-1);i<=Math.min(27,tier+1);i++){const b=document.createElement('span');b.className='pill-button '+(i===tier?'active':i>tier?'disabled':'');b.textContent=`${i+1} ${TA[i].name}`;stages.append(b);}
+  const stages=q(root,'.stage-controls');stages.replaceChildren();stages.classList.add('stage-atlas');
+  stages.setAttribute('role','group');stages.setAttribute('aria-label',L('All 28 evolution forms','Все 28 форм эволюции','Las 28 formas de evolución'));
+  const galleryTitle=document.createElement('div');galleryTitle.className='stage-atlas-title';
+  galleryTitle.textContent=L('ALL 28 FORMS · CLICK TO INSPECT','ВСЕ 28 ФОРМ · НАЖМИ ДЛЯ ПРОСМОТРА','LAS 28 FORMAS · PULSA PARA VER');
+  stages.before(galleryTitle);
+  const caption=document.createElement('div');caption.className='stage-atlas-caption';caption.setAttribute('aria-live','polite');
+  stages.after(caption);
+  const buttons=[];
+  for(let i=0;i<TA.length;i++){
+   const b=document.createElement('button');b.type='button';b.className='stage-form-card';
+   b.classList.add(i<tier?'past':i===tier?'current':'future');
+   b.dataset.tier=String(i);b.setAttribute('aria-current',i===tier?'step':'false');
+   b.style.setProperty('--form-color',TA[i].color);
+   const canvas=document.createElement('canvas');canvas.className='stage-form-portrait';canvas.dataset.size='76';
+   const content=document.createElement('span');content.className='stage-form-copy';
+   const num=document.createElement('small');num.textContent=String(i+1).padStart(2,'0')+' / '+TA.length;
+   const name=document.createElement('strong');name.textContent=TA[i].name;
+   const status=document.createElement('em');status.textContent=i<tier?L('REACHED','ПРОЙДЕНО','ALCANZADO'):i===tier?L('CURRENT','ТЕКУЩАЯ','ACTUAL'):L('AHEAD','ВПЕРЕДИ','POR VENIR');
+   content.append(num,name,status);b.append(canvas,content);stages.append(b);buttons.push(b);
+   paintStagePortrait(canvas,i);
+  }
+  const inspect=i=>{
+   buttons.forEach((b,j)=>b.setAttribute('aria-pressed',String(i===j)));
+   caption.textContent=(i===tier?L('CURRENT FORM','ТЕКУЩАЯ ФОРМА','FORMA ACTUAL'):i<tier?L('PAST FORM','ПРОЙДЕННАЯ ФОРМА','FORMA ANTERIOR'):L('FUTURE FORM','БУДУЩАЯ ФОРМА','FORMA FUTURA'))+' · '+TA[i].name+' — '+TA[i].desc;
+  };
+  buttons.forEach((b,i)=>b.onclick=()=>inspect(i));inspect(tier);
+  stages.scrollTop=Math.max(0,buttons[tier]?.offsetTop-stages.offsetTop-95||0);
   const recipe=q(root,'.recipe'),req=g.endless?[]:stageRecipe();text(root,'.recipe-head b',`${req.filter(r=>(g.materials[r.type]||0)>=r.amount).length} / ${req.length}`);qa(recipe,'.recipe-row').forEach(n=>n.remove());const foot=q(recipe,'.recipe-foot');
   req.forEach(({type,amount})=>{const m=MATERIALS[type],v=g.materials[type]||0,row=document.createElement('div');row.className='recipe-row';row.innerHTML=`<span class="material-icon ${type==='ore'?'rock':type}" style="--material-color:${m.color}"></span><div>${esc(window.SpaceI18n?.t(m.label)||m.label)}<small>${v>=amount?L('READY','ГОТОВО','LISTO'):L('Still needed: ','Не хватает: ','Faltan: ')+fmt(amount-v)}</small></div><b>${fmt(v)} / ${fmt(amount)}</b><span class="req-dot ${v>=amount?'ready':''}"></span>`;recipe.insertBefore(row,foot);});
   text(foot,'.overline',L('EVOLUTION OBJECTIVES','ЗАДАЧИ ЭВОЛЮЦИИ','OBJETIVOS DE EVOLUCIÓN'));qa(foot,':scope>div:not(.overline)').forEach((row,i)=>{row.innerHTML=esc($('mission-'+(i+1)+'-label').textContent)+'<b>'+esc($('mission-'+(i+1)+'-val').textContent)+'</b>';});
+  const remaining=Math.max(0,MIN_STAGE_SECONDS-(g.stageElapsed||0));
+  const pacing=document.createElement('div');pacing.className='evolution-flight-timer';
+  pacing.textContent=g.endless?L('ENDLESS GROWTH','БЕСКОНЕЧНЫЙ РОСТ','CRECIMIENTO INFINITO'):
+   remaining>0?L('Time until next form','До следующей формы','Tiempo hasta la siguiente forma')+': '+Math.ceil(remaining)+L('s',' с',' s'):
+   L('Flight time complete · finish the objectives','Время полёта пройдено · выполни задачи','Tiempo cumplido · termina los objetivos');
+  recipe.append(pacing);
   if(g.endless)text(root,'.recipe-head>span',L('BEYOND THE HORIZON','ЗА ГОРИЗОНТОМ','MÁS ALLÁ DEL HORIZONTE'));translate(root);
  }
  const trackCover=(t,i)=>t.cover?`<img src="${esc(t.cover)}" alt="${esc(t.title)}" loading="lazy" decoding="async" width="360" height="360">`:visual.musicCover(i);
