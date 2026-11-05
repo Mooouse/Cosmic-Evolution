@@ -1,0 +1,68 @@
+name: Record real CrazyGames gameplay previews
+on:
+  push:
+    branches: [crazygames-video-preview]
+    paths:
+      - scripts/record_crazygames_previews.cjs
+      - .github/workflows/gameplay-preview.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Install Chromium for Playwright
+        run: |
+          npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/video-test" playwright@1.56.1
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/video-chromium"
+          "$RUNNER_TEMP/video-test/node_modules/.bin/playwright" install chromium --only-shell
+      - name: Capture 16:9 and 2:3 actual game
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/video-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          export NODE_PATH="$RUNNER_TEMP/video-test/node_modules"
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/video-chromium"
+          node scripts/record_crazygames_previews.cjs
+          test -s video-export/Infiniti_Space_Gameplay_1920x1080.mp4
+          test -s video-export/Infiniti_Space_Gameplay_1080x1620.mp4
+      - name: Verify CrazyGames video specifications
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, os
+          for width, height, suffix in [(1920,1080,"1920x1080"),(1080,1620,"1080x1620")]:
+              p="video-export/Infiniti_Space_Gameplay_"+suffix+".mp4"
+              info=json.loads(subprocess.check_output(["ffprobe","-v","error","-show_format","-show_streams","-of","json",p]))
+              s=info['streams'][0]; d=float(info['format']['duration'])
+              assert s['width']==width and s['height']==height, info
+              assert 14 <= d <= 20, d
+              assert os.path.getsize(p)<50_000_000, os.path.getsize(p)
+              assert len(info['streams'])==1, "video preview must have no audio"
+              print("PASS",p,os.path.getsize(p),"bytes",d,"seconds")
+          PY
+      - name: Publish video files in isolated preview branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f video-export/*mp4
+          if ! git diff --cached --quiet; then
+            git commit -m "Export verified real gameplay previews [skip ci]"
+            git push origin HEAD:crazygames-video-preview
+          fi
+      - name: Temporary download if publishing fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infiniti-Space-Gameplay-Previews
+          path: video-export/
+          retention-days: 1
+          if-no-files-found: ignore
