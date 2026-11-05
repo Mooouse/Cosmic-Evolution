@@ -125,7 +125,7 @@ function normaliseMapPins(value){
 g.freeFlights=Object.fromEntries(Object.entries(g.freeFlights||{}).filter(([key,e])=>e&&[e.x,e.y,e.vx,e.vy,e.flightTime,e.r].every(Number.isFinite)&&e.r>0&&(typeof e.chunk==='string'||(e.cosmic&&Number.isFinite(e.gx)&&Number.isFinite(e.gy)))&&Number.isInteger(e.index)&&e.index>=0&&e.index<32));
 g.viewZoom=Number.isFinite(g.viewZoom)?clamp(g.viewZoom,.05,10):1;
 globalThis.SpaceMeta?.state(g);
-if(TEST_MODE)globalThis.SpaceMeta?.setTesterTuning({rewardMultiplier:tester.rewardMultiplier,trackChance:tester.trackChance});
+
 if(!g.drift||typeof g.drift!=='object')g.drift={route:[],seconds:0,totalDistance:0,visits:0,last:null};
 if(!Array.isArray(g.drift.route))g.drift.route=[];
 g.awaySince=Number.isFinite(g.awaySince)?Math.max(0,g.awaySince):0;
@@ -3422,6 +3422,7 @@ function testerRemakeNearby(){
 }
 function testerInit(){
  if(!TEST_MODE){$('btn-tester').hidden=true;return;}
+ window.SpaceMeta?.setTesterTuning({rewardMultiplier:tester.rewardMultiplier,trackChance:tester.trackChance});
  const tier=$('tester-tier');
  TA.forEach((form,index)=>{const option=document.createElement('option');option.value=String(index);
  option.textContent=`${index+1}. ${form.name}`;tier.append(option);});
