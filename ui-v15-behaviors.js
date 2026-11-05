@@ -31,13 +31,29 @@ function closeSelect(refocus=false){
  if(refocus)state.trigger.focus();
 }
 function updateSelect(state){
+ // Marker lists are rebuilt when a pin is created, edited or deleted.
+ // Rebuild only when the native options change; never leave stale dropdown items.
+ const options=[...state.native.options];
+ const fingerprint=JSON.stringify(options.map(o=>[o.value,o.textContent,o.disabled]));
+ if(state.optionsFingerprint!==fingerprint){
+  state.optionsFingerprint=fingerprint;
+  state.list.replaceChildren();
+  options.forEach((opt,i)=>{
+   const b=document.createElement('button');b.type='button';b.className='game-select-item';b.setAttribute('role','option');b.disabled=opt.disabled;
+   const label=document.createElement('span');label.textContent=opt.textContent;
+   const tick=document.createElement('span');tick.className='game-select-check';tick.innerHTML='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.4 12 13 4.8"/></svg>';
+   b.append(label,tick);
+   b.onclick=()=>{state.native.selectedIndex=i;state.native.dispatchEvent(new Event('change',{bubbles:true}));updateSelect(state);closeSelect(true);};
+   state.list.append(b);
+  });
+ }
  const opt=state.native.options[state.native.selectedIndex];
  state.value.textContent=opt?opt.textContent:'Выбрать';
  state.trigger.disabled=state.native.disabled;
  state.root.classList.toggle('is-disabled',state.native.disabled);
  state.list.querySelectorAll('button').forEach((b,i)=>{
-   b.classList.toggle('is-selected',i===state.native.selectedIndex);
-   b.setAttribute('aria-selected',String(i===state.native.selectedIndex));
+  b.classList.toggle('is-selected',i===state.native.selectedIndex);
+  b.setAttribute('aria-selected',String(i===state.native.selectedIndex));
  });
 }
 function enhanceSelects(scope){for(const native of scope.querySelectorAll('select')){if(native.dataset.v15Select)return;native.dataset.v15Select='1';
@@ -49,20 +65,13 @@ function enhanceSelects(scope){for(const native of scope.querySelectorAll('selec
  const menu=document.createElement('div');menu.className='game-select-pop';menu.setAttribute('role','listbox');menu.setAttribute('aria-label',native.getAttribute('aria-label')||'Список');menu.hidden=true;
  const list=document.createElement('div');list.className='game-select-options';menu.append(list);document.body.append(menu);
  const state={root,trigger,value,chevron,native,menu,list};customSelects.push(state);
- [...native.options].forEach((opt,i)=>{
-  const b=document.createElement('button');b.type='button';b.className='game-select-item';b.setAttribute('role','option');
-  const label=document.createElement('span');label.textContent=opt.textContent;
-  const tick=document.createElement('span');tick.className='game-select-check';tick.innerHTML='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.4 12 13 4.8"/></svg>';
-  b.append(label,tick);b.onclick=()=>{native.selectedIndex=i;native.dispatchEvent(new Event('change',{bubbles:true}));updateSelect(state);closeSelect(true)};
-  list.append(b);
- });
  function place(){const r=trigger.getBoundingClientRect();let roomBelow=innerHeight-r.bottom;let height=Math.min(300,native.options.length*51+15);const above=roomBelow<height+15&&r.top>height+15;
   menu.style.left=Math.max(8,Math.min(r.left,innerWidth-r.width-8))+'px';menu.style.top=(above?r.top-height-6:r.bottom+6)+'px';menu.style.width=r.width+'px';menu.style.maxHeight=Math.max(120,innerHeight-24)+'px';}
  trigger.addEventListener('click',()=>{if(native.disabled)return;if(openSelect===state){closeSelect();return;}closeSelect();openSelect=state;state.menu.hidden=false;state.root.classList.add('is-open');state.trigger.setAttribute('aria-expanded','true');updateSelect(state);place();});
  trigger.addEventListener('keydown',e=>{if(!['ArrowDown','ArrowUp','Enter',' ','Home','End','Escape'].includes(e.key))return;e.preventDefault();e.stopPropagation();if(e.key==='Escape'){closeSelect(true);return;}if(!openSelect){trigger.click();}if(!openSelect)return;const selected=[...list.querySelectorAll('button')];const curr=selected.indexOf(document.activeElement);const idx=(curr>=0?curr:native.selectedIndex);
   if(e.key==='Home')selected[0]?.focus();else if(e.key==='End')selected.at(-1)?.focus();else if(e.key==='ArrowDown')selected[(idx+1)%selected.length]?.focus();else if(e.key==='ArrowUp')selected[(idx-1+selected.length)%selected.length]?.focus();else if(['Enter',' '].includes(e.key))selected[Math.max(0,native.selectedIndex)]?.click();});
  list.addEventListener('keydown',e=>{const opts=[...list.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeSelect(true)}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();opts[(i+(e.key==='ArrowDown'?1:opts.length-1))%opts.length]?.focus()}});
- state.observer=new MutationObserver(()=>updateSelect(state));state.observer.observe(native,{attributes:true,attributeFilter:['disabled']});native.addEventListener('change',()=>updateSelect(state));
+ state.observer=new MutationObserver(()=>updateSelect(state));state.observer.observe(native,{attributes:true,attributeFilter:['disabled'],childList:true,subtree:true,characterData:true});native.addEventListener('change',()=>updateSelect(state));
  updateSelect(state);
 }
 }
