@@ -34,7 +34,7 @@ async function run(browser,width,height){
    await tester.click({timeout:15000});
    const panel=page.locator('#tester-panel');
    assert.ok(await panel.isVisible(),'Invisible tester hotspot must still work');
-   await tester.click({timeout:15000}); // close by same invisible hotspot
+   await page.locator('#tester-close').click({timeout:15000}); // panel covers the hotspot when open
   }
 
   // Reward screen: scrollable content, fixed header & tabs, real clickable tabs.
