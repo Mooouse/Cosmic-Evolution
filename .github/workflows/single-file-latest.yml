@@ -1,0 +1,61 @@
+name: Export latest Infiniti Space one-file build
+on:
+  push:
+    branches: [crazygames-single-file-3-59-7]
+    paths:
+      - scripts/build_single_html.py
+      - scripts/test_single_file.cjs
+      - .github/workflows/single-file.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-one-file:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out isolated export branch
+        uses: actions/checkout@v4
+      - name: Install MP3 encoder for offline audio packing
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Bundle everything into standalone index.html
+        run: |
+          ffmpeg -version | head -1
+          python3 scripts/build_single_html.py
+          test -s single-file/index.html
+      - name: Browser smoke test with no external assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/infiniti-browser-test" playwright@1.56.1
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/infiniti-chromium"
+          "$RUNNER_TEMP/infiniti-browser-test/node_modules/.bin/playwright" install chromium --only-shell
+          python3 -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/infiniti-single-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          export NODE_PATH="$RUNNER_TEMP/infiniti-browser-test/node_modules"
+          node scripts/test_single_file.cjs
+      - name: Package one-file ZIP ready for CrazyGames upload
+        run: |
+          python3 -c "import zipfile; z=zipfile.ZipFile('single-file/Infiniti-Space-CrazyGames.zip','w',compression=zipfile.ZIP_DEFLATED,compresslevel=9); z.write('single-file/index.html','index.html'); z.close()"
+          python3 -c "import zipfile; z=zipfile.ZipFile('single-file/Infiniti-Space-CrazyGames.zip'); assert z.namelist()==['index.html']; assert z.testzip() is None; print('PASS: upload-ready ZIP contains exactly one root index.html')"
+      - name: Store completed index.html in export branch (not main)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add single-file/index.html
+          git add -f single-file/Infiniti-Space-CrazyGames.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Export verified one-file CrazyGames index.html [skip ci]"
+            git push origin HEAD:crazygames-single-file-3-59-7
+          fi
+      - name: Temporary backup artifact if publishing fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infiniti-Space-index-html
+          path: single-file/index.html
+          retention-days: 1
+          if-no-files-found: ignore
