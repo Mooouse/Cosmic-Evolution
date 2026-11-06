@@ -1,0 +1,197 @@
+/* Infiniti Space notification system v3.59.7.
+   One coalesced ordinary toast + at most one queued achievement, never a
+   column of messages. No pointer interception; safe-area-aware positioning. */
+body.ui-v15 #hud #toast-root{
+  position:fixed!important;
+  z-index:110!important;
+  top:clamp(112px,15vh,168px)!important;
+  left:auto!important;
+  right:clamp(12px,2vw,26px)!important;
+  bottom:auto!important;
+  width:min(300px,calc(100vw - 24px))!important;
+  max-width:calc(100vw - 24px)!important;
+  min-width:0!important;
+  max-height:min(165px,calc(100dvh - 190px))!important;
+  padding:0!important;
+  margin:0!important;
+  transform:none!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:6px!important;
+  overflow:hidden!important;
+  pointer-events:none!important;
+  contain:layout style;
+}
+body.ui-v15 #hud #toast-root .toast,
+body.ui-v15 #hud #toast-root .achievement-unlock{
+  position:relative!important;
+  box-sizing:border-box!important;
+  inset:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  left:auto!important;
+  right:auto!important;
+  transform:none!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  min-height:0!important;
+  max-height:77px!important;
+  margin:0!important;
+  padding:9px 11px!important;
+  border-radius:9px!important;
+  border:1px solid #8863d2!important;
+  border-bottom:3px solid #4d22c6!important;
+  background:linear-gradient(145deg,#281841f4,#140c2ff5)!important;
+  color:#f0e7ff!important;
+  font-size:12px!important;
+  font-weight:750!important;
+  line-height:1.35!important;
+  text-align:left!important;
+  letter-spacing:0!important;
+  box-shadow:0 5px 14px #05020db3!important;
+  white-space:normal!important;
+  overflow:hidden!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+  pointer-events:none!important;
+  animation:notice-show .18s ease-out both!important;
+}
+body.ui-v15 #hud #toast-root .toast{
+  display:flex!important;
+  gap:8px!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+}
+body.ui-v15 #hud #toast-root .toast-message{
+  display:-webkit-box!important;
+  min-width:0!important;
+  max-width:100%!important;
+  flex:1 1 auto!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:3!important;
+  line-clamp:3!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+body.ui-v15 #hud #toast-root .toast-count{
+  display:grid!important;
+  place-items:center!important;
+  min-width:28px!important;
+  max-width:40px!important;
+  height:23px!important;
+  flex:0 0 auto!important;
+  padding:0 5px!important;
+  border-radius:5px!important;
+  border:1px solid #a784ef!important;
+  background:#50308c!important;
+  color:#fff!important;
+  font-size:10px!important;
+  font-weight:900!important;
+}
+body.ui-v15 #hud #toast-root .toast-count[hidden]{display:none!important}
+body.ui-v15 #hud #toast-root .toast.golden{
+  border-top-color:#b6925e!important;
+  border-left-color:#b6925e!important;
+  border-right-color:#b6925e!important;
+  color:#ffe1a6!important;
+}
+body.ui-v15 #hud #toast-root .toast.danger{color:#ffbcbf!important;border-color:#a75c81!important}
+body.ui-v15 #hud #toast-root .toast.requirements{line-height:1.3!important}
+body.ui-v15 #hud #toast-root .achievement-unlock{
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  border-color:var(--rarity,#936dec)!important;
+  color:#f5edff!important;
+}
+body.ui-v15 #hud #toast-root .achievement-unlock>div{
+  flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;
+}
+body.ui-v15 #hud #toast-root .achievement-unlock .achievement-seal{
+  flex:0 0 auto!important;
+  font-size:21px!important;
+  line-height:1!important;
+}
+body.ui-v15 #hud #toast-root .achievement-unlock small{
+  display:block!important;
+  font-size:9px!important;
+  line-height:1.3!important;
+  margin:0 0 3px!important;
+  letter-spacing:.06em!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+body.ui-v15 #hud #toast-root .achievement-unlock strong{
+  display:-webkit-box!important;
+  min-width:0!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  line-height:1.25!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  line-clamp:2!important;
+  overflow:hidden!important;
+  overflow-wrap:anywhere!important;
+}
+/* Don't overlay dialogs or consume touch input while navigating rewards/menu. */
+body.ui-v15:has(#modal:not(.off)) #hud #toast-root{
+  opacity:0!important;
+  visibility:hidden!important;
+}
+@keyframes notice-show{
+  from{opacity:0;translate:0 -5px}
+  to{opacity:1;translate:0 0}
+}
+@media (max-width:800px),(pointer:coarse) and (max-width:1100px){
+  body.ui-v15 #hud #toast-root{
+    top:calc(max(8px,env(safe-area-inset-top)) + 150px)!important;
+    left:max(9px,env(safe-area-inset-left))!important;
+    right:auto!important;
+    width:min(232px,59vw)!important;
+    max-width:calc(100vw - max(18px,env(safe-area-inset-right)))!important;
+    max-height:min(86px,calc(100dvh - 252px))!important;
+  }
+  body.ui-v15 #hud #toast-root .toast,
+  body.ui-v15 #hud #toast-root .achievement-unlock{
+    max-height:82px!important;
+    padding:7px 9px!important;
+    font-size:11px!important;
+  }
+  body.ui-v15 #hud #toast-root .achievement-unlock strong{
+    font-size:11px!important;
+  }
+}
+/* In landscape use the narrow right margin BELOW two top HUD rows.
+   Even on 568x320, the actual playfield centre remains visible. */
+@media(orientation:landscape) and (max-height:540px) and (max-width:1100px) and (pointer:coarse){
+  body.ui-v15 #hud #toast-root{
+    top:calc(max(4px,env(safe-area-inset-top)) + clamp(32px,8.4vh,38px) + clamp(36px,10vh,44px) + 16px)!important;
+    left:auto!important;
+    right:max(8px,env(safe-area-inset-right))!important;
+    bottom:auto!important;
+    width:min(178px,30vw)!important;
+    max-height:66px!important;
+  }
+  body.ui-v15 #hud #toast-root .toast,
+  body.ui-v15 #hud #toast-root .achievement-unlock{
+    max-height:66px!important;
+    padding:6px 8px!important;
+    font-size:10px!important;
+    line-height:1.2!important;
+  }
+  body.ui-v15 #hud #toast-root .achievement-unlock .achievement-seal{
+    font-size:16px!important;
+  }
+  body.ui-v15 #hud #toast-root .achievement-unlock strong{
+    font-size:10px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  body.ui-v15 #hud #toast-root .toast,
+  body.ui-v15 #hud #toast-root .achievement-unlock{
+    animation:none!important;
+  }
+}
