@@ -98,7 +98,12 @@ async function run(browser,width,height){
   assert.ok(zoomAfter>zoomBefore*1.1,'Two-finger map zoom failed '+format({zoomBefore,zoomAfter}));
 
   // Return and verify only one cooldown indicator can be visually present.
+  // The map was entered from the main menu, so Back correctly returns
+  // to the menu first. Start a real game before inspecting gameplay controls.
   await page.locator('#screen-map [data-page="play"]').first().click({timeout:20000});
+  await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='menu',null,{timeout:15000});
+  await page.locator('#screen-menu .primary.big-play').click({timeout:15000});
+  if(await page.locator('#tutorial-skip').isVisible())await page.locator('#tutorial-skip').click();
   await page.waitForFunction(()=>document.getElementById('modal')?.classList.contains('off'),null,{timeout:30000});
   const abilities=await page.locator('#hud .v15-hud .abilities .ability-btn').evaluateAll(buttons=>buttons.map(b=>({
    indicator:!!b.querySelector('.ability-cooldown-label'),
