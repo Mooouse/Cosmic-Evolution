@@ -844,7 +844,7 @@ body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning .roulette-disc-
   }
   /* Keep a small fixed joystick on the right where users expect it.
      Floating joystick remains floating in its own mode. */
-  body.ui-v15.phone-controls:not(.mobile-floating):not(.mobile-gyro):not(.mobile-direction) #hud #flight-stick {
+  body.ui-v15:not(.mobile-floating):not(.mobile-gyro):not(.mobile-direction) #hud #flight-stick {
     left:auto!important;
     right:var(--land-right)!important;
     top:auto!important;
