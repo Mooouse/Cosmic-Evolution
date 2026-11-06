@@ -1,7 +1,7 @@
 name: Verify Mobile UI, Rewards and Map Pinch
 on:
   push:
-    branches: [fix-mobile-hud-rewards-map-20261106]
+    branches: [fix-unified-hud-roulette-disc-20261106]
     paths:
       - game.js
       - index.html
