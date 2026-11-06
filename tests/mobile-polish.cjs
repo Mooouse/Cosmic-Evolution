@@ -79,6 +79,9 @@ async function run(browser,width,height){
   await page.waitForFunction(()=>document.getElementById('modal')?.dataset.screen==='map');
   const rect=await page.locator('#atlas-canvas').boundingBox();
   assert.ok(rect?.width>80&&rect?.height>80,'Map canvas missing');
+  // The first-stage atlas may start at its hard maximum zoom (12x).
+  // Zoom out first, so a successful outward pinch has room to increase it.
+  for(let i=0;i<4;i++)await page.locator('#atlas-zoom-out').click();
   const zoomBefore=await page.evaluate(()=>window.CosmicEvolutionDebug.atlasZoom);
   const cdp=await context.newCDPSession(page);
   const x=rect.x+rect.width/2,y=rect.y+rect.height/2;
