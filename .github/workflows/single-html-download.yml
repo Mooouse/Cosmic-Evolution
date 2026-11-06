@@ -1,0 +1,48 @@
+name: Publish single HTML as direct-download asset
+on:
+  push:
+    branches: [crazygames-single-file-3-59-7]
+    paths:
+      - .github/workflows/single-html-download.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release-html:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify last standalone HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("single-file/index.html")
+          raw = p.read_bytes()
+          assert raw.startswith(b'<!doctype html>')
+          assert len(raw) < 20000000
+          assert b'notification-system.css' in raw
+          assert b'mobile-ui-polish.css' in raw
+          assert b'infiniti-music-12' in raw
+          assert b'v3.59.7' in raw
+          print('Verified full game',len(raw),'bytes')
+          PY
+      - name: Upload index.html to GitHub Release for real browser download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="infiniti-space-html-v3.59.7"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" single-file/index.html --clobber
+          else
+            gh release create "$TAG" single-file/index.html \
+              --target "$GITHUB_SHA" \
+              --title "Infiniti Space v3.59.7 — one-file HTML" \
+              --notes "Download index.html (19.6 MB). Complete game with all 12 compressed music tracks and latest mobile controls and notifications. This release is a standalone HTML copy and does not change the live game." \
+              --latest=false
+          fi
+          gh release view "$TAG" --json assets --jq '.assets[] | select(.name=="index.html") | .url'
