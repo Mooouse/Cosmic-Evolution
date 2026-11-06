@@ -88,7 +88,7 @@ async function test(browser,info){
   assert.ok(achievement.box.bottom<=height+1,'Achievement exceeds viewport height '+JSON.stringify(achievement));
   assert.equal(achievement.pointer,'none','Achievement blocks controls');
   if(mobile&&width===390){
-   await pause(3700);
+   await page.waitForFunction(()=>document.getElementById('toast-root').textContent.includes('Event while achievement active'),null,{timeout:9500});
    const after=await page.evaluate(()=>({
     count:document.getElementById('toast-root').children.length,
     text:document.getElementById('toast-root').textContent
