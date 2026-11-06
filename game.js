@@ -88,15 +88,17 @@ const GAME_BUILD_VERSION=(()=>{
 })();
 
 const TEST_KEY = 'cosmic-evolution-tester-v1';
-const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,ring:1,density:16,showStats:true,rewardMultiplier:1,trackChance:.8});
+const TEST_DEFAULTS = Object.freeze({speed:1,gravity:1,loot:1,zoom:1,ring:1,density:32,showStats:true,rewardMultiplier:1,trackChance:.8});
 let tester={...TEST_DEFAULTS};
 try {
  const savedTester=JSON.parse(localStorage.getItem(TEST_KEY)||'null');
  if(TEST_MODE&&savedTester&&typeof savedTester==='object')for(const k in TEST_DEFAULTS)
   if(typeof savedTester[k]===typeof TEST_DEFAULTS[k])tester[k]=savedTester[k];
- if(TEST_MODE&&savedTester&&!savedTester.densityBalanceV&&tester.density===32)tester.density=16;
+ // Saved tester settings that still have the previous default inherit the new 32.
+ // Preserve any custom density and never downgrade an existing 32.
+ if(TEST_MODE&&savedTester&&savedTester.densityBalanceV!==3&&tester.density===16)tester.density=32;
 }catch(_){}
-function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:2}));}catch(_){}}
+function saveTester(){try{localStorage.setItem(TEST_KEY,JSON.stringify({...tester,densityBalanceV:3}));}catch(_){}}
 
 const fresh = () => ({version:1,tier:0,matter:0,credits:0,total:0,time:0,awaySince:0,awayFromFlight:false,drift:{route:[],seconds:0,totalDistance:0,visits:0,last:null},daily:{lastDay:-1,spinDay:-1,streak:0,claims:0,spins:0,musicWins:0},awaitingReturnEvolution:false,reviveUsed:false,collects:0,rare:0,pulses:0,losses:0,unlocks:0,stageCollects:0,stageRare:0,stagePulses:0,upgrade:{gravity:0,speed:0,harvest:0,shield:0},sound:true,particles:true,quality:1,autoQuality:false,autoQualityV:1,buyAmount:1,music:true,musicVolume:.30,soundVolume:.7,achievements:{},bestChain:0,bestiary:{},tutorialDone:false,ownedTracks:[],activeTrack:null,controlMode:'follow',flightFeel:'smooth',mobileMode:'fixed',headingAngle:0,viewZoom:1,controlV:2,worldX:0,worldY:0,mapPins:[],nextPinId:1,activePin:null,abyssConsumed:{},abyssPositions:{},freeFlights:{},flightEpoch:0,complete:false,endless:false,visited:[],discoveryDiscs:[],exploredBonus:0,endlessGrowth:0,depleted:{},depletedMacro:{},depletedCosmic:{},stageExplored:0,materials:{ore:0,crystal:0,ice:0,gas:0,plasma:0,exotic:0},rebalanceV:3});
 let g = fresh();
