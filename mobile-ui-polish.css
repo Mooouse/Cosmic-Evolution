@@ -541,3 +541,11 @@ body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning .roulette-disc-
     transition-duration:1ms!important;
   }
 }
+
+/* Settings already lives in the pause menu on phones; keep that fourth icon
+   hidden instead of letting the new shared button rule resurrect it. */
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px){
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn[data-page="settings"]{
+    display:none!important;
+  }
+}
