@@ -1,12 +1,11 @@
 name: Verify Mobile Landscape HUD Layout
 on:
   push:
-    branches: [fix-unified-hud-roulette-disc-20261106]
+    branches: [fix-mobile-landscape-hud-20261106]
     paths:
       - game.js
       - index.html
       - mobile-ui-polish.css
-      - tests/mobile-polish.cjs
       - .github/workflows/mobile-landscape-qa.yml
       - tests/mobile-landscape-qa.cjs
   workflow_dispatch:
@@ -25,7 +24,7 @@ jobs:
           npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/mobile-ui-qa" playwright@1.56.1
           export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mobile-chromium"
           "$RUNNER_TEMP/mobile-ui-qa/node_modules/.bin/playwright" install chromium --only-shell
-      - name: Test actual mobile UI at three phone sizes
+      - name: Test touch HUD layout at five landscape phone sizes
         shell: bash
         run: |
           set -euo pipefail
