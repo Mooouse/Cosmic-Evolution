@@ -1,0 +1,36 @@
+name: Verify Mobile Landscape HUD Layout
+on:
+  push:
+    branches: [fix-mobile-landscape-hud-20261106]
+    paths:
+      - game.js
+      - index.html
+      - mobile-ui-polish.css
+      - .github/workflows/mobile-landscape-qa.yml
+      - tests/mobile-landscape-qa.cjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/mobile-ui-qa" playwright@1.56.1
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mobile-chromium"
+          "$RUNNER_TEMP/mobile-ui-qa/node_modules/.bin/playwright" install chromium --only-shell
+      - name: Test touch HUD layout at five landscape phone sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/mobile-ui-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mobile-chromium"
+          export NODE_PATH="$RUNNER_TEMP/mobile-ui-qa/node_modules"
+          node tests/mobile-landscape-qa.cjs
