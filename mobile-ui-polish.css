@@ -549,3 +549,15 @@ body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning .roulette-disc-
     display:none!important;
   }
 }
+
+/* Cooldown state should modify the indicator, not the shared button frame. */
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px){
+ body.ui-v15 #hud .v15-hud .abilities .ability-btn,
+ body.ui-v15 #hud .v15-hud .abilities .ability-btn[data-cooling="true"],
+ body.ui-v15 #hud .v15-hud .abilities .ability-btn[data-cooling="false"]{
+   border-top-color:var(--hud-panel-border)!important;
+   border-right-color:var(--hud-panel-border)!important;
+   border-left-color:var(--hud-panel-border)!important;
+   border-bottom-color:var(--hud-panel-bottom)!important;
+ }
+}
