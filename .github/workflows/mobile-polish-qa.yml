@@ -1,13 +1,14 @@
 name: Verify Mobile UI, Rewards and Map Pinch
 on:
   push:
-    branches: [fix-mobile-hud-rewards-map-20261106]
+    branches: [fix-unified-hud-roulette-disc-20261106]
     paths:
       - game.js
       - index.html
       - mobile-ui-polish.css
       - tests/mobile-polish.cjs
       - .github/workflows/mobile-polish-qa.yml
+      - tests/mobile-unified-qa.cjs
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,3 +35,4 @@ jobs:
           export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mobile-chromium"
           export NODE_PATH="$RUNNER_TEMP/mobile-ui-qa/node_modules"
           node tests/mobile-polish.cjs
+          node tests/mobile-unified-qa.cjs
