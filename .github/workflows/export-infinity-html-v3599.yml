@@ -1,0 +1,64 @@
+name: Export latest Infinity Space v3.59.9 HTML
+on:
+  push:
+    branches: [infinity-space-one-file-v3-59-9]
+    paths:
+      - scripts/build_single_html.py
+      - scripts/test_single_file.cjs
+      - .github/workflows/export-infinity-html-v3599.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  export-html:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare encoder
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Build corrected one-file game
+        run: |
+          python3 scripts/build_single_html.py
+          test -s single-file/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('single-file/index.html')
+          s=p.read_text('utf-8')
+          assert p.stat().st_size<20_000_000,p.stat().st_size
+          assert '<title>Infinity Space — From Dust to Infinity</title>' in s
+          assert 'INFINITI SPACE' not in s.upper()
+          assert 'notification-system.css' in s
+          print('PASS standalone Infinity Space',p.stat().st_size,'bytes')
+          PY
+      - name: Launch standalone game in Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/infinity-test" playwright@1.56.1
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/infinity-chromium"
+          "$RUNNER_TEMP/infinity-test/node_modules/.bin/playwright" install chromium --only-shell
+          python3 -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/infinity-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          export NODE_PATH="$RUNNER_TEMP/infinity-test/node_modules"
+          node scripts/test_single_file.cjs
+      - name: Attach actual index.html download to Infinity Space release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="infinity-space-html-v3.59.9"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" single-file/index.html --clobber
+          else
+            gh release create "$TAG" single-file/index.html \
+              --target "$GITHUB_SHA" \
+              --title "Infinity Space v3.59.9 — Standalone HTML" \
+              --notes "Correctly named Infinity Space. One index.html (under 20 MB), all 12 Opus tracks, game UI, mobile controls, roulette, daily rewards and notification fixes. Source game remains in the existing Pages repository to preserve save keys and links." \
+              --latest=false
+          fi
+          gh release view "$TAG" --json assets --jq '.assets[] | select(.name=="index.html") | [.name, .size, .url]'
