@@ -2735,6 +2735,8 @@ function installRewardsWheelGuard(){
  const modal=$('modal');
  modal.addEventListener('wheel',event=>{
   if(modal.classList.contains('off')||!['daily','roulette'].includes(modal.dataset.screen))return;
+  // Keep reward content scrolling natively without scaling its hit targets.
+  if(!event.ctrlKey&&event.target?.closest?.('.rewards-page-content'))return;
   if(event.cancelable)event.preventDefault();
  },{passive:false});
  rewardsWheelGuardInstalled=true;
@@ -3570,9 +3572,76 @@ function showMap(){
  setNavigationState('map');$('modal').dataset.screen='map';$('modal').firstElementChild.classList.add('atlas-card');atlasVisible=true;attachContinue();
  const cv=$('atlas-canvas');cv.style.touchAction='none';atlasFitPlayer();
  cv.addEventListener('contextmenu',atlasContextMenu);
- cv.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;atlas.focusTween=null;atlas.drag=true;atlas.moved=false;atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;cv.setPointerCapture(ev.pointerId);});
- cv.addEventListener('pointermove',ev=>{if(!atlas.drag)return;if(Math.hypot(ev.clientX-atlas.downX,ev.clientY-atlas.downY)>6)atlas.moved=true;if(atlas.placingPin||!atlas.moved)return;const scale=atlasScale();atlas.x-=(ev.clientX-atlas.lastX)/scale;atlas.y-=(ev.clientY-atlas.lastY)/scale;atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;});
- cv.addEventListener('pointerup',ev=>{if(atlas.drag&&!atlas.moved){const box=cv.getBoundingClientRect();atlasMapClick(ev.clientX-box.left,ev.clientY-box.top);}atlas.drag=false;});cv.addEventListener('pointercancel',()=>atlas.drag=false);
+ // Pointer IDs are tracked individually: one touch pans, two touches zoom
+ // around their midpoint and pan with it, without triggering marker clicks.
+ const atlasTouches=new Map();
+ let atlasPinch=null,atlasGesture=false;
+ const atlasPair=()=>{
+  const [a,b]=Array.from(atlasTouches.values());
+  return {distance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),
+   x:(a.x+b.x)*.5,y:(a.y+b.y)*.5};
+ };
+ cv.addEventListener('pointerdown',ev=>{
+  if(ev.pointerType==='mouse'&&ev.button!==0)return;
+  atlas.focusTween=null;
+  atlasTouches.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  cv.setPointerCapture(ev.pointerId);
+  if(atlasTouches.size===1){
+   atlas.drag=true;atlas.moved=false;atlasGesture=false;atlasPinch=null;
+   atlas.downX=atlas.lastX=ev.clientX;atlas.downY=atlas.lastY=ev.clientY;
+  }else{
+   atlas.drag=false;atlas.moved=true;atlasGesture=true;
+   if(atlasTouches.size===2)atlasPinch=atlasPair();
+  }
+ });
+ cv.addEventListener('pointermove',ev=>{
+  if(!atlasTouches.has(ev.pointerId))return;
+  atlasTouches.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(atlasTouches.size===2){
+   const next=atlasPair(),prev=atlasPinch||next;
+   const rect=cv.getBoundingClientRect();
+   changeAtlasZoom(clamp(next.distance/prev.distance,.7,1.4),
+    prev.x-rect.left,prev.y-rect.top);
+   const scale=atlasScale();
+   atlas.x-=(next.x-prev.x)/scale;
+   atlas.y-=(next.y-prev.y)/scale;
+   atlasPinch=next;atlas.drag=false;atlas.moved=true;atlas.dirty=true;
+   if(ev.cancelable)ev.preventDefault();
+   return;
+  }
+  if(atlasTouches.size!==1)return;
+  if(atlasGesture&&!atlas.drag){
+   atlas.drag=true;atlas.moved=true;
+   atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;return;
+  }
+  if(!atlas.drag)return;
+  if(Math.hypot(ev.clientX-atlas.downX,ev.clientY-atlas.downY)>6)atlas.moved=true;
+  if(atlas.placingPin||!atlas.moved)return;
+  const scale=atlasScale();
+  atlas.x-=(ev.clientX-atlas.lastX)/scale;
+  atlas.y-=(ev.clientY-atlas.lastY)/scale;
+  atlas.lastX=ev.clientX;atlas.lastY=ev.clientY;atlas.dirty=true;
+ });
+ const releaseAtlasTouch=ev=>{
+  if(!atlasTouches.has(ev.pointerId))return;
+  const isClick=ev.type==='pointerup'&&atlasTouches.size===1
+    &&atlas.drag&&!atlas.moved&&!atlasGesture;
+  atlasTouches.delete(ev.pointerId);
+  if(isClick){
+   const rect=cv.getBoundingClientRect();
+   atlasMapClick(ev.clientX-rect.left,ev.clientY-rect.top);
+  }
+  atlas.drag=false;atlasPinch=null;
+  if(atlasTouches.size===1){
+   const p=Array.from(atlasTouches.values())[0];
+   atlas.downX=atlas.lastX=p.x;atlas.downY=atlas.lastY=p.y;
+   atlas.moved=true;atlasGesture=true;
+  }
+  if(atlasTouches.size===0)atlasGesture=false;
+ };
+ cv.addEventListener('pointerup',releaseAtlasTouch);
+ cv.addEventListener('pointercancel',releaseAtlasTouch);
+ cv.addEventListener('lostpointercapture',releaseAtlasTouch);
  cv.addEventListener('wheel',ev=>{ev.preventDefault();const box=cv.getBoundingClientRect();changeAtlasZoom(Math.exp(-clamp(ev.deltaY,-300,300)*.002),ev.clientX-box.left,ev.clientY-box.top);},{passive:false});
  $('atlas-zoom-in').onclick=()=>changeAtlasZoom(1.4);
  $('atlas-zoom-out').onclick=()=>changeAtlasZoom(1/1.4);
