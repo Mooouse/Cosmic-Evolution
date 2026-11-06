@@ -561,3 +561,351 @@ body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning .roulette-disc-
    border-bottom-color:var(--hud-panel-bottom)!important;
  }
 }
+
+
+/* v3.59.6 — PHONE LANDSCAPE ONLY.
+   Portrait selectors were winning on coarse devices 844x390/932x430:
+   they stretched the progress card across the viewport and occupied the
+   entire playfield with 60px abilities + 150px directional controls.
+   Compact two-row strip above the playfield; flight controls stay in corners. */
+@media (orientation:landscape) and (max-height:540px) and (max-width:1100px) and (pointer:coarse){
+  body.ui-v15 #hud .v15-hud {
+    --hud-top-size:clamp(32px,8.4vh,38px);
+    --land-top:max(4px,env(safe-area-inset-top));
+    --land-left:max(8px,env(safe-area-inset-left));
+    --land-right:max(8px,env(safe-area-inset-right));
+    --land-row2:calc(var(--land-top) + var(--hud-top-size) + 6px);
+    --land-action-size:clamp(36px,10vh,44px);
+  }
+  body.ui-v15 #hud .v15-hud .hud-top {
+    position:absolute!important;
+    inset:var(--land-top) var(--land-right) auto var(--land-left)!important;
+    display:grid!important;
+    grid-template-columns:var(--hud-top-size) minmax(0,1fr) max-content!important;
+    width:auto!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    gap:4px!important;
+    padding:0!important;
+    margin:0!important;
+    background:none!important;
+    border:0!important;
+    box-shadow:none!important;
+    z-index:20!important;
+    pointer-events:none;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top>*{pointer-events:auto!important}
+  body.ui-v15 #hud .v15-hud .hud-top .hud-left {
+    grid-column:1!important;grid-row:1!important;
+    width:var(--hud-top-size)!important;
+    min-width:var(--hud-top-size)!important;
+    max-width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    padding:0!important;margin:0!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-left .brand-icon{
+    width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;
+    min-width:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    flex:0 0 var(--hud-top-size)!important;
+    padding:2px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-left .brand-icon .mark.small{
+    transform:scale(.8)!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources{
+    grid-column:2!important;grid-row:1!important;
+    flex:1 1 auto!important;
+    width:100%!important;
+    min-width:0!important;
+    height:var(--hud-top-size)!important;
+    display:flex!important;
+    gap:4px!important;margin:0!important;
+    align-items:stretch!important;
+    justify-content:stretch!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources>div{
+    flex:1 1 0!important;
+    width:0!important;
+    min-width:0!important;
+    max-width:none!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    padding:1px 5px!important;
+    margin:0!important;
+    overflow:hidden!important;
+    gap:4px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources strong{
+    font-size:clamp(10px,2.25vh,13px)!important;
+    line-height:1!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources .res-hex{
+    width:10px!important;height:10px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources .res-star{
+    font-size:13px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands {
+    grid-column:3!important;grid-row:1!important;
+    display:flex!important;
+    justify-self:end!important;
+    gap:4px!important;
+    min-width:0!important;
+    height:var(--hud-top-size)!important;
+    margin:0!important;padding:0!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn{
+    flex:0 0 var(--hud-top-size)!important;
+    width:var(--hud-top-size)!important;
+    min-width:var(--hud-top-size)!important;
+    max-width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    max-height:var(--hud-top-size)!important;
+    padding:4px!important;
+    font-size:15px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn svg,
+  body.ui-v15 #hud .v15-hud .hud-commands>.icon-btn .ui-symbol{
+    width:20px!important;height:20px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn[data-page="settings"] {
+    display:none!important;
+  }
+  /* Compact evolution progress in the center of the SECOND row; avoids
+     the top buttons, and leaves the entire middle of the landscape usable. */
+  body.ui-v15 #hud .v15-hud .evo-status{
+    position:absolute!important;
+    top:var(--land-row2)!important;
+    left:50%!important;
+    right:auto!important;
+    bottom:auto!important;
+    transform:translateX(-50%)!important;
+    width:clamp(190px,39vw,340px)!important;
+    max-width:calc(100vw - 240px)!important;
+    height:clamp(32px,10vh,42px)!important;
+    min-height:0!important;
+    padding:5px 9px!important;
+    margin:0!important;
+    overflow:hidden!important;
+    z-index:12!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status .evo-title{
+    font-size:clamp(9px,2.4vh,11px)!important;
+    line-height:1.1!important;
+    min-height:0!important;
+    margin:0 0 4px!important;
+    padding-right:40px!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status .evo-aux{
+    top:5px!important;right:9px!important;
+    margin:0!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status .evo-aux b{
+    font-size:clamp(10px,2.5vh,12px)!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status .progress-bar{
+    height:6px!important;
+    margin:0!important;
+    border-radius:4px!important;
+  }
+  body.ui-v15 #hud .v15-hud .upgrade-pull{
+    position:absolute!important;
+    top:var(--land-row2)!important;
+    left:var(--land-left)!important;
+    right:auto!important;
+    bottom:auto!important;
+    transform:none!important;
+    width:var(--land-action-size)!important;
+    min-width:var(--land-action-size)!important;
+    max-width:var(--land-action-size)!important;
+    height:var(--land-action-size)!important;
+    min-height:var(--land-action-size)!important;
+    max-height:var(--land-action-size)!important;
+    padding:5px!important;
+    border-radius:var(--hud-panel-radius)!important;
+    z-index:18!important;
+  }
+  body.ui-v15 #hud .v15-hud .upgrade-pull .ui-symbol,
+  body.ui-v15 #hud .v15-hud .upgrade-pull svg{
+    width:22px!important;height:22px!important;
+  }
+  body.ui-v15 #hud .v15-hud .quick-upgrades{
+    position:absolute!important;
+    top:calc(var(--land-row2) + var(--land-action-size) + 4px)!important;
+    bottom:auto!important;
+    left:var(--land-left)!important;
+    transform:none!important;
+    max-height:min(240px,calc(100dvh - 105px))!important;
+    width:min(215px,45vw)!important;
+    min-width:0!important;
+    overflow:auto!important;
+    z-index:38!important;
+  }
+  /* Secondary controls are on the far right of row 2, never on progress. */
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio{
+    position:fixed!important;
+    top:var(--land-row2)!important;
+    bottom:auto!important;
+    left:auto!important;
+    right:var(--land-right)!important;
+    transform:none!important;
+    gap:4px!important;
+    padding:0!important;
+    background:none!important;
+    border:0!important;
+    box-shadow:none!important;
+    z-index:36!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio>.icon-btn{
+    flex:0 0 var(--land-action-size)!important;
+    width:var(--land-action-size)!important;
+    min-width:var(--land-action-size)!important;
+    max-width:var(--land-action-size)!important;
+    height:var(--land-action-size)!important;
+    min-height:var(--land-action-size)!important;
+    max-height:var(--land-action-size)!important;
+    padding:5px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio>.icon-btn svg {
+    width:21px!important;height:21px!important;
+  }
+  body.ui-v15 #hud .v15-hud .v15-camera-toggle{
+    position:absolute!important;
+    top:var(--land-row2)!important;
+    left:calc(var(--land-left) + var(--land-action-size) + 5px)!important;
+    right:auto!important;
+    bottom:auto!important;
+    transform:none!important;
+    width:var(--land-action-size)!important;
+    min-width:var(--land-action-size)!important;
+    max-width:var(--land-action-size)!important;
+    height:var(--land-action-size)!important;
+    min-height:var(--land-action-size)!important;
+    max-height:var(--land-action-size)!important;
+    padding:4px!important;
+    border:2px solid var(--hud-panel-border)!important;
+    border-bottom:5px solid var(--hud-panel-bottom)!important;
+    border-radius:var(--hud-panel-radius)!important;
+    background:var(--hud-panel-bg)!important;
+    box-shadow:var(--hud-panel-shadow)!important;
+  }
+  body.ui-v15 #hud .v15-hud .camera-buttons{
+    top:calc(var(--land-row2) + var(--land-action-size) + 4px)!important;
+    left:var(--land-left)!important;
+    bottom:auto!important;
+    right:auto!important;
+  }
+  /* Ability actions sit bottom LEFT side by side; not a tall stack. */
+  body.ui-v15 #hud .v15-hud .abilities{
+    position:absolute!important;
+    left:calc(var(--land-left) + 3px)!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:max(8px,env(safe-area-inset-bottom))!important;
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:flex-end!important;
+    justify-content:flex-start!important;
+    gap:10px!important;
+    min-height:0!important;
+    width:auto!important;
+    z-index:24!important;
+  }
+  body.ui-v15 #hud .v15-hud .abilities>.ability-btn{
+    flex:0 0 var(--land-action-size)!important;
+    width:var(--land-action-size)!important;
+    min-width:var(--land-action-size)!important;
+    max-width:var(--land-action-size)!important;
+    height:var(--land-action-size)!important;
+    min-height:var(--land-action-size)!important;
+    max-height:var(--land-action-size)!important;
+    padding:5px!important;
+  }
+  body.ui-v15 #hud .v15-hud .abilities .ability-shape,
+  body.ui-v15 #hud .v15-hud .abilities .ability-shape svg{
+    width:22px!important;height:22px!important;
+  }
+  body.ui-v15 #hud .v15-hud .abilities .ability-cooldown-label{
+    top:-10px!important;
+    right:-6px!important;
+    left:auto!important;
+    height:17px!important;
+    min-height:17px!important;
+    min-width:32px!important;
+    padding:2px 3px!important;
+    font-size:9px!important;
+    line-height:11px!important;
+  }
+  /* Keep a small fixed joystick on the right where users expect it.
+     Floating joystick remains floating in its own mode. */
+  body.ui-v15.phone-controls:not(.mobile-floating):not(.mobile-gyro):not(.mobile-direction) #hud #flight-stick {
+    left:auto!important;
+    right:var(--land-right)!important;
+    top:auto!important;
+    bottom:max(7px,env(safe-area-inset-bottom))!important;
+    width:clamp(86px,24vh,108px)!important;
+    height:clamp(86px,24vh,108px)!important;
+    max-width:108px!important;
+    transform:none!important;
+  }
+  body.ui-v15.phone-controls.mobile-floating #hud #flight-stick{
+    width:96px!important;height:96px!important;
+  }
+  body.ui-v15.phone-controls.heading-mode #hud #direction-control{
+    position:absolute!important;
+    top:auto!important;
+    left:auto!important;
+    right:var(--land-right)!important;
+    bottom:max(7px,env(safe-area-inset-bottom))!important;
+    width:100px!important;
+    min-width:100px!important;
+    max-width:100px!important;
+    min-height:100px!important;
+    height:112px!important;
+    padding:5px!important;
+    z-index:24!important;
+  }
+  body.ui-v15.phone-controls.heading-mode #hud #direction-control .direction-dial-ring{
+    width:71px!important;height:71px!important;
+    flex:0 0 71px!important;
+  }
+  body.ui-v15.phone-controls.heading-mode #hud #direction-control .direction-arrow{
+    width:62px!important;height:62px!important;
+  }
+  body.ui-v15.phone-controls #hud .phone-gyro-quick:not([hidden]){
+    position:absolute!important;
+    left:auto!important;
+    right:var(--land-right)!important;
+    top:auto!important;
+    bottom:max(8px,env(safe-area-inset-bottom))!important;
+    width:109px!important;
+    max-width:109px!important;
+    min-height:40px!important;
+    padding:6px!important;
+    font-size:10px!important;
+  }
+  body.ui-v15 #hud .world-coords,
+  body.ui-v15 #hud .player-label{
+    display:none!important;
+  }
+}
+/* Tiny phones in landscape (iPhone SE / foldables): minimize decorations to
+   preserve actual play area without removing controls or changing hit boxes. */
+@media (orientation:landscape) and (max-height:360px) and (max-width:760px) and (pointer:coarse){
+  body.ui-v15 #hud .v15-hud{
+    --hud-top-size:31px;
+    --land-action-size:36px;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status{
+    width:clamp(180px,34vw,245px)!important;
+    height:32px!important;
+    padding:4px 7px!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status .evo-title{font-size:9px!important;margin-bottom:4px!important}
+}
