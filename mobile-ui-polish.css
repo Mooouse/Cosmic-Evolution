@@ -909,3 +909,21 @@ body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning .roulette-disc-
   }
   body.ui-v15 #hud .v15-hud .evo-status .evo-title{font-size:9px!important;margin-bottom:4px!important}
 }
+
+
+/* Resource totals should be compact badges, not two enormous bars stretching
+   across the landscape screen. Leave the starfield visible in the header. */
+@media (orientation:landscape) and (max-height:540px) and (max-width:1100px) and (pointer:coarse){
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources{
+    width:max-content!important;
+    max-width:100%!important;
+    justify-self:start!important;
+    justify-content:flex-start!important;
+    flex:0 1 auto!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources>div:not(.hud-time){
+    flex:0 1 clamp(74px,11.5vw,118px)!important;
+    width:clamp(74px,11.5vw,118px)!important;
+    max-width:clamp(74px,11.5vw,118px)!important;
+  }
+}
