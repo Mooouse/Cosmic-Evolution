@@ -1,4 +1,4 @@
-/* Infiniti Space v3.41 — in-game controls, compact upgrades, readable atlas. */
+/* Infinity Space v3.41 — in-game controls, compact upgrades, readable atlas. */
 .ui-v15 #hud .v15-hud .upgrade-pull{display:flex!important;cursor:pointer;z-index:14}
 .ui-v15 #hud .v15-hud .upgrade-pull[aria-expanded="true"]{border-color:#b59aff!important;color:#fff!important;background:linear-gradient(160deg,#52338c,#261845)!important}
 .ui-v15 #hud .v15-hud .quick-upgrades{

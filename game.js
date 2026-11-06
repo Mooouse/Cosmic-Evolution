@@ -1,4 +1,4 @@
-/* Infiniti Space — dependency-free 2D Canvas game. No 3D / external game engines. */
+/* Infinity Space — dependency-free 2D Canvas game. No 3D / external game engines. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -332,7 +332,7 @@ function scheduleMusic(){}
 function startMusic(){const t=MUSIC_TRACKS.find(t=>t.id===g.activeTrack&&g.ownedTracks.includes(t.id));if(!t){if(externalMusic)externalMusic.pause();externalMusic=null;g.activeTrack=null;}else if(!externalMusic){externalMusic=new Audio(t.src);externalMusic.loop=true;}initAudio();setMusicVolume();}
 addEventListener('space-platform-audio',()=>setMusicVolume());
 function save(){if(testerAbsoluteResetPending)return;g.worldX=player.x;g.worldY=player.y;try{localStorage.setItem(SAVE_KEY,JSON.stringify(g));}catch(_){toastStorageWarning();}}
-let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Infiniti Space: сохранение мира не помещается в localStorage');}}
+let storageWarned=false;function toastStorageWarning(){if(!storageWarned){storageWarned=true;console.warn('Infinity Space: сохранение мира не помещается в localStorage');}}
 
 function makeSky(){
  skyLayer=null;skyDepthLayers=[];
@@ -2025,7 +2025,7 @@ function initGpuLens(){
  if(gpuLensUnavailable)return null;
  const surface=document.createElement('canvas');
  const gl=surface.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:false});
- if(!gl){gpuLensUnavailable=true;console.warn('Infiniti Space: WebGL unavailable, using Canvas lens');return null;}
+ if(!gl){gpuLensUnavailable=true;console.warn('Infinity Space: WebGL unavailable, using Canvas lens');return null;}
  const shader=(type,source)=>{
   const sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);
   if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){const message=gl.getShaderInfoLog(sh);gl.deleteShader(sh);throw new Error('Lens shader: '+message);}
@@ -2105,7 +2105,7 @@ function renderGpuLens(p,R,outer){
   // Consume the WebGL drawing buffer synchronously, before the browser can
   // discard it. The opaque horizon is still painted afterwards on frameCtx.
   ctx.drawImage(surface,0,0,W,H);lensBackend='gpu';return true;
- }catch(error){gpuLensUnavailable=true;gpuLens=null;console.warn('Infiniti Space: Canvas lens fallback',error.message);return false;}
+ }catch(error){gpuLensUnavailable=true;gpuLens=null;console.warn('Infinity Space: Canvas lens fallback',error.message);return false;}
 }
 // True gravitational lensing of the existing stars/galaxies. No gas or disk.
 let lensInput=null,lensOutput=null,lensInputCtx=null,lensOutputCtx=null;
@@ -2883,7 +2883,7 @@ function rewardsShell(screen,title,subtitle,body){
   '<button type="button" id="rewards-tab-daily" class="'+(screen==='daily'?'selected':'')+'" aria-current="'+(screen==='daily'?'page':'false')+'">✦ '+L('Daily gifts','Ежедневные награды','Regalos diarios')+'</button>'+
   '<button type="button" id="rewards-tab-roulette" class="'+(screen==='roulette'?'selected':'')+'" aria-current="'+(screen==='roulette'?'page':'false')+'">◉ '+L('Roulette','Рулетка','Ruleta')+'</button></nav>';
  show('<div class="daily-screen rewards-screen rewards-'+screen+'">'+
-  '<header class="rewards-header"><div><div class="daily-eyebrow">INFINITI SPACE / '+L('REWARDS','НАГРАДЫ','RECOMPENSAS')+'</div>'+
+  '<header class="rewards-header"><div><div class="daily-eyebrow">INFINITY SPACE / '+L('REWARDS','НАГРАДЫ','RECOMPENSAS')+'</div>'+
   '<h2>'+title+'</h2><p>'+subtitle+'</p></div>'+
   '<button type="button" id="daily-back" class="daily-back">'+L('← BACK','← НАЗАД','← VOLVER')+'</button></header>'+
   tabs+'<main class="rewards-page-content">'+body+'</main></div>');
@@ -3268,7 +3268,7 @@ function showCosmicRoulette(origin){
  };
 }
 function showMainMenu(paused=false){
- show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITI<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>${GAME_BUILD_VERSION} / INFINITI SPACE</span></div>`);
+ show(`<div class="menu-scene-label" aria-hidden="true">SINGULARITY / ∞</div><div class="menu-content"><div class="hero-kicker">${paused?'ПОЛЁТ ПРИОСТАНОВЛЕН':'ОТ ЧАСТИЦЫ ДО БЕСКОНЕЧНОСТИ'}</div><h1>INFINITY<br><span>SPACE</span></h1><p class="modal-lead">Твоя гравитация. Твоя эволюция.<br>Бесконечная Вселенная впереди.</p><nav class="menu-nav" aria-label="Главное меню"><button id="btn-start" class="primary-button">${paused||g.time>0?'ПРОДОЛЖИТЬ ПУТЕШЕСТВИЕ':'НАЧАТЬ ЭВОЛЮЦИЮ'} <span>${uiIcon('arrow')}</span></button><button id="menu-map"><span>${uiIcon('map')}</span>Карта Вселенной <small>M</small></button><button id="menu-achievements"><span>${uiIcon('achievements')}</span>Достижения <small>${uiIcon('expand')}</small></button><button id="menu-bestiary"><span>${uiIcon('map')}</span>${L('Bestiary','Бестиарий','Bestiario')} <small>${uiIcon('expand')}</small></button><button id="menu-statistics"><span>${uiIcon('statistics')}</span>Статистика <small>${uiIcon('expand')}</small></button><button id="menu-settings"><span>${uiIcon('settings')}</span>Настройки <small>${uiIcon('expand')}</small></button></nav><div class="menu-save"><span class="live-dot"></span>${g.time>10?`${TA[g.tier].name} · ${timeFmt(g.time)} · автосохранение`:'28 форм эволюции · свободное исследование'}</div></div><div class="menu-footer"><span>WASD — полёт · Колёсико — масштаб · E — импульс</span><span>${GAME_BUILD_VERSION} / INFINITY SPACE</span></div>`);
  menuVisible=true;setNavigationState('menu');$('modal').dataset.screen='menu';$('modal').firstElementChild.classList.add('menu-card');
  $('btn-start').onclick=()=>g.tutorialDone?resumeGame():showTutorial();$('menu-map').onclick=showMap;
  const dailyMenuBtn=document.createElement('button');dailyMenuBtn.id='menu-daily';
@@ -3769,7 +3769,7 @@ function dieInAbyss(h){
   if(!pendingDeath)return;
   try{showDeathOffer();}
   catch(error){
-   console.error('Infiniti Space death screen:',error);
+   console.error('Infinity Space death screen:',error);
    // The fallback MUST preserve the flight results and rewarded-ad revival,
    // never collapse into the restart-only panel reported by testers.
    const modal=$('modal'),d=pendingDeath;
@@ -4168,7 +4168,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
  function mount(name){
   stopMusicPreview();visual?.cleanupSelects();const old=$('modal').firstElementChild,holder=document.createElement('template');holder.innerHTML=tpl[name];const root=holder.content.firstElementChild;root.classList.add('active');
   $('modal').replaceChildren(root);$('modal').dataset.screen=name;
-  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITI SPACE · '+GAME_BUILD_VERSION;});
+  qa(root,'.br-settings-side-note,.br-readout-foot,.sub-footer,.br-head-tag,.micro').forEach(e=>{if(/ДЕМО|DEMO|PREVIEW|ПРОТОТИП|СОХРАНЕНИЕ 01/.test(e.textContent))e.textContent='INFINITY SPACE · '+GAME_BUILD_VERSION;});
   decorate(root);return {root,old};
  }
  showMainMenu=function(paused=false){enterScreen('menu');legacy.menu(paused);const {root}=mount('menu');
@@ -4264,7 +4264,7 @@ if(window.SpaceUIv15Templates && document.createElement('template').content){
   q(root,'[data-settings-pane="graphics"] .br-warning').remove();
   text(root,'.br-controls>div:nth-child(5) kbd','ESC');
   qa(root,'[data-settings-pane="general"] .br-warning,.br-settings-side-note').forEach(n=>n.remove());
-  text(root,'.br-readout-foot','INFINITI SPACE · '+GAME_BUILD_VERSION);text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
+  text(root,'.br-readout-foot','INFINITY SPACE · '+GAME_BUILD_VERSION);text(root,'.br-settings-foot>span',L('SETTINGS SAVED AUTOMATICALLY','НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ','AJUSTES GUARDADOS AUTOMÁTICAMENTE'));
   q(root,'#set-sound-volume').setAttribute('aria-label',L('Effects volume','Громкость эффектов','Volumen de efectos'));decorate(root);visual?.enhanceSelects(root);decoratePhoneSettings(root);
  };
  function showV15Upgrades(){enterScreen('upgrades');show('');const {root}=mount('upgrades');const render=()=>{

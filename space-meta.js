@@ -1,4 +1,4 @@
-/* Infiniti Space: persistent daily rewards, roulette and safe away-flight planning.
+/* Infinity Space: persistent daily rewards, roulette and safe away-flight planning.
    Pure deterministic helpers; rendering and platform SDK stay in game.js. */
 (function(root){
  'use strict';

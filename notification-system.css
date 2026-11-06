@@ -1,4 +1,4 @@
-/* Infiniti Space notification system v3.59.7.
+/* Infinity Space notification system v3.59.7.
    One coalesced ordinary toast + at most one queued achievement, never a
    column of messages. No pointer interception; safe-area-aware positioning. */
 body.ui-v15 #hud #toast-root{
