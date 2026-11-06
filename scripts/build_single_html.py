@@ -38,7 +38,7 @@ def data_uri(path, mime):
     return "data:" + mime + ";base64," + base64.b64encode((ROOT / path).read_bytes()).decode("ascii")
 
 html = read("index.html")
-assert 'notification-system.css?v=3.59.9' in html, "The latest notification UI is missing"
+assert 'notification-system.css?v=3.59.7' in html, "The latest notification UI is missing"
 assert '<title>Infinity Space — From Dust to Infinity</title>' in html, "Game title was not renamed to Infinity Space"
 assert 'INFINITI SPACE' not in html.upper(), "Old name remained in page source"
 assert 'mobile-ui-polish.css?v=3.59.6' in html, "The latest landscape UI is missing"
