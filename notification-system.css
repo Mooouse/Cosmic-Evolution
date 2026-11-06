@@ -147,7 +147,7 @@ body.ui-v15:has(#modal:not(.off)) #hud #toast-root{
 }
 @media (max-width:800px),(pointer:coarse) and (max-width:1100px){
   body.ui-v15 #hud #toast-root{
-    top:calc(max(8px,env(safe-area-inset-top)) + 213px)!important;
+    top:calc(max(8px,env(safe-area-inset-top)) + 150px)!important;
     left:max(9px,env(safe-area-inset-left))!important;
     right:auto!important;
     width:min(232px,59vw)!important;
