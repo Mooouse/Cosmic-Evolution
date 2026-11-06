@@ -1,4 +1,4 @@
-/* Infiniti Space v3.50 — galactic rainbow roulette & expanded tester */
+/* Infinity Space v3.50 — galactic rainbow roulette & expanded tester */
 body.ui-v15 #modal:is([data-screen="roulette"],[data-screen="daily"]) .modal-card:has(.daily-screen){
  background:
   radial-gradient(ellipse at 87% 13%,rgba(100,40,169,.22),transparent 43%),
