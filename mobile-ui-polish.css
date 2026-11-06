@@ -322,3 +322,222 @@ body.ui-v15 #modal[data-screen="roulette"] .daily-spin{
   body.ui-v15 #modal[data-screen="daily"] .daily-day{min-height:58px!important}
   body.ui-v15 #modal[data-screen="daily"] .daily-day-current{min-height:72px!important}
 }
+
+
+/* v3.59.5 — ONE component system, including the actual header buttons.
+   All compact HUD pieces use an identical bevel, outline and corner radius.
+   Previous partial reskins missed command buttons and the detached audio row. */
+@media(max-width:800px),(pointer:coarse) and (max-width:1100px){
+  body.ui-v15 #hud .v15-hud{
+    --hud-panel-bg:linear-gradient(165deg,#31214deb,#1d1238f5 70%,#160d2cfa);
+    --hud-panel-border:#8461ce;
+    --hud-panel-bottom:#4d22c6;
+    --hud-panel-shadow:inset 0 1px 0 #d0b7ff35,0 3px 0 #1b0b3b,0 6px 15px #0501139a;
+    --hud-panel-radius:9px;
+    --hud-top-size:44px;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top{
+    box-sizing:border-box!important;
+    inset:max(8px,env(safe-area-inset-top)) 10px auto!important;
+    display:grid!important;
+    grid-template-columns:var(--hud-top-size) minmax(0,1fr) max-content!important;
+    align-items:stretch!important;
+    column-gap:5px!important;
+    width:auto!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    padding:0!important;
+    margin:0!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-left{
+    grid-column:1!important;grid-row:1!important;
+    display:block!important;
+    box-sizing:border-box!important;
+    width:var(--hud-top-size)!important;
+    min-width:var(--hud-top-size)!important;
+    max-width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    padding:0!important;margin:0!important;
+    border:0!important;background:none!important;box-shadow:none!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources{
+    grid-column:2!important;grid-row:1!important;
+    display:flex!important;
+    min-width:0!important;width:100%!important;
+    height:var(--hud-top-size)!important;
+    gap:5px!important;align-items:stretch!important;
+    justify-content:stretch!important;
+    margin:0!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources>div{
+    flex:1 1 0!important;
+    min-width:0!important;
+    width:0!important;
+    max-width:none!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    padding:3px 4px!important;
+    margin:0!important;
+    gap:4px!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+    white-space:nowrap!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources strong{
+    min-width:0!important;
+    font-size:clamp(11px,3.2vw,15px)!important;
+    line-height:1.1!important;
+    font-weight:950!important;
+    letter-spacing:-.035em!important;
+    text-overflow:ellipsis!important;
+    overflow:hidden!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands{
+    grid-column:3!important;grid-row:1!important;
+    display:flex!important;
+    gap:4px!important;
+    margin:0!important;padding:0!important;
+    height:var(--hud-top-size)!important;
+    align-items:stretch!important;
+    justify-self:end!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn{
+    box-sizing:border-box!important;
+    flex:0 0 var(--hud-top-size)!important;
+    width:var(--hud-top-size)!important;
+    min-width:var(--hud-top-size)!important;
+    max-width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    max-height:var(--hud-top-size)!important;
+    padding:6px!important;
+    display:grid!important;
+    place-items:center!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-left .brand-icon,
+  body.ui-v15 #hud .v15-hud .hud-top .hud-resources>div,
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn,
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio>.icon-btn,
+  body.ui-v15 #hud .v15-hud .evo-status,
+  body.ui-v15 #hud .v15-hud .upgrade-pull,
+  body.ui-v15 #hud .v15-hud .abilities>.ability-btn{
+    box-sizing:border-box!important;
+    background:var(--hud-panel-bg)!important;
+    border:2px solid var(--hud-panel-border)!important;
+    border-bottom:5px solid var(--hud-panel-bottom)!important;
+    border-radius:var(--hud-panel-radius)!important;
+    box-shadow:var(--hud-panel-shadow)!important;
+    color:#eee5ff!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-left .brand-icon{
+    position:relative!important;
+    display:grid!important;place-items:center!important;
+    width:var(--hud-top-size)!important;min-width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;min-height:var(--hud-top-size)!important;
+    flex:0 0 var(--hud-top-size)!important;
+    margin:0!important;padding:5px!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-top .hud-commands>.icon-btn svg,
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio>.icon-btn svg{
+    display:block!important;
+    width:23px!important;height:23px!important;
+    margin:auto!important;
+    color:#e1d3ff!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status{
+    box-sizing:border-box!important;
+    position:absolute!important;
+    top:calc(max(8px,env(safe-area-inset-top)) + 54px)!important;
+    width:calc(100vw - 20px)!important;
+    max-width:calc(100vw - 20px)!important;
+    min-height:69px!important;
+    left:50%!important;right:auto!important;
+    transform:translateX(-50%)!important;
+    padding:10px 11px!important;
+    margin:0!important;
+    z-index:15!important;
+  }
+  body.ui-v15 #hud .v15-hud .evo-status .evo-title{margin-bottom:9px!important;}
+  /* Unlike the old overlay, the detached sound controls are positioned AFTER
+     the evolution card, never over it. The precise top is set on resize too. */
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio{
+    position:fixed!important;
+    top:var(--quick-audio-top,calc(max(8px,env(safe-area-inset-top)) + 153px))!important;
+    bottom:auto!important;
+    right:10px!important;left:auto!important;
+    display:flex!important;align-items:center!important;
+    gap:6px!important;
+    padding:0!important;margin:0!important;
+    border:none!important;border-radius:0!important;
+    background:none!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+    z-index:35!important;
+  }
+  body.ui-v15 #hud .v15-hud .hud-commands .quick-audio>.icon-btn{
+    flex:0 0 var(--hud-top-size)!important;
+    width:var(--hud-top-size)!important;
+    min-width:var(--hud-top-size)!important;
+    max-width:var(--hud-top-size)!important;
+    height:var(--hud-top-size)!important;
+    min-height:var(--hud-top-size)!important;
+    max-height:var(--hud-top-size)!important;
+    display:grid!important;place-items:center!important;
+    padding:6px!important;
+    opacity:1!important;
+  }
+  body.ui-v15 #hud .v15-hud .abilities>.ability-btn{
+    border-radius:var(--hud-panel-radius)!important;
+  }
+  @media(max-width:380px){
+    body.ui-v15 #hud .v15-hud{--hud-top-size:40px;}
+    body.ui-v15 #hud .v15-hud .hud-top{
+      column-gap:4px!important;
+    }
+    body.ui-v15 #hud .v15-hud .hud-top .hud-commands{gap:3px!important}
+    body.ui-v15 #hud .v15-hud .hud-top .hud-resources{gap:3px!important}
+    body.ui-v15 #hud .v15-hud .hud-top .hud-resources strong{font-size:11px!important}
+  }
+}
+
+/* v3.59.5 Roulette: rotate ONLY the circular artwork, never its containing
+   square element, compositor layer, parent gradient or stage decoration. */
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel,
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning,
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.finished{
+  transform:none!important;
+  transition:none!important;
+  background:transparent!important;
+  background-image:none!important;
+  border-radius:50%!important;
+  box-shadow:none!important;
+  filter:none!important;
+  isolation:isolate;
+}
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel::before,
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel::after{
+  display:none!important;
+  content:none!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel .roulette-disc-svg{
+  display:block!important;
+  transform:rotate(0deg);
+  transform-origin:50% 50%;
+  transition:transform 7.2s cubic-bezier(.48,0,.12,1);
+  will-change:transform;
+  border:0!important;
+  background:transparent!important;
+  border-radius:50%!important;
+  clip-path:circle(49.1% at 50% 50%)!important;
+  -webkit-clip-path:circle(49.1% at 50% 50%)!important;
+  box-shadow:none!important;
+}
+body.ui-v15 #modal[data-screen="roulette"] #daily-wheel.spinning .roulette-disc-svg{
+  transform:rotate(var(--wheel-turn,0deg))!important;
+}
+@media(prefers-reduced-motion:reduce){
+  body.ui-v15 #modal[data-screen="roulette"] #daily-wheel .roulette-disc-svg{
+    transition-duration:1ms!important;
+  }
+}
