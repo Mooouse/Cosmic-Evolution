@@ -1441,3 +1441,38 @@ assert.ok(!game.includes('coinsCost:'),'Dead runs may not cost stardust');
  assert.ok(page.includes('id="tester-full-reset"'));
  console.log('PASS: confirmed tester-only absolute wipe deletes all test data, never the real save');
 }
+
+
+// Density 32 must apply in live play and tester mode, including existing
+// tester profiles still at the old default, without overriding custom tuning.
+{
+ const start=game.indexOf('const TEST_DEFAULTS = Object.freeze(');
+ const end=game.indexOf('const fresh = () =>',start);
+ assert.ok(start>0&&end>start,'Missing density defaults initialization');
+ const section=game.slice(start,end);
+ function initDensity(stored,mode){
+  let saved=null;
+  const sandbox={
+   TEST_MODE:mode,TEST_KEY:'cosmic-evolution-tester-v1',
+   localStorage:{
+    getItem:()=>stored?JSON.stringify(stored):null,
+    setItem:(key,value)=>{saved=JSON.parse(value);}
+   }
+  };
+  vm.createContext(sandbox);
+  const output=vm.runInContext(section+'\n({defaultDensity:TEST_DEFAULTS.density,currentDensity:tester.density,saveTester});',sandbox);
+  output.saveTester();
+  return {defaultDensity:output.defaultDensity,currentDensity:output.currentDensity,stored:saved};
+ }
+ assert.equal(initDensity(null,false).defaultDensity,32);
+ assert.equal(initDensity(null,false).currentDensity,32,'Fresh normal games use density 32');
+ assert.equal(initDensity(null,true).currentDensity,32,'Fresh tester games use density 32');
+ assert.equal(initDensity({density:16,densityBalanceV:2},true).currentDensity,32,'Old default migrates to 32');
+ assert.equal(initDensity({density:32},true).currentDensity,32,'Previously selected 32 never downgrades');
+ assert.equal(initDensity({density:20,densityBalanceV:2},true).currentDensity,20,'Custom density is preserved');
+ assert.equal(initDensity({density:16,densityBalanceV:3},true).currentDensity,16,'New custom density 16 is preserved');
+ assert.equal(initDensity(null,true).stored.densityBalanceV,3,'New migration version is persisted');
+ assert.ok(page.includes('data-test="density" type="range" min="4" max="32" step="1" value="32"'),'Tester slider starts at 32');
+ assert.ok(page.includes('data-test-value="density">32/32'),'Tester readout starts at 32');
+ console.log('PASS: density 32 default for normal and tester games; old defaults migrate while custom settings remain');
+}
