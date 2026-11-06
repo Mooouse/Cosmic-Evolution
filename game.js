@@ -371,7 +371,56 @@ function applyResolution(){
 function resize(){W=innerWidth;H=innerHeight;applyResolution();makeSky();if(atlasVisible)atlas.dirty=true;}
 
 addEventListener('resize',resize);resize();
-function toast(message,kind=''){let el=document.createElement('div');el.className=`toast ${kind}`;el.textContent=message;$('toast-root').append(el);setTimeout(()=>el.remove(),3100);}
+// Small, bounded notification system: one ordinary message, one achievement at
+// most. Floods merge into a counter rather than building a screen-filling stack.
+// Achievements are prioritized, while any ordinary event waits until they close.
+let activeToast=null,deferredToast=null;
+function toast(message,kind=''){
+ const root=$('toast-root');
+ const value=String(message??'').trim();
+ if(!root||!value)return;
+ const achievement=root.querySelector('.achievement-unlock');
+ if(achievement){
+  if(deferredToast){
+   deferredToast.count++;
+   deferredToast.message=value;deferredToast.kind=kind;
+  }else deferredToast={message:value,kind,count:1};
+  return;
+ }
+ const now=performance.now();
+ if(!activeToast?.el.isConnected){
+  const el=document.createElement('div');
+  const text=document.createElement('span');
+  const count=document.createElement('span');
+  el.setAttribute('role','status');
+  text.className='toast-message';
+  count.className='toast-count';count.hidden=true;
+  el.append(text,count);root.append(el);
+  activeToast={el,text,count,message:value,kind,n:1,first:now,timer:null};
+ }else{
+  // The latest relevant event is shown, with a single count for the burst.
+  activeToast.message=value;activeToast.kind=kind;activeToast.n++;
+ }
+ const entry=activeToast;
+ entry.el.className='toast'+(kind?' '+kind:'');
+ entry.text.textContent=value;
+ entry.count.hidden=entry.n<=1;
+ entry.count.textContent=entry.n>1?'+'+(entry.n-1):'';
+ clearTimeout(entry.timer);
+ // Continuous events cannot keep a notification on the screen forever.
+ const remaining=Math.max(350,Math.min(2600,5200-(now-entry.first)));
+ entry.timer=setTimeout(()=>{
+  if(activeToast===entry)activeToast=null;
+  entry.el.remove();
+ },remaining);
+}
+function clearOrdinaryToast(){
+ if(!activeToast)return;
+ clearTimeout(activeToast.timer);
+ activeToast.el.remove();
+ activeToast=null;
+}
+
 // Campaign target: roughly one minute of active gathering per form.
 // Requirements are distance and discovery goals, not artificial AFK timers.
 function missionReq(){return {rare:0,explore:Math.min(3,1+Math.floor(g.tier/10)),collect:Math.round(TA[g.tier].required*.45)};}
@@ -2590,9 +2639,34 @@ function celebrateAchievement(a){
  const [key,color,label]=RARITIES[a[1]],el=document.createElement('div');
  el.className=`achievement-unlock rarity-${key}`;el.style.setProperty('--rarity',color);el.setAttribute('role','status');
  el.innerHTML=`<span class="achievement-seal">✦</span><div><small>${L(...label)} · ${L('ACHIEVEMENT','ДОСТИЖЕНИЕ','LOGRO')}</small><strong>${L(...a[2])}</strong></div><span class="achievement-rays" aria-hidden="true"></span>`;
- $('toast-root').append(el);setTimeout(()=>el.remove(),4300);
- for(let i=0;i<=a[1];i++)setTimeout(()=>sound(330*2**((i*3+a[1])/12),a[1]>3?'triangle':'sine',.25+a[1]*.05,.02),i*120);
+ // An achievement is important, so it temporarily replaces the ordinary
+ // toast instead of stacking on it. The latest ordinary notice is deferred.
+ if(activeToast){
+  const old=activeToast;
+  deferredToast={message:old.message,kind:old.kind,count:old.n};
+ }
+ clearOrdinaryToast();
+ const root=$('toast-root');
+ root.querySelectorAll('.achievement-unlock').forEach(node=>node.remove());
+ root.append(el);
+ setTimeout(()=>{
+  el.remove();
+  if(deferredToast){
+   const pending=deferredToast;deferredToast=null;
+   toast(pending.message,pending.kind);
+   if(pending.count>1&&activeToast){
+    activeToast.n=pending.count;
+    activeToast.count.hidden=false;
+    activeToast.count.textContent='+'+(pending.count-1);
+   }
+  }
+ },3500);
+ for(let i=0;i<=a[1];i++setTimeout(()=>sound(330*2**((i*3+a[1])/12),a[1]>3?'triangle':'sine',.25+a[1]*.05,.02),i*120);
  if(a[1]>=4)window.SpacePlatform?.happy();
+}
+// Test-only hook for phone/desktop notification overflow regression checks.
+if(new URLSearchParams(location.search).get('tester')==='1'){
+ window.InfinitiNoticeQA={toast,achievement:()=>celebrateAchievement(ACHIEVEMENTS[0])};
 }
 function showAchievements(){
  const earned=Object.keys(g.achievements||{}).length;
