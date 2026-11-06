@@ -5,7 +5,7 @@ on:
     paths:
       - scripts/build_single_html.py
       - scripts/test_single_file.cjs
-      - .github/workflows/single-file.yml
+      - .github/workflows/single-file-latest.yml
   workflow_dispatch:
 permissions:
   contents: write
