@@ -2661,7 +2661,7 @@ function celebrateAchievement(a){
    }
   }
  },3500);
- for(let i=0;i<=a[1];i++setTimeout(()=>sound(330*2**((i*3+a[1])/12),a[1]>3?'triangle':'sine',.25+a[1]*.05,.02),i*120);
+ for(let i=0;i<=a[1];i++)setTimeout(()=>sound(330*2**((i*3+a[1])/12),a[1]>3?'triangle':'sine',.25+a[1]*.05,.02),i*120);
  if(a[1]>=4)window.SpacePlatform?.happy();
 }
 // Test-only hook for phone/desktop notification overflow regression checks.
