@@ -1,0 +1,37 @@
+name: Verify Improved Celestial Objects
+on:
+  push:
+    branches: [visual-celestial-art-20261106]
+    paths:
+      - game.js
+      - index.html
+      - tests/celestial-art-qa.cjs
+      - .github/workflows/celestial-art-qa.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent --no-audit --no-fund --prefix "$RUNNER_TEMP/celestial-test" playwright@1.56.1
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/celestial-chromium"
+          "$RUNNER_TEMP/celestial-test/node_modules/.bin/playwright" install chromium --only-shell
+      - name: Unit regressions + actual desktop and phone sprite rendering
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check game.js
+          node tests/regressions.cjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/celestial-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          export NODE_PATH="$RUNNER_TEMP/celestial-test/node_modules"
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/celestial-chromium"
+          node tests/celestial-art-qa.cjs
